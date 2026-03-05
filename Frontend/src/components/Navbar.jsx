@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import logoImg from '../assets/logo.png';
 
 const Navbar = () => {
@@ -66,7 +67,9 @@ const Navbar = () => {
                     </ul>
 
                     <div className="d-flex gap-2">
-                        <button className="btn btn-outline-light">Đăng nhập</button>
+                        <Link to="/login" className="btn btn-outline-light">
+                            Đăng nhập
+                        </Link>
                     </div>
 
                 </div>

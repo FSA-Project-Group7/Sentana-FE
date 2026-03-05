@@ -1,63 +1,71 @@
-/* src/pages/Login.css */
-
 .login-container {
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
-    background-color: #f4f4f4;
+    background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('../assets/banner.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 .login-form-card {
-    background-color: #fff;
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    width: 350px;
+    background-color: rgba(255, 255, 255, 0.85);
+    padding: 40px 35px;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    width: 360px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .login-title {
     text-align: center;
-    margin-bottom: 20px;
-    color: #333;
+    margin-bottom: 25px;
+    color: #222;
+    font-size: 24px;
+    font-weight: 800;
 }
 
 .login-error {
     color: #dc3545;
-    /* Màu đỏ báo lỗi */
     text-align: center;
     font-size: 14px;
     margin-bottom: 15px;
+    background-color: rgba(220, 53, 69, 0.1);
+    padding: 8px;
+    border-radius: 4px;
 }
 
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 18px;
 }
 
 .login-input-group label {
-    font-weight: bold;
+    font-weight: 600;
     font-size: 14px;
-    color: #555;
+    color: #444;
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
 }
 
 .login-input {
     width: 100%;
-    padding: 10px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #bbb;
     box-sizing: border-box;
-    /* Đảm bảo input không bị tràn ra ngoài */
     font-size: 14px;
+    background-color: rgba(255, 255, 255, 0.9);
+    transition: all 0.3s ease;
 }
 
 .login-input:focus {
     outline: none;
     border-color: #007BFF;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
 }
 
 .login-button {
@@ -65,16 +73,20 @@
     background-color: #007BFF;
     color: #fff;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
-    font-size: 15px;
-    transition: background-color 0.2s;
-    /* Hiệu ứng chuyển màu mượt mà */
+    font-size: 16px;
+    transition: background-color 0.2s, transform 0.1s;
+    margin-top: 10px;
 }
 
 .login-button:hover:not(:disabled) {
     background-color: #0056b3;
+}
+
+.login-button:active:not(:disabled) {
+    transform: scale(0.98);
 }
 
 .login-button:disabled {
