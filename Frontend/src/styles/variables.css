@@ -1,0 +1,14 @@
+:root {
+    /* Lấy từ gốc Homepage */
+    --sentana-dark: #1a1d21;
+    --sentana-dark-deep: #111315;
+    --sentana-text: #ffffff;
+    --sentana-text-muted: #adb5bd;
+
+    /* Điểm nhấn xanh ngọc từ ảnh mẫu quản lý */
+    --sentana-accent: #00c292;
+    --sentana-accent-hover: #00a87d;
+
+    /* Màu nền content (sáng nhẹ để dễ đọc bảng) */
+    --sentana-bg-main: #f4f7f6;
+}

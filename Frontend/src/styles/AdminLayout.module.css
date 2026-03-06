@@ -1,0 +1,106 @@
+.adminContainer {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f4f7f6;
+}
+
+.sidebar {
+    width: 260px;
+    background-color: rgba(33, 37, 41, 0.9);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    backdrop-filter: blur(5px);
+}
+
+.sidebarHeader {
+    padding: 30px 20px;
+    background-color: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: center;
+}
+
+.logoText {
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #ffffff;
+    font-size: 1.25rem;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.sidebarMenu {
+    padding: 20px 0;
+    flex-grow: 1;
+}
+
+.menuLabel {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #8a8d91;
+    padding: 0 25px 10px;
+    letter-spacing: 1px;
+}
+
+.navLink {
+    display: flex;
+    align-items: center;
+    padding: 14px 25px;
+    color: #adb5bd;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.navLink:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+}
+
+.activeLink {
+    background-color: #00c292 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 194, 146, 0.3);
+}
+
+.mainContent {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.topbar {
+    background-color: #ffffff;
+    height: 65px;
+    display: flex;
+    align-items: center;
+    padding: 0 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    justify-content: space-between;
+}
+
+.contentBody {
+    padding: 25px;
+    overflow-y: auto;
+    flex-grow: 1;
+    background-color: #f8f9fa;
+}
+
+.logoutBtn {
+    padding: 20px 25px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ff6b6b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+.logoutBtn:hover {
+    background-color: rgba(255, 107, 107, 0.1);
+}
