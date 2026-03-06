@@ -3,155 +3,238 @@ import api from '../../utils/axiosConfig';
 
 const ServiceManagement = () => {
     const [services, setServices] = useState([]);
-    const [formData, setFormData] = useState({ serviceName: '', price: '', unit: '' });
-    const [editId, setEditId] = useState(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    // --- STATE CHO FORM THÊM/SỬA ---
+    const [showForm, setShowForm] = useState(false);
+    const [isEdit, setIsEdit] = useState(false);
+    const [currentId, setCurrentId] = useState(null);
+    const [formData, setFormData] = useState({
+        serviceName: '',
+        description: '',
+        serviceFee: '',
+        status: 1 // Giả sử 1 là Active
+    });
+
+    // --- LẤY DỮ LIỆU ---
+    const fetchServices = async () => {
+        try {
+            setLoading(true);
+            const response = await api.get('/Service');
+            const data = response.data.data || response.data || [];
+            setServices(data);
+        } catch (error) {
+            console.error("Lỗi lấy dữ liệu dịch vụ:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         fetchServices();
     }, []);
 
-    const fetchServices = async () => {
-        try {
-            const response = await api.get('/Service');
-            // Backend trả về danh sách trực tiếp hoặc bọc trong object, tùy thuộc vào ApiResponse
-            setServices(response.data.data || response.data);
-        } catch (error) {
-            console.error("Lỗi tải danh sách dịch vụ:", error);
+    const handleDelete = async (id) => {
+        // Kiểm tra xem có nhận được ID không
+        if (!id) {
+            alert("Không tìm thấy ID dịch vụ hợp lệ!");
+            return;
         }
+
+        if (window.confirm("Bạn có chắc chắn muốn xóa (vô hiệu hóa) dịch vụ này không?")) {
+            try {
+                await api.delete(`/Service/${id}`);
+                alert("Xóa dịch vụ thành công!");
+                fetchServices(); // Gọi lại API để cập nhật bảng
+            } catch (error) {
+                console.error("Lỗi xóa dịch vụ:", error);
+
+                // Bắt và hiển thị câu thông báo lỗi chi tiết từ Back-end
+                const errorMessage = error.response?.data?.message || "Đã xảy ra lỗi hệ thống!";
+
+                if (errorMessage === "Service is already inactive.") {
+                    alert("Dịch vụ này đã ngừng hoạt động từ trước rồi!");
+                } else {
+                    alert(`Lỗi: ${errorMessage}`);
+                }
+            }
+        }
+    };
+
+    // --- HÀM HIỂN THỊ FORM ---
+    const handleShowAdd = () => {
+        setIsEdit(false);
+        setFormData({ serviceName: '', description: '', serviceFee: '', status: 1 });
+        setShowForm(true);
+    };
+
+    const handleShowEdit = (svc) => {
+        setIsEdit(true);
+        setCurrentId(svc.serviceId || svc.ServiceId);
+        setFormData({
+            serviceName: svc.serviceName || svc.ServiceName || '',
+            description: svc.description || svc.Description || '',
+            serviceFee: svc.serviceFee ?? svc.ServiceFee ?? '',
+            status: svc.status ?? svc.Status ?? 1
+        });
+        setShowForm(true);
     };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+
+        // Nếu trường đang nhập là status hoặc serviceFee, ép kiểu nó về dạng Số (Number)
+        let parsedValue = value;
+        if (name === 'status') {
+            parsedValue = parseInt(value, 10);
+        } else if (name === 'serviceFee') {
+            // serviceFee có thể để chuỗi tạm thời trong ô input, nhưng nếu muốn an toàn khi gửi thì ép về float/number
+            parsedValue = value ? Number(value) : '';
+        }
+
+        setFormData({ ...formData, [name]: parsedValue });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsSubmitting(true);
         try {
-            if (editId) {
-                // Khớp với [PUT] /api/Service/{id} 
-                // Sử dụng UpdateServiceRequestDto: { serviceName, price, unit }
-                await api.put(`/Service/${editId}`, formData);
-                alert("Cập nhật dịch vụ thành công!");
+            if (isEdit) {
+                // Cần đảm bảo BE có endpoint PUT /api/Service/{id}
+                await api.put(`/Service/${currentId}`, formData);
+                alert("Cập nhật thành công!");
             } else {
-                // Khớp với [POST] /api/Service
-                // Sử dụng CreateServiceRequestDto: { serviceName, price, unit }
                 await api.post('/Service', formData);
-                alert("Thêm dịch vụ thành công!");
+                alert("Thêm mới thành công!");
             }
-            setFormData({ serviceName: '', price: '', unit: '' });
-            setEditId(null);
+            setShowForm(false);
             fetchServices();
-            document.getElementById('closeServiceModal').click();
         } catch (error) {
-            alert(error.response?.data?.message || "Thao tác thất bại");
-        } finally {
-            setIsSubmitting(false);
+            console.error("Lỗi lưu dịch vụ:", error);
+            alert("Đã xảy ra lỗi khi lưu. Vui lòng kiểm tra lại!");
         }
     };
 
-    const handleEdit = (service) => {
-        setEditId(service.serviceId);
-        setFormData({
-            serviceName: service.serviceName,
-            price: service.price,
-            unit: service.unit
-        });
+    // --- CÁC HÀM FORMAT (Giữ nguyên của bạn) ---
+    const formatCurrency = (amount) => {
+        if (!amount && amount !== 0) return '---';
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa dịch vụ này?")) {
-            try {
-                await api.delete(`/Service/${id}`);
-                fetchServices();
-            } catch (error) {
-                alert("Không thể xóa dịch vụ đang được sử dụng.");
-            }
-        }
+    const formatDate = (dateString) => {
+        if (!dateString) return '---';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid Date';
+        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const renderStatus = (status) => {
+        if (status === 1 || status === 'Active') return <span className="badge bg-success">Hoạt động</span>;
+        return <span className="badge bg-secondary">Ngừng hoạt động</span>;
     };
 
     return (
-        <div className="container-fluid mt-4">
+        <div className="container mt-4">
             <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3>Quản Lý Dịch Vụ</h3>
-                <button 
-                    className="btn btn-primary" 
-                    data-bs-toggle="modal" 
-                    data-bs-target="#serviceModal"
-                    onClick={() => { setEditId(null); setFormData({ serviceName: '', price: '', unit: '' }); }}
-                >
-                    + Thêm Dịch Vụ Mới
-                </button>
+                <h3 className="fw-bold">Quản lý Dịch vụ</h3>
+                {!showForm && (
+                    <button className="btn btn-success" onClick={handleShowAdd}>
+                        + Thêm dịch vụ
+                    </button>
+                )}
             </div>
 
-            <table className="table table-hover border">
-                <thead className="table-light">
-                    <tr>
-                        <th>Tên Dịch Vụ</th>
-                        <th>Đơn Giá (VNĐ)</th>
-                        <th>Đơn Vị Tính</th>
-                        <th>Thao Tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {services.map((s) => (
-                        <tr key={s.serviceId}>
-                            <td>{s.serviceName}</td>
-                            <td>{Number(s.price).toLocaleString()}</td>
-                            <td>{s.unit}</td>
-                            <td>
-                                <button 
-                                    className="btn btn-sm btn-outline-warning me-2"
-                                    data-bs-toggle="modal" data-bs-target="#serviceModal"
-                                    onClick={() => handleEdit(s)}
-                                >Sửa</button>
-                                <button 
-                                    className="btn btn-sm btn-outline-danger"
-                                    onClick={() => handleDelete(s.serviceId)}
-                                >Xóa</button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-
-            {/* Modal */}
-            <div className="modal fade" id="serviceModal" tabIndex="-1">
-                <div className="modal-dialog">
-                    <div className="modal-content">
+            {/* --- KHU VỰC HIỂN THỊ FORM THÊM/SỬA --- */}
+            {showForm && (
+                <div className="card mb-4 shadow-sm border-0">
+                    <div className="card-header bg-white fw-bold text-primary">
+                        {isEdit ? 'Chỉnh sửa dịch vụ' : 'Thêm dịch vụ mới'}
+                    </div>
+                    <div className="card-body">
                         <form onSubmit={handleSubmit}>
-                            <div className="modal-header">
-                                <h5 className="modal-title">{editId ? 'Cập Nhật Dịch Vụ' : 'Thêm Dịch Vụ'}</h5>
-                                <button type="button" className="btn-close" id="closeServiceModal" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div className="modal-body">
-                                <div className="mb-3">
+                            <div className="row mb-3">
+                                <div className="col-md-6">
                                     <label className="form-label">Tên dịch vụ</label>
-                                    <input type="text" name="serviceName" className="form-control" 
-                                        value={formData.serviceName} onChange={handleInputChange} required />
+                                    <input type="text" className="form-control" name="serviceName" value={formData.serviceName} onChange={handleInputChange} required />
                                 </div>
-                                <div className="mb-3">
-                                    <label className="form-label">Giá tiền</label>
-                                    <input type="number" name="price" className="form-control" 
-                                        value={formData.price} onChange={handleInputChange} required />
-                                </div>
-                                <div className="mb-3">
-                                    <label className="form-label">Đơn vị (ví dụ: m3, kWh, tháng)</label>
-                                    <input type="text" name="unit" className="form-control" 
-                                        value={formData.unit} onChange={handleInputChange} required />
+                                <div className="col-md-6">
+                                    <label className="form-label">Phí dịch vụ (VNĐ)</label>
+                                    <input type="number" className="form-control" name="serviceFee" value={formData.serviceFee} onChange={handleInputChange} required />
                                 </div>
                             </div>
-                            <div className="modal-footer">
-                                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Đang lưu...' : 'Lưu'}
-                                </button>
+                            <div className="mb-3">
+                                <label className="form-label">Mô tả</label>
+                                <textarea className="form-control" name="description" rows="2" value={formData.description} onChange={handleInputChange}></textarea>
+                            </div>
+                            <div className="mb-3">
+                                <label className="form-label">Trạng thái</label>
+                                <select className="form-select" name="status" value={formData.status} onChange={handleInputChange}>
+                                    <option value={1}>Hoạt động</option>
+                                    <option value={0}>Ngừng hoạt động</option>
+                                </select>
+                            </div>
+                            <div className="text-end">
+                                <button type="button" className="btn btn-secondary me-2" onClick={() => setShowForm(false)}>Hủy</button>
+                                <button type="submit" className="btn btn-primary">Lưu thông tin</button>
                             </div>
                         </form>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* --- KHU VỰC BẢNG HIỂN THỊ (Ẩn đi khi đang load) --- */}
+            {loading ? (
+                <div className="text-center">Đang tải dữ liệu...</div>
+            ) : (
+                <div className="table-responsive">
+                    <table className="table table-hover align-middle">
+                        <thead className="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Tên dịch vụ</th>
+                                <th>Mô tả</th>
+                                <th>Phí dịch vụ</th>
+                                <th>Trạng thái</th>
+                                <th>Ngày tạo</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {services.length > 0 ? services.map((svc) => (
+                                <tr key={svc.serviceId || svc.ServiceId}>
+                                    <td className="fw-bold">{svc.serviceId || svc.ServiceId}</td>
+                                    <td>{svc.serviceName || svc.ServiceName || '---'}</td>
+                                    <td>{svc.description || svc.Description || '---'}</td>
+                                    <td className="text-danger fw-semibold">
+                                        {formatCurrency(svc.serviceFee ?? svc.ServiceFee)}
+                                    </td>
+                                    <td>{renderStatus(svc.status ?? svc.Status)}</td>
+                                    <td>{formatDate(svc.createdAt || svc.CreatedAt)}</td>
+                                    <td>
+                                        <button
+                                            className="btn btn-sm btn-outline-primary me-2"
+                                            onClick={() => handleShowEdit(svc)}
+                                        >
+                                            Sửa
+                                        </button>
+                                        <button
+                                            className="btn btn-sm btn-outline-danger"
+                                            onClick={() => handleDelete(svc.serviceId || svc.ServiceId)}
+                                        >
+                                            Xóa
+                                        </button>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan="7" className="text-center text-muted py-4">
+                                        Chưa có dịch vụ nào trong hệ thống.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 };
