@@ -1,42 +1,44 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/axiosConfig';
-import './Login.css'; 
+import './Login.css';
 
 const Login = () => {
-  const [userName, setUserName] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
   const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setErrorMsg('');
+    setError('');
     setIsLoading(true);
 
     try {
-      const response = await api.post('/Auth/login', {
-        userName: userName,
+      const response = await api.post('/Auth/Login', {
+        username: username,
         password: password
       });
+      // THÊM DÒNG NÀY ĐỂ DEBUG:
+      console.log("Dữ liệu BE trả về:", response.data);
 
-      const token = response.data.token;
+      const { token, role } = response.data.data;
 
-      if (token) {
-        localStorage.setItem('token', token);
-        alert('Đăng nhập thành công!');
-        navigate('/');
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error("Lỗi đăng nhập:", error);
-      if (error.response && error.response.data) {
-        setErrorMsg(error.response.data.message || 'Sai tài khoản hoặc mật khẩu!');
+      localStorage.setItem('token', token);
+      localStorage.setItem('role', role);
+
+      if (role === 'Manager') {
+        navigate('/admin');
+      } else if (role === 'Resident') {
+        navigate('/resident');
       } else {
-        setErrorMsg('Không thể kết nối đến máy chủ. Hãy kiểm tra lại Backend!');
+        navigate('/');
       }
+
+    } catch (err) {
+      console.error("Lỗi đăng nhập:", err);
+      setError('Sai tài khoản hoặc mật khẩu!');
     } finally {
       setIsLoading(false);
     }
@@ -47,18 +49,18 @@ const Login = () => {
       <div className="login-form-card">
         <h2 className="login-title">ĐĂNG NHẬP</h2>
 
-        {errorMsg && <p className="login-error">{errorMsg}</p>}
+        {error && <p className="login-error text-danger text-center">{error}</p>}
 
         <form onSubmit={handleLogin} className="login-form">
           <div className="login-input-group">
             <label>Tài khoản:</label>
             <input
               type="text"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="Nhập UserName..."
-              className="login-input"
+              className="login-input form-control mb-3"
             />
           </div>
 
@@ -70,11 +72,11 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="Nhập Password..."
-              className="login-input"
+              className="login-input form-control mb-3"
             />
           </div>
 
-          <button type="submit" disabled={isLoading} className="login-button">
+          <button type="submit" disabled={isLoading} className="login-button btn btn-primary w-100 mt-2">
             {isLoading ? 'Đang xử lý...' : 'Đăng nhập'}
           </button>
         </form>
