@@ -3,34 +3,33 @@ import api from '../../utils/axiosConfig';
 
 const ApartmentManagement = () => {
     const [apartments, setApartments] = useState([]);
-    const [buildings, setBuildings] = useState([]); // State for buildings dropdown
+    const [buildings, setBuildings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editId, setEditId] = useState(null);
 
-    // Form state maps strictly to CreateApartmentDto requirements
     const initialFormState = {
         buildingId: '',
-        apartmentCode: '',
-        apartmentName: '',
-        apartmentNumber: 0,
-        floorNumber: 0,
-        area: 0,
+        apartmentNumber: '',
+        floorNumber: '',
+        area: '',
         status: 1
     };
     const [formData, setFormData] = useState(initialFormState);
 
+    const extractApartmentNumber = (code) => {
+        if (!code) return '';
+        return code.split('-').pop();
+    };
+
     const fetchData = async () => {
         try {
             setLoading(true);
-
-            // Fetch both apartments and buildings concurrently
             const [aptRes, bldRes] = await Promise.all([
                 api.get('/Apartments'),
                 api.get('/Buildings')
             ]);
 
-            // Extract data safely to prevent crashes
             const aptList = aptRes.data.data ? aptRes.data.data : aptRes.data;
             const bldList = bldRes.data.data ? bldRes.data.data : bldRes.data;
 
@@ -49,12 +48,9 @@ const ApartmentManagement = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        const numberFields = ['buildingId', 'apartmentNumber', 'floorNumber', 'area', 'status'];
-
-        // Ensure numeric types for strict C# backend validation
         setFormData(prev => ({
             ...prev,
-            [name]: numberFields.includes(name) ? Number(value) : value
+            [name]: value
         }));
     };
 
@@ -63,11 +59,9 @@ const ApartmentManagement = () => {
             setEditId(apartment.apartmentId);
             setFormData({
                 buildingId: apartment.buildingId || '',
-                apartmentCode: apartment.apartmentCode || '',
-                apartmentName: apartment.apartmentName || '',
-                apartmentNumber: apartment.apartmentNumber || 0,
-                floorNumber: apartment.floorNumber || 0,
-                area: apartment.area || 0,
+                apartmentNumber: extractApartmentNumber(apartment.apartmentCode),
+                floorNumber: apartment.floorNumber || '',
+                area: apartment.area || '',
                 status: apartment.status || 1
             });
         } else {
@@ -82,26 +76,31 @@ const ApartmentManagement = () => {
 
         try {
             if (editId) {
-                // 1. Update general information (Name, Code, Area, etc.) via PUT
-                await api.put(`/Apartments/${editId}`, formData);
-
-                // 2. Update status specifically via PATCH since backend separates this logic
-                await api.patch(`/Apartments/${editId}/status`, formData.status, {
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                alert("Cập nhật thành công!");
+                const updatePayload = {
+                    apartmentNumber: Number(formData.apartmentNumber),
+                    area: Number(formData.area),
+                    status: Number(formData.status)
+                };
+                await api.put(`/Apartments/${editId}`, updatePayload);
+                alert("Cập nhật thông tin phòng thành công!");
             } else {
-                // Create new apartment via POST
-                await api.post('/Apartments', formData);
-                alert("Thêm căn hộ thành công!");
+                const createPayload = {
+                    buildingId: Number(formData.buildingId),
+                    floorNumber: Number(formData.floorNumber),
+                    apartmentNumber: Number(formData.apartmentNumber),
+                    area: Number(formData.area),
+                    status: Number(formData.status)
+                };
+                await api.post('/Apartments', createPayload);
+                alert("Thêm căn hộ mới thành công!");
             }
 
             await fetchData();
             document.getElementById('closeAptModal').click();
         } catch (error) {
             console.error("API Error:", error.response?.data);
-            alert(error.response?.data?.message || "Thao tác thất bại. Vui lòng kiểm tra lại thông tin nhập.");
+            const errorMessage = error.response?.data?.message || "Thao tác thất bại. Vui lòng kiểm tra lại thông tin nhập.";
+            alert("LỖI: " + errorMessage);
         } finally {
             setIsSubmitting(false);
         }
@@ -112,8 +111,10 @@ const ApartmentManagement = () => {
             try {
                 await api.delete(`/Apartments/${id}`);
                 await fetchData();
+                alert("Xóa thành công!");
             } catch (error) {
-                alert("Không thể xóa căn hộ lúc này.");
+                const errorMessage = error.response?.data?.message || "Không thể xóa căn hộ lúc này.";
+                alert("LỖI: " + errorMessage);
             }
         }
     };
@@ -141,6 +142,7 @@ const ApartmentManagement = () => {
                                         <th>STT</th>
                                         <th>Mã Căn</th>
                                         <th>Tên Căn Hộ</th>
+                                        <th>Số phòng</th>
                                         <th>Tầng</th>
                                         <th>Diện tích</th>
                                         <th>Trạng thái</th>
@@ -148,24 +150,31 @@ const ApartmentManagement = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {apartments.map((apt, idx) => (
-                                        <tr key={apt.apartmentId}>
-                                            <td>{idx + 1}</td>
-                                            <td className="fw-bold text-primary">{apt.apartmentCode}</td>
-                                            <td className="fw-semibold">{apt.apartmentName}</td>
-                                            <td>{apt.floorNumber}</td>
-                                            <td>{apt.area} m²</td>
-                                            <td>
-                                                <span className={`badge ${apt.status === 1 ? 'bg-success' : apt.status === 2 ? 'bg-warning text-dark' : 'bg-secondary'}`}>
-                                                    {apt.status === 1 ? 'Trống' : apt.status === 2 ? 'Đang thuê' : 'Bảo trì'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(apt)} data-bs-toggle="modal" data-bs-target="#apartmentModal">Sửa</button>
-                                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(apt.apartmentId, apt.apartmentCode)}>Xóa</button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {apartments.map((apt, idx) => {
+                                        const derivedRoomNumber = extractApartmentNumber(apt.apartmentCode);
+
+                                        return (
+                                            <tr key={apt.apartmentId}>
+                                                <td>{idx + 1}</td>
+                                                <td className="fw-bold text-primary">{apt.apartmentCode}</td>
+                                                <td className="fw-semibold">{apt.apartmentName}</td>
+
+                                                <td className="fw-semibold">{derivedRoomNumber}</td>
+
+                                                <td>{apt.floorNumber}</td>
+                                                <td>{apt.area} m²</td>
+                                                <td>
+                                                    <span className={`badge ${apt.status === 1 ? 'bg-success' : apt.status === 2 ? 'bg-warning text-dark' : 'bg-secondary'}`}>
+                                                        {apt.status === 1 ? 'Trống' : apt.status === 2 ? 'Đang thuê' : 'Bảo trì'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(apt)} data-bs-toggle="modal" data-bs-target="#apartmentModal">Sửa</button>
+                                                    <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(apt.apartmentId, apt.apartmentCode)}>Xóa</button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -184,38 +193,39 @@ const ApartmentManagement = () => {
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
                                 <div className="row g-3">
-                                    {/* Re-added Building dropdown for POST request */}
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Thuộc Tòa Nhà (Bắt buộc)</label>
-                                        <select className="form-select" name="buildingId" value={formData.buildingId} onChange={handleInputChange} required>
-                                            <option value="" disabled>-- Chọn Tòa Nhà --</option>
-                                            {buildings.map(b => (
-                                                <option key={b.buildingId} value={b.buildingId}>{b.buildingCode} - {b.buildingName}</option>
-                                            ))}
-                                        </select>
+                                    {/* Ẩn chọn tòa nhà và tầng khi Update */}
+                                    {!editId && (
+                                        <>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Thuộc Tòa Nhà (Bắt buộc)</label>
+                                                <select className="form-select" name="buildingId" value={formData.buildingId} onChange={handleInputChange} required>
+                                                    <option value="" disabled>-- Chọn Tòa Nhà --</option>
+                                                    {buildings.map(b => (
+                                                        <option key={b.buildingId} value={b.buildingId}>{b.buildingCode} - {b.buildingName}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Tầng (VD: 7)</label>
+                                                <input type="number" min="1" className="form-control" name="floorNumber" value={formData.floorNumber} onChange={handleInputChange} required />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Ô nhập số phòng thay đổi gợi ý tùy theo chế độ Create / Update */}
+                                    <div className={!editId ? "col-md-4" : "col-md-6"}>
+                                        <label className="form-label fw-semibold text-primary">
+                                            {editId ? "Số Căn Hộ (VD: 709)" : "Số phòng trên tầng (VD: 9)"}
+                                        </label>
+                                        <input type="number" min="1" className="form-control border-primary" name="apartmentNumber" value={formData.apartmentNumber} onChange={handleInputChange} required />
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Mã Căn Hộ (VD: 12A05)</label>
-                                        <input type="text" className="form-control" name="apartmentCode" value={formData.apartmentCode} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-12">
-                                        <label className="form-label fw-semibold">Tên Căn Hộ</label>
-                                        <input type="text" className="form-control" name="apartmentName" value={formData.apartmentName} onChange={handleInputChange} required placeholder="VD: Căn hộ cao cấp..." />
-                                    </div>
-                                    {/* Re-added ApartmentNumber for POST request */}
-                                    <div className="col-md-3">
-                                        <label className="form-label fw-semibold">Số phòng</label>
-                                        <input type="number" min="1" className="form-control" name="apartmentNumber" value={formData.apartmentNumber} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-3">
-                                        <label className="form-label fw-semibold">Tầng</label>
-                                        <input type="number" min="1" className="form-control" name="floorNumber" value={formData.floorNumber} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-3">
+
+                                    <div className={!editId ? "col-md-4" : "col-md-6"}>
                                         <label className="form-label fw-semibold">Diện tích (m²)</label>
                                         <input type="number" min="1" step="0.1" className="form-control" name="area" value={formData.area} onChange={handleInputChange} required />
                                     </div>
-                                    <div className="col-md-3">
+
+                                    <div className={!editId ? "col-md-4" : "col-md-12"}>
                                         <label className="form-label fw-semibold">Trạng thái</label>
                                         <select className="form-select" name="status" value={formData.status} onChange={handleInputChange}>
                                             <option value={1}>Trống</option>
@@ -223,6 +233,14 @@ const ApartmentManagement = () => {
                                             <option value={3}>Bảo trì</option>
                                         </select>
                                     </div>
+
+                                    {!editId && (
+                                        <div className="col-12 mt-3">
+                                            <small className="text-muted fst-italic">
+                                                * Lưu ý: Mã căn hộ và Tên căn hộ sẽ được hệ thống tự động khởi tạo dựa vào Tòa nhà, Tầng và Số phòng bạn nhập.
+                                            </small>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="modal-footer bg-light">
