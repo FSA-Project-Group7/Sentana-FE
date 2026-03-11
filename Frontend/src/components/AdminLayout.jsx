@@ -15,6 +15,7 @@ const AdminLayout = () => {
         { path: '/admin', label: 'Trang chủ', icon: 'bi-speedometer2' },
         { path: '/admin/buildings', label: 'Tòa nhà', icon: 'bi-building' },
         { path: '/admin/apartments', label: 'Danh sách phòng', icon: 'bi-door-open' },
+        { path: '/admin/residents', label: 'Quản lý Cư dân', icon: 'bi-people-fill' },
         { path: '/admin/accounts', label: 'Tài khoản hệ thống', icon: 'bi-person-lock' },
         { path: '/admin/technicians', label: 'Kỹ thuật viên', icon: 'bi-person-gear' },
         { path: '/admin/services', label: 'Dịch vụ tiện ích', icon: 'bi-tools' },
