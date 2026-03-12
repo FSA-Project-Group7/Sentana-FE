@@ -8,15 +8,23 @@ const AdminDashboard = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const [buildingsRes, apartmentsRes] = await Promise.all([
+                
+                const [buildingsRes, apartmentsRes, residentsRes] = await Promise.all([
                     api.get('/Buildings'),
-                    api.get('/Apartments')
+                    api.get('/Apartments'),
+                    api.get('/Residents/GetAllResidents') 
                 ]);
 
+                
+                const buildingsData = buildingsRes.data.data ? buildingsRes.data.data : buildingsRes.data;
+                const apartmentsData = apartmentsRes.data.data ? apartmentsRes.data.data : apartmentsRes.data;
+                const residentsData = residentsRes.data.data ? residentsRes.data.data : residentsRes.data;
+
+                
                 setStats({
-                    buildings: buildingsRes.data.length,
-                    apartments: apartmentsRes.data.length,
-                    residents: 0 
+                    buildings: Array.isArray(buildingsData) ? buildingsData.length : 0,
+                    apartments: Array.isArray(apartmentsData) ? apartmentsData.length : 0,
+                    residents: Array.isArray(residentsData) ? residentsData.length : 0
                 });
             } catch (error) {
                 console.error("Lỗi lấy dữ liệu thống kê:", error);
@@ -59,6 +67,7 @@ const AdminDashboard = () => {
                     <div className="card text-dark bg-warning h-100 shadow-sm border-0">
                         <div className="card-body d-flex flex-column justify-content-center align-items-center py-4">
                             <h5 className="card-title text-uppercase opacity-75">Tổng Cư Dân</h5>
+                            {/* Biến residents đã được gán giá trị tự động */}
                             <h2 className="display-4 fw-bold mb-0">{stats.residents}</h2>
                         </div>
                     </div>

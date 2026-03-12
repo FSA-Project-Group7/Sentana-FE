@@ -1,51 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
+import Pagination from '../../components/common/Pagination';
 
 const ResidentManagement = () => {
     const [residents, setResidents] = useState([]);
-    const [apartments, setApartments] = useState([]);
+    const [apartments, setApartments] = useState([]); 
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [editId, setEditId] = useState(null);
 
-    // Form cho việc Thêm/Sửa thông tin cá nhân Cư dân
+    
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
+
+    
+    const [editId, setEditId] = useState(null);
     const initialFormState = {
-        userName: '',
-        password: '', // Chỉ bắt buộc khi tạo mới
-        fullName: '',
-        email: '',
-        phoneNumber: '',
-        identityCard: '',
-        country: 'Việt Nam',
-        city: 'Hà Nội',
-        address: ''
+        email: '', userName: '', password: '', fullName: '',
+        phoneNumber: '', identityCard: '', country: 'Việt Nam', city: 'Hà Nội', address: ''
     };
     const [formData, setFormData] = useState(initialFormState);
 
-    // Form cho việc Gán phòng (Assign Room)
-    const initialAssignState = {
-        residentId: '',
-        apartmentId: '',
-        relationshipId: 1 // Mặc định 1: Chủ hộ
-    };
-    const [assignData, setAssignData] = useState(initialAssignState);
-    const [selectedResidentName, setSelectedResidentName] = useState("");
+    
+    const [selectedResident, setSelectedResident] = useState(null);
+    const [selectedApartmentId, setSelectedApartmentId] = useState('');
 
-    // Hàm lấy dữ liệu Cư dân và Danh sách phòng (để xổ xuống chọn khi Gán)
+    
+    const [importFile, setImportFile] = useState(null);
+    const [importResult, setImportResult] = useState(null);
+
+    
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [resRes, aptRes] = await Promise.all([
-                api.get('/Residents'),
-                api.get('/Apartments')
+            const [resData, aptData] = await Promise.all([
+                api.get('/Residents/GetAllResidents'),
+                api.get('/Apartments') 
             ]);
 
-            // Xử lý an toàn dữ liệu trả về từ ApiResponse của BE
-            const resList = resRes.data.data ? resRes.data.data : resRes.data;
-            const aptList = aptRes.data.data ? aptRes.data.data : aptRes.data;
+            const rList = resData.data.data ? resData.data.data : resData.data;
+            const aList = aptData.data.data ? aptData.data.data : aptData.data;
 
-            setResidents(Array.isArray(resList) ? resList : []);
-            setApartments(Array.isArray(aptList) ? aptList : []);
+            setResidents(Array.isArray(rList) ? rList : []);
+            setApartments(Array.isArray(aList) ? aList : []);
+
+            
+            setCurrentPage(1);
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu:", error);
         } finally {
@@ -57,31 +56,24 @@ const ResidentManagement = () => {
         fetchData();
     }, []);
 
-    // Xử lý thay đổi input cho Form Thêm/Sửa Cư dân
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Xử lý thay đổi input cho Form Gán phòng
-    const handleAssignChange = (e) => {
-        const { name, value } = e.target;
-        setAssignData(prev => ({ ...prev, [name]: Number(value) }));
-    };
-
-    // Mở Modal Thêm / Sửa thông tin Cư dân
+    
     const handleOpenModal = (resident = null) => {
         if (resident) {
             setEditId(resident.accountId);
             setFormData({
-                userName: resident.userName || '',
-                password: '', // Khi sửa thường không trả về password
-                fullName: resident.fullName || '',
                 email: resident.email || '',
+                userName: resident.userName || '',
+                password: '', 
+                fullName: resident.fullName || '',
                 phoneNumber: resident.phoneNumber || '',
                 identityCard: resident.identityCard || '',
                 country: resident.country || 'Việt Nam',
-                city: resident.city || '',
+                city: resident.city || 'Hà Nội',
                 address: resident.address || ''
             });
         } else {
@@ -90,224 +82,351 @@ const ResidentManagement = () => {
         }
     };
 
-    // Mở Modal Gán Phòng
-    const handleOpenAssignModal = (resident) => {
-        setSelectedResidentName(resident.fullName || resident.userName);
-        setAssignData({
-            residentId: resident.accountId,
-            apartmentId: '',
-            relationshipId: 1
-        });
-    };
-
-    // Submit API: Thêm hoặc Sửa Cư Dân
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
             if (editId) {
-                // Sửa cư dân
-                await api.put(`/Residents/${editId}`, formData);
-                alert("Cập nhật thông tin cư dân thành công!");
+                const updatePayload = {
+                    email: formData.email, fullName: formData.fullName,
+                    phoneNumber: formData.phoneNumber, identityCard: formData.identityCard,
+                    country: formData.country, city: formData.city, address: formData.address
+                };
+                const res = await api.put(`/Residents/UpdateResident/${editId}`, updatePayload);
+                alert(res.data?.message || "Cập nhật thành công!");
             } else {
-                // Thêm cư dân mới
-                await api.post('/Residents', formData);
-                alert("Tạo tài khoản cư dân thành công!");
+                const res = await api.post('/Residents/CreateResident', formData);
+                alert(res.data?.message || "Thêm Cư dân thành công!");
             }
-            await fetchData();
-            document.getElementById('closeResidentModal').click();
+            fetchData();
+            document.getElementById('closeResModal').click();
         } catch (error) {
-            const errorMessage = error.response?.data?.message || "Thao tác thất bại. Vui lòng kiểm tra lại.";
+            let errorMessage = "Lỗi đầu vào, vui lòng kiểm tra lại!";
+
+            
+            if (error.response?.data?.errors) {
+                const firstErrorKey = Object.keys(error.response.data.errors)[0];
+                errorMessage = error.response.data.errors[firstErrorKey][0];
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            }
+
             alert("LỖI: " + errorMessage);
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Submit API: Gán Cư dân vào Phòng
-    const handleAssignSubmit = async (e) => {
-        e.preventDefault();
+    
+    const handleOpenAssignModal = (resident) => {
+        setSelectedResident(resident);
+        setSelectedApartmentId('');
+    };
+
+    const handleAssignRoom = async () => {
+        if (!selectedApartmentId) return alert("Vui lòng chọn một căn hộ!");
         setIsSubmitting(true);
         try {
-            await api.post('/Residents/assign-room', assignData);
-            alert("Đã gán cư dân vào phòng thành công!");
-            await fetchData(); // Load lại để thấy danh sách phòng hiển thị
+            const payload = { accountId: selectedResident.accountId, apartmentId: Number(selectedApartmentId), relationshipId: null };
+            const res = await api.post('/Residents/assign', payload);
+            alert(res.data?.message || "Đã gán phòng thành công!");
             document.getElementById('closeAssignModal').click();
+            fetchData();
         } catch (error) {
-            const errorMessage = error.response?.data?.message || "Lỗi khi gán phòng.";
-            alert("LỖI: " + errorMessage);
+            alert("LỖI: " + (error.response?.data?.message || "Không thể gán phòng."));
         } finally {
             setIsSubmitting(false);
         }
     };
+
+    const handleRemoveRoom = async () => {
+        if (!selectedApartmentId) return alert("Vui lòng chọn căn hộ muốn gỡ!");
+        if (window.confirm(`CẢNH BÁO: Gỡ cư dân sẽ làm vô hiệu hóa Hợp đồng, chuyển phòng thành Trống và khóa tài khoản Cư dân. Bạn có chắc chắn?`)) {
+            setIsSubmitting(true);
+            try {
+                const payload = { accountId: selectedResident.accountId, apartmentId: Number(selectedApartmentId), relationshipId: null };
+                const res = await api.post('/Residents/remove', payload);
+                alert(res.data?.message || "Đã gỡ cư dân khỏi phòng!");
+                document.getElementById('closeAssignModal').click();
+                fetchData();
+            } catch (error) {
+                alert("LỖI: " + (error.response?.data?.message || "Không thể gỡ."));
+            } finally {
+                setIsSubmitting(false);
+            }
+        }
+    };
+
+    
+    const handleFileChange = (e) => {
+        setImportFile(e.target.files[0]);
+        setImportResult(null);
+    };
+
+    const handleImportExcel = async (e) => {
+        e.preventDefault();
+        if (!importFile) return alert("Vui lòng chọn file Excel!");
+
+        setIsSubmitting(true);
+        const formPayload = new FormData();
+        formPayload.append('File', importFile);
+
+        try {
+            const res = await api.post('/Residents/import', formPayload, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setImportResult(res.data.data);
+            alert(res.data?.message || "Import hoàn tất!");
+            fetchData();
+        } catch (error) {
+            alert("LỖI IMPORT: " + (error.response?.data?.message || "Có lỗi xảy ra khi đọc file."));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    
+    
+    
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    
+    const currentResidents = residents.slice(indexOfFirstItem, indexOfLastItem);
 
     return (
         <div className="container-fluid p-0">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="fw-bold mb-0">Quản lý Cư Dân</h2>
-                <button className="btn btn-primary" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#residentModal">
-                    <i className="bi bi-person-plus-fill me-2"></i> Thêm Cư Dân
-                </button>
+            {/* TIÊU ĐỀ & NÚT */}
+            <div className="d-flex justify-content-between align-items-start mb-4">
+                <div>
+                    <h2 className="fw-bold mb-0">Quản lý Cư dân</h2>
+                    <div className="text-muted small mt-2">Quản lý hồ sơ và điều phối phòng ở cho cư dân</div>
+                </div>
+                <div className="d-flex align-items-center">
+                    <button className="btn btn-success me-3" data-bs-toggle="modal" data-bs-target="#importModal" onClick={() => { setImportFile(null); setImportResult(null); }}>
+                        <i className="bi bi-file-earmark-excel me-2"></i> Import Excel
+                    </button>
+                    <button className="btn btn-primary" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#residentModal" style={{ minWidth: '150px' }}>
+                        <i className="bi bi-person-plus-fill me-2"></i> Thêm Cư dân
+                    </button>
+                </div>
             </div>
 
+            {/* BẢNG DỮ LIỆU */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
                         <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
                     ) : residents.length === 0 ? (
-                        <div className="text-center p-5 text-muted">Chưa có dữ liệu cư dân nào trong hệ thống.</div>
+                        <div className="text-center p-5 text-muted">Chưa có dữ liệu Cư dân nào.</div>
                     ) : (
-                        <div className="table-responsive">
-                            <table className="table table-hover table-bordered mb-0 align-middle text-center">
-                                <thead className="table-light">
-                                    <tr>
-                                        <th>STT</th>
-                                        <th>Mã Cư Dân</th>
-                                        <th>Họ & Tên</th>
-                                        <th>SĐT / Email</th>
-                                        <th>CCCD</th>
-                                        <th>Căn hộ đang ở</th>
-                                        <th>Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {residents.map((res, idx) => (
-                                        <tr key={res.accountId}>
-                                            <td>{idx + 1}</td>
-                                            <td className="fw-bold text-primary">{res.code || 'N/A'}</td>
-                                            <td className="fw-semibold text-start">{res.fullName || res.userName}</td>
-                                            <td className="text-start">
-                                                <div><i className="bi bi-telephone-fill text-success me-1"></i> {res.phoneNumber}</div>
-                                                <div><i className="bi bi-envelope-fill text-secondary me-1"></i> {res.email}</div>
-                                            </td>
-                                            <td>{res.identityCard}</td>
-                                            <td className="text-start">
-                                                {/* Hiển thị các phòng cư dân đang ở nếu có */}
-                                                {res.apartments && res.apartments.length > 0 ? (
-                                                    res.apartments.map((apt, i) => (
-                                                        <span key={i} className="badge bg-info text-dark me-1 mb-1 border border-secondary">
-                                                            {apt.apartmentCode}
-                                                        </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-muted fst-italic">Chưa có phòng</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <button className="btn btn-sm btn-outline-warning me-2 mb-1" title="Sửa thông tin" onClick={() => handleOpenModal(res)} data-bs-toggle="modal" data-bs-target="#residentModal">
-                                                    Sửa
-                                                </button>
-                                                <button className="btn btn-sm btn-outline-success mb-1" title="Gán vào căn hộ" onClick={() => handleOpenAssignModal(res)} data-bs-toggle="modal" data-bs-target="#assignRoomModal">
-                                                    Gán Phòng
-                                                </button>
-                                            </td>
+                        <>
+                            <div className="table-responsive">
+                                <table className="table table-hover table-bordered mb-0 align-middle text-center">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th>STT</th>
+                                            <th>Mã Cư Dân</th>
+                                            <th className="text-start">Họ và Tên</th>
+                                            <th>Thông tin liên hệ</th>
+                                            <th>CCCD</th>
+                                            <th>Trạng thái Hệ thống</th>
+                                            <th>Hành động</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        {/* Render mảng currentResidents thay vì residents */}
+                                        {currentResidents.map((res, idx) => {
+                                            
+                                            const stt = indexOfFirstItem + idx + 1;
+
+                                            return (
+                                                <tr key={res.accountId}>
+                                                    <td>{stt}</td>
+                                                    <td className="fw-bold text-primary">{res.code}</td>
+                                                    <td className="text-start">
+                                                        <div className="fw-semibold">{res.fullName}</div>
+                                                        <div className="small text-muted">@{res.userName}</div>
+                                                    </td>
+                                                    <td>
+                                                        <div className="small">{res.phoneNumber}</div>
+                                                        <div className="small text-muted">{res.email}</div>
+                                                    </td>
+                                                    <td>{res.identityCard}</td>
+                                                    <td>
+                                                        <span className={`badge rounded-pill ${res.status === 1 ? 'bg-success' : 'bg-secondary'}`}>
+                                                            {res.status === 1 ? 'Đang hoạt động' : 'Vô hiệu hóa'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button className="btn btn-sm btn-outline-info me-2" onClick={() => handleOpenAssignModal(res)} data-bs-toggle="modal" data-bs-target="#assignModal" title="Xử lý phòng ở">
+                                                            <i className="bi bi-house-door me-1"></i> Xử lý Phòng
+                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-warning" onClick={() => handleOpenModal(res)} data-bs-toggle="modal" data-bs-target="#residentModal">
+                                                            <i className="bi bi-pencil-square me-1"></i> Sửa
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* NHÚNG COMPONENT PHÂN TRANG VÀO ĐÂY */}
+                            <Pagination
+                                totalItems={residents.length}
+                                itemsPerPage={itemsPerPage}
+                                currentPage={currentPage}
+                                onPageChange={setCurrentPage}
+                            />
+                        </>
                     )}
                 </div>
             </div>
 
-            {/* MODAL 1: THÊM / SỬA CƯ DÂN */}
+            {/* 1. MODAL THÊM / SỬA CƯ DÂN */}
             <div className="modal fade" id="residentModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-lg">
                     <div className="modal-content">
                         <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
-                            <h5 className="modal-title fw-bold">{editId ? 'Cập Nhật Cư Dân' : 'Thêm Cư Dân Mới'}</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeResidentModal"></button>
+                            <h5 className="modal-title fw-bold">{editId ? 'Cập Nhật Hồ Sơ Cư Dân' : 'Thêm Cư Dân Mới'}</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeResModal"></button>
                         </div>
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
                                 <div className="row g-3">
+                                    <div className="col-12"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin tài khoản</h6></div>
                                     <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Tên Đăng Nhập (*)</label>
-                                        <input type="text" className="form-control" name="userName" value={formData.userName} onChange={handleInputChange} required disabled={!!editId} />
+                                        <label className="form-label fw-semibold">Tên đăng nhập {editId ? '' : '(*)'}</label>
+                                        <input type="text" className="form-control" name="userName" value={formData.userName} onChange={handleInputChange} required={!editId} disabled={!!editId} />
                                     </div>
-                                    {!editId && (
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-semibold">Mật khẩu (*)</label>
-                                            <input type="password" className="form-control" name="password" value={formData.password} onChange={handleInputChange} required />
-                                        </div>
-                                    )}
-                                    <div className="col-md-12">
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Mật khẩu {editId ? '' : '(*)'}</label>
+                                        <input type="password" className="form-control" name="password" value={formData.password} onChange={handleInputChange} required={!editId} disabled={!!editId} />
+                                    </div>
+
+                                    <div className="col-12 mt-4"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin cá nhân</h6></div>
+                                    <div className="col-md-6">
                                         <label className="form-label fw-semibold">Họ và Tên (*)</label>
                                         <input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Số CCCD (*)</label>
+                                        <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} pattern="\d{12}" title="Gồm đúng 12 chữ số" required />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Số điện thoại (*)</label>
+                                        <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} pattern="\d{10}" title="Số điện thoại VN 10 số" required />
                                     </div>
                                     <div className="col-md-6">
                                         <label className="form-label fw-semibold">Email (*)</label>
                                         <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Số điện thoại (*)</label>
-                                        <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} required />
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-semibold">Quốc gia</label>
+                                        <input type="text" className="form-control" name="country" value={formData.country} onChange={handleInputChange} />
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Số CCCD (*)</label>
-                                        <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Tỉnh/Thành phố</label>
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-semibold">Thành phố</label>
                                         <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} />
                                     </div>
-                                    <div className="col-md-12">
-                                        <label className="form-label fw-semibold">Địa chỉ thường trú</label>
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
                                         <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} />
                                     </div>
                                 </div>
                             </div>
                             <div className="modal-footer bg-light">
                                 <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
-                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>Lưu Cư Dân</button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
 
-            {/* MODAL 2: GÁN PHÒNG (ASSIGN ROOM) */}
-            <div className="modal fade" id="assignRoomModal" tabIndex="-1" aria-hidden="true">
+            {/* 2. MODAL GÁN / GỠ PHÒNG */}
+            <div className="modal fade" id="assignModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog">
                     <div className="modal-content">
-                        <div className="modal-header bg-success text-white">
-                            <h5 className="modal-title fw-bold">Gán Căn Hộ Cho Cư Dân</h5>
+                        <div className="modal-header bg-info text-white">
+                            <h5 className="modal-title fw-bold">Xử lý Phòng Ở</h5>
                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeAssignModal"></button>
                         </div>
-                        <form onSubmit={handleAssignSubmit}>
-                            <div className="modal-body">
-                                <p>Đang thao tác cho cư dân: <strong className="text-primary">{selectedResidentName}</strong></p>
-
-                                <div className="mb-3">
-                                    <label className="form-label fw-semibold">Chọn Căn Hộ</label>
-                                    <select className="form-select border-success" name="apartmentId" value={assignData.apartmentId} onChange={handleAssignChange} required>
-                                        <option value="" disabled>-- Vui lòng chọn --</option>
-                                        {apartments.map(apt => (
-                                            <option key={apt.apartmentId} value={apt.apartmentId}>
-                                                {apt.apartmentName} ({apt.apartmentCode}) - {apt.area} m²
-                                            </option>
-                                        ))}
-                                    </select>
+                        <div className="modal-body">
+                            {selectedResident && (
+                                <div className="alert alert-secondary mb-3">
+                                    Đang xử lý cho: <strong>{selectedResident.fullName}</strong> ({selectedResident.code})
                                 </div>
+                            )}
+                            <label className="form-label fw-semibold">Chọn Căn Hộ Mục Tiêu</label>
+                            <select className="form-select border-info mb-3" value={selectedApartmentId} onChange={(e) => setSelectedApartmentId(e.target.value)}>
+                                <option value="">-- Chọn một căn hộ --</option>
+                                {apartments.map(apt => (
+                                    <option key={apt.apartmentId} value={apt.apartmentId}>
+                                        {apt.apartmentCode} - {apt.apartmentName} (Tầng {apt.floorNumber})
+                                    </option>
+                                ))}
+                            </select>
 
-                                <div className="mb-3">
-                                    <label className="form-label fw-semibold">Vai trò / Quan hệ</label>
-                                    <select className="form-select" name="relationshipId" value={assignData.relationshipId} onChange={handleAssignChange} required>
-                                        <option value={1}>Chủ hộ</option>
-                                        <option value={2}>Vợ / Chồng</option>
-                                        <option value={3}>Con cái</option>
-                                        <option value={4}>Khách thuê</option>
-                                        <option value={5}>Khác</option>
-                                    </select>
-                                    <small className="text-muted mt-1 d-block">(*) Hệ thống cần thông tin này để thiết lập quyền lợi tiện ích cho cư dân.</small>
-                                </div>
+                            <div className="text-muted small mb-3">
+                                <i className="bi bi-info-circle text-primary"></i> <strong>Gán Cư Dân:</strong> Sẽ đưa cư dân vào phòng này. Nếu phòng đang Trống, sẽ tự động chuyển sang Đang Thuê.<br /><br />
+                                <i className="bi bi-exclamation-triangle text-danger"></i> <strong>Gỡ Cư Dân:</strong> (Chỉ dùng khi trả phòng/hết hợp đồng). Hệ thống sẽ Vô hiệu hóa hợp đồng, chuyển phòng về Trống và Khóa tài khoản cư dân.
                             </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" className="btn btn-success" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Đang xử lý...' : 'Xác nhận Gán Phòng'}
+                        </div>
+                        <div className="modal-footer bg-light d-flex justify-content-between">
+                            <button type="button" className="btn btn-outline-danger" onClick={handleRemoveRoom} disabled={isSubmitting || !selectedApartmentId}>
+                                <i className="bi bi-box-arrow-right"></i> Gỡ Cư Dân
+                            </button>
+                            <button type="button" className="btn btn-info text-white fw-bold" onClick={handleAssignRoom} disabled={isSubmitting || !selectedApartmentId}>
+                                <i className="bi bi-house-add"></i> Gán Cư Dân Vào Phòng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 3. MODAL IMPORT EXCEL */}
+            <div className="modal fade" id="importModal" tabIndex="-1" aria-hidden="true">
+                <div className="modal-dialog modal-lg">
+                    <div className="modal-content">
+                        <div className="modal-header bg-success text-white">
+                            <h5 className="modal-title fw-bold">Nhập Danh Sách Từ Excel</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form onSubmit={handleImportExcel}>
+                            <div className="modal-body">
+                                <div className="mb-3">
+                                    <label className="form-label fw-semibold">Chọn file Excel (.xlsx)</label>
+                                    <input type="file" className="form-control border-success" accept=".xlsx" onChange={handleFileChange} required />
+                                </div>
+                                <div className="alert alert-warning small">
+                                    <strong>Cấu trúc file bắt buộc (Từ cột A đến I):</strong><br />
+                                    Email | UserName | FullName | Phone | CCCD | Country | City | Address | ApartmentCode (Mã phòng: Tùy chọn)
+                                </div>
+
+                                {/* Báo cáo kết quả Import */}
+                                {importResult && (
+                                    <div className="mt-4 p-3 border rounded bg-light">
+                                        <h6 className="fw-bold mb-2">Kết quả xử lý:</h6>
+                                        <p className="mb-1 text-primary">Tổng số dòng đã quét: <strong>{importResult.totalRows}</strong></p>
+                                        <p className="mb-1 text-success">Thành công: <strong>{importResult.successCount}</strong></p>
+                                        <p className="mb-2 text-danger">Thất bại: <strong>{importResult.failedCount}</strong></p>
+
+                                        {importResult.errors && importResult.errors.length > 0 && (
+                                            <div className="bg-white p-2 border border-danger rounded" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                                {importResult.errors.map((err, i) => (
+                                                    <div key={i} className="text-danger small mb-1">- {err}</div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer bg-light">
+                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                                <button type="submit" className="btn btn-success" disabled={isSubmitting || !importFile}>
+                                    {isSubmitting ? 'Đang đọc file...' : 'Tiến Hành Import'}
                                 </button>
                             </div>
                         </form>

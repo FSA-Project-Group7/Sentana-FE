@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
+import Pagination from '../../components/common/Pagination';
 
 const ApartmentManagement = () => {
     const [apartments, setApartments] = useState([]);
@@ -7,6 +8,11 @@ const ApartmentManagement = () => {
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [showTrash, setShowTrash] = useState(false);
+
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10);
 
     const initialFormState = {
         buildingId: '',
@@ -22,11 +28,14 @@ const ApartmentManagement = () => {
         return code.split('-').pop();
     };
 
+
     const fetchData = async () => {
         try {
             setLoading(true);
+            const aptEndpoint = showTrash ? '/Apartments/deleted' : '/Apartments';
+
             const [aptRes, bldRes] = await Promise.all([
-                api.get('/Apartments'),
+                api.get(aptEndpoint),
                 api.get('/Buildings')
             ]);
 
@@ -35,6 +44,9 @@ const ApartmentManagement = () => {
 
             setApartments(Array.isArray(aptList) ? aptList : []);
             setBuildings(Array.isArray(bldList) ? bldList : []);
+
+
+            setCurrentPage(1);
         } catch (error) {
             console.error(error);
         } finally {
@@ -42,9 +54,10 @@ const ApartmentManagement = () => {
         }
     };
 
+
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [showTrash]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -107,11 +120,11 @@ const ApartmentManagement = () => {
     };
 
     const handleDelete = async (id, aptCode) => {
-        if (window.confirm(`Bạn có chắc chắn muốn xóa căn hộ ${aptCode}?`)) {
+        if (window.confirm(`Xác nhận đưa căn hộ ${aptCode} vào danh sách đã xóa?`)) {
             try {
                 await api.delete(`/Apartments/${id}`);
                 await fetchData();
-                alert("Xóa thành công!");
+                alert("Đã đưa vào danh sách đã xóa.");
             } catch (error) {
                 const errorMessage = error.response?.data?.message || "Không thể xóa căn hộ lúc này.";
                 alert("LỖI: " + errorMessage);
@@ -119,13 +132,56 @@ const ApartmentManagement = () => {
         }
     };
 
+
+    const handleRestore = async (id) => {
+        try {
+            await api.put(`/Apartments/${id}/restore`);
+            alert("Đã khôi phục căn hộ thành công!");
+            await fetchData();
+        } catch (error) {
+            alert("LỖI: " + (error.response?.data?.message || "Không thể khôi phục."));
+        }
+    };
+
+
+    const handleHardDelete = async (id, aptCode) => {
+        if (window.confirm(`CẢNH BÁO: Bạn sắp XÓA VĨNH VIỄN căn hộ ${aptCode}. Hành động này không thể hoàn tác. Xác nhận?`)) {
+            try {
+                await api.delete(`/Apartments/${id}/hard`);
+                alert("Đã xóa vĩnh viễn thành công!");
+                await fetchData();
+            } catch (error) {
+                alert("LỖI: " + (error.response?.data?.message || "Không thể xóa."));
+            }
+        }
+    };
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+
+    const currentApartments = apartments.slice(indexOfFirstItem, indexOfLastItem);
+
     return (
         <div className="container-fluid p-0">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="fw-bold mb-0">Quản lý Căn hộ</h2>
-                <button className="btn btn-primary" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#apartmentModal">
-                    <i className="bi bi-plus-circle me-2"></i> Thêm Căn hộ
-                </button>
+            {/* TIÊU ĐỀ VÀ CÁC NÚT (Đồng bộ style với Tòa nhà) */}
+            <div className="d-flex justify-content-between align-items-start mb-4">
+                <div>
+                    <h2 className="fw-bold mb-0">{showTrash ? 'Danh sách đã xóa: Căn hộ' : 'Quản lý Căn hộ'}</h2>
+                    {showTrash && <div className="text-danger small mt-2">Các dữ liệu bị ngưng hoạt động đang được lưu trữ tại đây</div>}
+                </div>
+
+                <div className="d-flex align-items-center">
+                    {!showTrash && (
+                        <button className="btn btn-primary me-3" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#apartmentModal" style={{ minWidth: '160px' }}>
+                            <i className="bi bi-plus-circle me-2"></i> Thêm Căn hộ
+                        </button>
+                    )}
+
+                    <button className={`btn ${showTrash ? 'btn-outline-secondary' : 'btn-outline-danger'}`} onClick={() => setShowTrash(!showTrash)}>
+                        <i className={`bi ${showTrash ? 'bi-arrow-left-circle' : 'bi-archive'} me-2`}></i>
+                        {showTrash ? 'Quay lại Danh sách' : 'Danh sách đã xóa'}
+                    </button>
+                </div>
             </div>
 
             <div className="card shadow-sm border-0">
@@ -133,55 +189,88 @@ const ApartmentManagement = () => {
                     {loading ? (
                         <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
                     ) : apartments.length === 0 ? (
-                        <div className="text-center p-5 text-muted">Chưa có dữ liệu căn hộ nào.</div>
+                        <div className="text-center p-5 text-muted">{showTrash ? 'Không có căn hộ nào bị xóa.' : 'Chưa có dữ liệu căn hộ nào.'}</div>
                     ) : (
-                        <div className="table-responsive">
-                            <table className="table table-hover table-bordered mb-0 align-middle text-center">
-                                <thead className="table-light">
-                                    <tr>
-                                        <th>STT</th>
-                                        <th>Mã Căn</th>
-                                        <th>Tên Căn Hộ</th>
-                                        <th>Số phòng</th>
-                                        <th>Tầng</th>
-                                        <th>Diện tích</th>
-                                        <th>Trạng thái</th>
-                                        <th>Hành động</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {apartments.map((apt, idx) => {
-                                        const derivedRoomNumber = extractApartmentNumber(apt.apartmentCode);
+                        <>
+                            <div className="table-responsive">
+                                <table className="table table-hover table-bordered mb-0 align-middle text-center">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th>STT</th>
+                                            <th>Mã Căn</th>
+                                            <th className="text-start">Tên Căn Hộ</th>
+                                            <th>Số phòng</th>
+                                            <th>Tầng</th>
+                                            <th>Diện tích</th>
+                                            <th>{showTrash ? 'Trạng thái xóa' : 'Trạng thái'}</th>
+                                            <th>Hành động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {/* Render mảng currentApartments thay vì apartments */}
+                                        {currentApartments.map((apt, idx) => {
+                                            const derivedRoomNumber = extractApartmentNumber(apt.apartmentCode);
 
-                                        return (
-                                            <tr key={apt.apartmentId}>
-                                                <td>{idx + 1}</td>
-                                                <td className="fw-bold text-primary">{apt.apartmentCode}</td>
-                                                <td className="fw-semibold">{apt.apartmentName}</td>
+                                            const stt = indexOfFirstItem + idx + 1;
 
-                                                <td className="fw-semibold">{derivedRoomNumber}</td>
+                                            return (
+                                                <tr key={apt.apartmentId}>
+                                                    <td>{stt}</td>
+                                                    <td className={`fw-bold ${showTrash ? 'text-muted' : 'text-primary'}`}>{apt.apartmentCode}</td>
+                                                    <td className={`fw-semibold text-start ${showTrash ? 'text-muted text-decoration-line-through' : ''}`}>{apt.apartmentName}</td>
+                                                    <td className="fw-semibold">{derivedRoomNumber}</td>
+                                                    <td>{apt.floorNumber}</td>
+                                                    <td>{apt.area} m²</td>
+                                                    <td>
+                                                        {showTrash ? (
+                                                            <span className="badge bg-danger">Đã xóa</span>
+                                                        ) : (
+                                                            <span className={`badge ${apt.status === 1 ? 'bg-success' : apt.status === 2 ? 'bg-warning text-dark' : 'bg-secondary'}`}>
+                                                                {apt.status === 1 ? 'Trống' : apt.status === 2 ? 'Đang thuê' : 'Bảo trì'}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        {showTrash ? (
+                                                            <>
+                                                                <button className="btn btn-sm btn-outline-success me-2" onClick={() => handleRestore(apt.apartmentId)} title="Khôi phục">
+                                                                    <i className="bi bi-arrow-counterclockwise"></i> Khôi phục
+                                                                </button>
+                                                                <button className="btn btn-sm btn-danger" onClick={() => handleHardDelete(apt.apartmentId, apt.apartmentCode)} title="Xóa vĩnh viễn">
+                                                                    <i className="bi bi-trash3"></i> Xóa hẳn
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(apt)} data-bs-toggle="modal" data-bs-target="#apartmentModal">
+                                                                    <i className="bi bi-pencil-square me-1"></i> Cập nhật
+                                                                </button>
+                                                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(apt.apartmentId, apt.apartmentCode)}>
+                                                                    <i className="bi bi-x-circle me-1"></i> Xóa
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                                                <td>{apt.floorNumber}</td>
-                                                <td>{apt.area} m²</td>
-                                                <td>
-                                                    <span className={`badge ${apt.status === 1 ? 'bg-success' : apt.status === 2 ? 'bg-warning text-dark' : 'bg-secondary'}`}>
-                                                        {apt.status === 1 ? 'Trống' : apt.status === 2 ? 'Đang thuê' : 'Bảo trì'}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(apt)} data-bs-toggle="modal" data-bs-target="#apartmentModal">Sửa</button>
-                                                    <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(apt.apartmentId, apt.apartmentCode)}>Xóa</button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                            {/* NHÚNG COMPONENT PHÂN TRANG VÀO ĐÂY */}
+                            <Pagination
+                                totalItems={apartments.length}
+                                itemsPerPage={itemsPerPage}
+                                currentPage={currentPage}
+                                onPageChange={setCurrentPage}
+                            />
+                        </>
                     )}
                 </div>
             </div>
 
+            {/* MODAL (Giữ nguyên như cũ) */}
             <div className="modal fade" id="apartmentModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-lg">
                     <div className="modal-content">
@@ -193,7 +282,6 @@ const ApartmentManagement = () => {
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
                                 <div className="row g-3">
-                                    {/* Ẩn chọn tòa nhà và tầng khi Update */}
                                     {!editId && (
                                         <>
                                             <div className="col-md-6">
@@ -212,7 +300,6 @@ const ApartmentManagement = () => {
                                         </>
                                     )}
 
-                                    {/* Ô nhập số phòng thay đổi gợi ý tùy theo chế độ Create / Update */}
                                     <div className={!editId ? "col-md-4" : "col-md-6"}>
                                         <label className="form-label fw-semibold text-primary">
                                             {editId ? "Số Căn Hộ (VD: 709)" : "Số phòng trên tầng (VD: 9)"}

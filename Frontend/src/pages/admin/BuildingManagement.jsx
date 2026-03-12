@@ -4,18 +4,19 @@ import api from '../../utils/axiosConfig';
 const BuildingManagement = () => {
     const [buildings, setBuildings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showTrash, setShowTrash] = useState(false);
 
     const [formData, setFormData] = useState({
-        buildingCode: '', buildingName: '', address: '', city: '', floorNumber: 0, apartmentNumber: 0, status: 1
+        buildingCode: '', buildingName: '', address: '', city: 'Hà Nội', floorNumber: 0, apartmentNumber: 0, status: 1
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
-
     const [editId, setEditId] = useState(null);
 
     const fetchBuildings = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/Buildings');
+            const endpoint = showTrash ? '/Buildings/deleted' : '/Buildings';
+            const response = await api.get(endpoint);
             setBuildings(response.data);
         } catch (error) {
             console.error("Lỗi khi tải danh sách:", error);
@@ -26,7 +27,7 @@ const BuildingManagement = () => {
 
     useEffect(() => {
         fetchBuildings();
-    }, []);
+    }, [showTrash]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -38,13 +39,12 @@ const BuildingManagement = () => {
 
     const handleOpenAdd = () => {
         setEditId(null);
-        setFormData({
-            buildingCode: '', buildingName: '', address: '', city: '', floorNumber: 0, apartmentNumber: 0, status: 1
-        });
+        setFormData({ buildingCode: '', buildingName: '', address: '', city: 'Hà Nội', floorNumber: 0, apartmentNumber: 0, status: 1 });
     };
 
     const handleOpenEdit = (building) => {
         setEditId(building.buildingId);
+        const statusValue = (building.status === 1 || building.status === 'Active') ? 1 : 0;
         setFormData({
             buildingCode: building.buildingCode,
             buildingName: building.buildingName,
@@ -52,57 +52,82 @@ const BuildingManagement = () => {
             city: building.city,
             floorNumber: building.floorNumber,
             apartmentNumber: building.apartmentNumber,
-            status: building.status
+            status: statusValue
         });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
-
         try {
             if (editId) {
-                await api.put(`/Buildings/${editId}`, formData);
+                const updatePayload = { ...formData, apartmentNumber: formData.floorNumber * 10 };
+                await api.put(`/Buildings/${editId}`, updatePayload);
                 alert("Cập nhật thông tin thành công!");
             } else {
-                await api.post('/Buildings', formData);
+                const createPayload = { buildingCode: "AUTO", buildingName: "AUTO", apartmentNumber: 0, floorNumber: formData.floorNumber, city: formData.city, address: formData.address };
+                await api.post('/Buildings', createPayload);
                 alert("Thêm tòa nhà thành công!");
             }
-
             fetchBuildings();
             document.getElementById('closeModal').click();
-
         } catch (error) {
-            console.error("Lỗi khi lưu tòa nhà:", error);
-            alert(error.response?.data?.message || "Có lỗi xảy ra, vui lòng thử lại!");
+            alert("LỖI: " + (error.response?.data?.message || "Có lỗi xảy ra, vui lòng thử lại!"));
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleDelete = async (id, name) => {
-        const isConfirm = window.confirm(`Bạn có chắc chắn muốn xóa tòa nhà "${name}" không?`);
-
-        if (isConfirm) {
+        if (window.confirm(`Xác nhận đưa tòa nhà "${name}" vào thùng rác?`)) {
             try {
                 await api.delete(`/Buildings/${id}`);
-                alert("Đã xóa tòa nhà thành công!");
+                alert("Đã đưa vào thùng rác.");
+                fetchBuildings();
+            } catch (error) { alert("LỖI: " + error.response?.data?.message); }
+        }
+    };
 
+    const handleRestore = async (id) => {
+        try {
+            await api.put(`/Buildings/${id}/restore`);
+            alert("Đã khôi phục tòa nhà thành công!");
+            fetchBuildings();
+        } catch (error) { alert("LỖI: " + error.response?.data?.message); }
+    };
+
+    const handleHardDelete = async (id, name) => {
+        if (window.confirm(`CẢNH BÁO: Bạn sắp XÓA VĨNH VIỄN tòa nhà "${name}". Hành động này không thể hoàn tác. Xác nhận?`)) {
+            try {
+                await api.delete(`/Buildings/${id}/hard`);
+                alert("Đã xóa vĩnh viễn thành công!");
                 fetchBuildings();
             } catch (error) {
-                console.error("Lỗi khi xóa:", error);
-                alert("Có lỗi xảy ra, không thể xóa tòa nhà này!");
+                alert("LỖI: " + (error.response?.data?.message || "Không thể xóa."));
             }
         }
     };
 
     return (
         <div className="container-fluid p-0">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="fw-bold mb-0">Quản lý Tòa nhà</h2>
-                <button className="btn btn-primary" onClick={handleOpenAdd} data-bs-toggle="modal" data-bs-target="#buildingModal">
-                    <i className="bi bi-plus-circle me-2"></i> Thêm Tòa nhà
-                </button>
+            <div className="d-flex justify-content-between align-items-start mb-4">
+                <div>
+                    <h2 className="fw-bold mb-0">{showTrash ? 'Danh sách đã xóa: Tòa nhà' : 'Quản lý Tòa nhà'}</h2>
+                    {showTrash && <div className="text-danger small mt-2">Các dữ liệu bị ngưng hoạt động đang được lưu trữ tại đây</div>}
+                </div>
+
+                <div className="d-flex align-items-center">
+                    {!showTrash && (
+                        <button className="btn btn-primary me-3" onClick={handleOpenAdd} data-bs-toggle="modal" data-bs-target="#buildingModal" style={{ minWidth: '160px' }}>
+                            <i className="bi bi-plus-circle me-2"></i> Thêm Tòa nhà
+                        </button>
+                    )}
+
+                    <button className={`btn ${showTrash ? 'btn-outline-secondary' : 'btn-outline-danger'}`} onClick={() => setShowTrash(!showTrash)}>
+                        <i className={`bi ${showTrash ? 'bi-arrow-left-circle' : 'bi-archive'} me-2`}></i>
+                        {showTrash ? 'Quay lại Danh sách' : 'Danh sách đã xóa'}
+                    </button>
+                </div>
             </div>
 
             <div className="card shadow-sm border-0">
@@ -110,49 +135,59 @@ const BuildingManagement = () => {
                     {loading ? (
                         <div className="text-center p-5"><div className="spinner-border text-primary" role="status"></div></div>
                     ) : buildings.length === 0 ? (
-                        <div className="text-center p-5 text-muted">Chưa có dữ liệu tòa nhà nào.</div>
+                        <div className="text-center p-5 text-muted">{showTrash ? 'Không có dữ liệu nào bị xóa.' : 'Chưa có dữ liệu tòa nhà nào.'}</div>
                     ) : (
                         <div className="table-responsive">
-                            <table className="table table-hover table-bordered mb-0 align-middle">
-                                <thead className="table-light text-center">
+                            <table className="table table-hover table-bordered mb-0 align-middle text-center">
+                                <thead className="table-light">
                                     <tr>
                                         <th>STT</th>
                                         <th>Mã Tòa</th>
-                                        <th>Tên Tòa nhà</th>
-                                        <th>Địa chỉ</th>
+                                        <th className="text-start">Tên Tòa nhà</th>
+                                        <th className="text-start">Địa chỉ</th>
                                         <th>Quy mô</th>
-                                        <th>Trạng thái</th>
+                                        <th>{showTrash ? 'Trạng thái xóa' : 'Trạng thái'}</th>
                                         <th>Hành động</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {buildings.map((building, index) => (
-                                        <tr key={building.buildingId} className="text-center">
+                                        <tr key={building.buildingId}>
                                             <td>{index + 1}</td>
-                                            <td className="fw-bold text-primary">{building.buildingCode}</td>
-                                            <td className="fw-semibold">{building.buildingName}</td>
-                                            <td className="text-start">{building.address}, {building.city}</td>
-                                            <td>{building.floorNumber} tầng, {building.apartmentNumber} căn</td>
+                                            <td className={`fw-bold ${showTrash ? 'text-muted' : 'text-primary'}`}>{building.buildingCode}</td>
+                                            <td className={`fw-semibold text-start ${showTrash ? 'text-muted text-decoration-line-through' : ''}`}>{building.buildingName}</td>
+                                            <td className="text-start text-muted">{building.address}, {building.city}</td>
+                                            <td>{building.floorNumber} tầng, <span className="text-success fw-bold">{building.apartmentNumber}</span> căn</td>
                                             <td>
-                                                <span className={`badge ${building.status === 1 ? 'bg-success' : 'bg-secondary'}`}>
-                                                    {building.status === 1 ? 'Hoạt động' : 'Bảo trì'}
-                                                </span>
+                                                {showTrash ? (
+                                                    <span className="badge bg-danger">Đã xóa</span>
+                                                ) : (
+                                                    <span className={`badge ${(building.status === 1 || building.status === 'Active') ? 'bg-success' : 'bg-secondary'}`}>
+                                                        {(building.status === 1 || building.status === 'Active') ? 'Hoạt động' : 'Bảo trì'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td>
-                                                <button
-                                                    className="btn btn-sm btn-outline-warning me-2"
-                                                    onClick={() => handleOpenEdit(building)}
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#buildingModal"
-                                                >
-                                                    Sửa
-                                                </button>
-                                                <button
-                                                    className="btn btn-sm btn-outline-danger"
-                                                    onClick={() => handleDelete(building.buildingId, building.buildingName)}
-                                                >
-                                                    Xóa
-                                                </button>
+                                                {showTrash ? (
+                                                    <>
+                                                        <button className="btn btn-sm btn-outline-success me-2" onClick={() => handleRestore(building.buildingId)} title="Khôi phục">
+                                                            <i className="bi bi-arrow-counterclockwise"></i> Khôi phục
+                                                        </button>
+                                                        <button className="btn btn-sm btn-danger" onClick={() => handleHardDelete(building.buildingId, building.buildingName)} title="Xóa vĩnh viễn">
+                                                            <i className="bi bi-trash3"></i> Xóa hẳn
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {/* ĐÃ ĐỔI TÊN THÀNH CẬP NHẬT Ở ĐÂY */}
+                                                        <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenEdit(building)} data-bs-toggle="modal" data-bs-target="#buildingModal">
+                                                            <i className="bi bi-pencil-square me-1"></i> Cập nhật
+                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(building.buildingId, building.buildingName)}>
+                                                            <i className="bi bi-x-circle me-1"></i> Xóa
+                                                        </button>
+                                                    </>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -170,54 +205,55 @@ const BuildingManagement = () => {
                             <h5 className="modal-title fw-bold">{editId ? 'Cập Nhật Tòa Nhà' : 'Thêm Tòa Nhà Mới'}</h5>
                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeModal" aria-label="Close"></button>
                         </div>
-
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
                                 <div className="row g-3">
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Mã Tòa Nhà</label>
-                                        <input type="text" className="form-control" name="buildingCode" value={formData.buildingCode} onChange={handleInputChange} required placeholder="VD: S1.01" />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Tên Tòa Nhà</label>
-                                        <input type="text" className="form-control" name="buildingName" value={formData.buildingName} onChange={handleInputChange} required placeholder="VD: Sentana Block A" />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Thành phố</label>
+                                    {editId && (
+                                        <div className="col-12">
+                                            <div className="alert alert-info py-2 mb-0">
+                                                Đang chỉnh sửa: <strong className="text-primary">{formData.buildingName} ({formData.buildingCode})</strong>
+                                                <br /><small className="text-muted">Mã và Tên tòa nhà được quản lý tự động bởi hệ thống.</small>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-semibold">Thành phố (*)</label>
                                         <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} required />
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
+                                    <div className="col-md-8">
+                                        <label className="form-label fw-semibold">Địa chỉ chi tiết (*)</label>
                                         <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} required />
                                     </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Số tầng</label>
-                                        <input type="number" min="1" className="form-control" name="floorNumber" value={formData.floorNumber} onChange={handleInputChange} required />
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Số tầng (*)</label>
+                                        <input type="number" min="1" className="form-control border-primary" name="floorNumber" value={formData.floorNumber} onChange={handleInputChange} required />
                                     </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Số căn hộ</label>
-                                        <input type="number" min="1" className="form-control" name="apartmentNumber" value={formData.apartmentNumber} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Trạng thái</label>
-                                        <select className="form-select" name="status" value={formData.status} onChange={handleInputChange}>
-                                            <option value={1}>Hoạt động</option>
-                                            <option value={0}>Bảo trì</option>
-                                        </select>
-                                    </div>
+                                    {editId && (
+                                        <div className="col-md-6">
+                                            <label className="form-label fw-semibold">Trạng thái</label>
+                                            <select className="form-select border-warning" name="status" value={formData.status} onChange={handleInputChange}>
+                                                <option value={1}>Hoạt động</option>
+                                                <option value={0}>Bảo trì</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                    {!editId && (
+                                        <div className="col-12 mt-2">
+                                            <small className="text-muted fst-italic">* Lưu ý: Mã tòa nhà, Tên tòa nhà và Tổng số lượng căn hộ sẽ được hệ thống tính toán tự động.</small>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="modal-footer bg-light">
                                 <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
                                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Đang xử lý...' : (editId ? 'Lưu Thay Đổi' : 'Lưu Tòa Nhà')}
+                                    {isSubmitting ? 'Đang xử lý...' : (editId ? 'Lưu Thay Đổi' : 'Tạo Tòa Nhà Mới')}
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
-
         </div>
     );
 };

@@ -6,29 +6,27 @@ const TechnicianManagement = () => {
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [showTrash, setShowTrash] = useState(false);
 
-    // Form state bao quát toàn bộ các trường mà DTO Backend yêu cầu
+
     const initialFormState = {
-        userName: '',
-        password: '', // Chỉ bắt buộc khi thêm mới
-        fullName: '',
-        email: '',
-        phoneNumber: '',
-        identityCard: '',
-        country: 'Việt Nam',
-        city: '',
-        address: ''
+        email: '', userName: '', password: '', fullName: '',
+        phoneNumber: '', identityCard: '', country: 'Việt Nam', city: 'Hà Nội', address: ''
     };
     const [formData, setFormData] = useState(initialFormState);
+
 
     const fetchTechnicians = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/Technicians');
-            const remoteData = response.data.data ? response.data.data : response.data;
-            setTechnicians(Array.isArray(remoteData) ? remoteData : []);
+            const endpoint = showTrash ? '/Technicians/Deleted' : '/Technicians';
+            const response = await api.get(endpoint);
+
+
+            const dataList = response.data.data ? response.data.data : response.data;
+            setTechnicians(Array.isArray(dataList) ? dataList : []);
         } catch (error) {
-            console.error("Lỗi tải danh sách:", error);
+            console.error("Lỗi khi tải dữ liệu:", error);
         } finally {
             setLoading(false);
         }
@@ -36,26 +34,26 @@ const TechnicianManagement = () => {
 
     useEffect(() => {
         fetchTechnicians();
-    }, []);
+    }, [showTrash]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Dùng chung 1 Modal cho cả Thêm mới và Sửa
+
     const handleOpenModal = (tech = null) => {
         if (tech) {
             setEditId(tech.accountId);
             setFormData({
-                userName: tech.userName || '',
-                password: '', // Không gửi lại password khi update
-                fullName: tech.fullName || '',
                 email: tech.email || '',
+                userName: tech.userName || '',
+                password: '',
+                fullName: tech.fullName || '',
                 phoneNumber: tech.phoneNumber || '',
                 identityCard: tech.identityCard || '',
                 country: tech.country || 'Việt Nam',
-                city: tech.city || '',
+                city: tech.city || 'Hà Nội',
                 address: tech.address || ''
             });
         } else {
@@ -64,158 +62,186 @@ const TechnicianManagement = () => {
         }
     };
 
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
             if (editId) {
-                // SỬA: Gọi đúng đường dẫn UpdateTechnician của BE
-                await api.put(`/Technicians/UpdateTechnician/${editId}`, {
-                    ...formData,
-                    isDeleted: false // Mặc định truyền thêm isDeleted theo DTO
-                });
-                alert("Cập nhật thông tin thành công!");
+
+                const updatePayload = {
+                    email: formData.email, fullName: formData.fullName,
+                    phoneNumber: formData.phoneNumber, identityCard: formData.identityCard,
+                    country: formData.country, city: formData.city, address: formData.address
+                };
+                const res = await api.put(`/Technicians/UpdateTechnician/${editId}`, updatePayload);
+                alert(res.data?.message || "Cập nhật thành công!");
             } else {
-                // THÊM MỚI: Gọi đúng đường dẫn CreateTechnician của BE
-                await api.post('/Technicians/CreateTechnician', formData);
-                alert("Tạo tài khoản Kỹ thuật viên thành công!");
+
+                const res = await api.post('/Technicians/CreateTechnician', formData);
+                alert(res.data?.message || "Thêm Kỹ thuật viên thành công!");
             }
-            await fetchTechnicians();
+            fetchTechnicians();
             document.getElementById('closeTechModal').click();
         } catch (error) {
-            console.error("Lỗi API chi tiết:", error.response?.data);
-
-            let errorMessage = "Vui lòng kiểm tra lại thông tin nhập.";
-            const responseData = error.response?.data;
-
-            if (responseData) {
-                // Trường hợp 1: Lỗi do Validation Regex của .NET Core tự động chặn (Nằm trong object 'errors')
-                if (responseData.errors) {
-                    const firstErrorKey = Object.keys(responseData.errors)[0];
-                    errorMessage = responseData.errors[firstErrorKey][0];
-                }
-                // Trường hợp 2: Lỗi logic do code BE ném ra (Nằm trong thuộc tính 'message' của ApiResponse)
-                else if (responseData.message) {
-                    errorMessage = responseData.message;
-                }
-            }
-
+            const errorMessage = error.response?.data?.message || "Lỗi đầu vào, vui lòng kiểm tra lại thông tin!";
             alert("LỖI: " + errorMessage);
         } finally {
             setIsSubmitting(false);
         }
     };
 
+
     const handleToggleStatus = async (id) => {
         try {
-            await api.put(`/Technicians/toggleStatus/${id}`);
-            // Gọi lại API để cập nhật bảng ngay lập tức
-            await fetchTechnicians();
-        } catch (error) {
-            alert("LỖI: " + (error.response?.data?.message || "Thao tác thất bại."));
-        }
+            const res = await api.put(`/Technicians/toggleStatus/${id}`);
+            alert(res.data?.message || "Đã thay đổi trạng thái hệ thống!");
+            fetchTechnicians();
+        } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể thực hiện.")); }
     };
 
     const handleToggleAvailability = async (id) => {
         try {
             const res = await api.put(`/Technicians/toggleAvailability/${id}`);
-            // Không cần alert để trải nghiệm bấm mượt mà hơn, chỉ cần load lại data
-            await fetchTechnicians();
-        } catch (error) {
-            alert("LỖI: " + (error.response?.data?.message || "Không thể đổi tình trạng."));
+            alert(res.data?.message || "Đã thay đổi tình trạng công việc!");
+            fetchTechnicians();
+        } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể thực hiện.")); }
+    };
+
+
+    const handleDelete = async (id, name) => {
+        if (window.confirm(`Xác nhận đưa KTV "${name}" vào danh sách đã xóa?`)) {
+            try {
+                const res = await api.delete(`/Technicians/DeleteTechnician/${id}`);
+                alert(res.data?.message || "Đã xóa thành công.");
+                fetchTechnicians();
+            } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể xóa.")); }
         }
     };
 
-    const handleDelete = async (id, name) => {
-        if (window.confirm(`Xác nhận xóa kỹ thuật viên ${name} khỏi hệ thống?`)) {
+    const handleRestore = async (id) => {
+        try {
+            const res = await api.put(`/Technicians/Restore/${id}`);
+            alert(res.data?.message || "Khôi phục thành công!");
+            fetchTechnicians();
+        } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể khôi phục.")); }
+    };
+
+    const handleHardDelete = async (id, name) => {
+        if (window.confirm(`CẢNH BÁO: Bạn sắp XÓA VĨNH VIỄN KTV "${name}". Hành động này không thể hoàn tác. Xác nhận?`)) {
             try {
-                // SỬA: Gọi đúng đường dẫn DeleteTechnician của BE
-                const res = await api.delete(`/Technicians/DeleteTechnician/${id}`);
-                alert(res.data.message || "Đã xóa kỹ thuật viên thành công.");
-                await fetchTechnicians();
-            } catch (error) {
-                alert("LỖI: " + (error.response?.data?.message || "Xóa thất bại. Kỹ thuật viên có thể đang tham gia sửa chữa."));
-            }
+                const res = await api.delete(`/Technicians/HardDelete/${id}`);
+                alert(res.data?.message || "Đã xóa vĩnh viễn.");
+                fetchTechnicians();
+            } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể xóa.")); }
         }
     };
 
     return (
         <div className="container-fluid p-0">
-            <div className="d-flex justify-content-between align-items-center mb-4">
+            {/* TIÊU ĐỀ & NÚT ĐIỀU HƯỚNG */}
+            <div className="d-flex justify-content-between align-items-start mb-4">
                 <div>
-                    <h2 className="fw-bold mb-0">Hồ sơ Kỹ thuật viên</h2>
-                    <div className="text-muted small">Quản lý tài khoản, trạng thái và thông tin liên lạc</div>
+                    <h2 className="fw-bold mb-0">{showTrash ? 'Danh sách đã xóa: Kỹ thuật viên' : 'Quản lý Kỹ thuật viên'}</h2>
+                    {showTrash && <div className="text-danger small mt-2">Các tài khoản bị vô hiệu hóa và xóa mềm lưu trữ tại đây</div>}
                 </div>
-                {/* Thêm nút Thêm Mới */}
-                <button className="btn btn-primary" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#techModal">
-                    <i className="bi bi-person-plus-fill me-2"></i> Thêm Kỹ Thuật Viên
-                </button>
+
+                <div className="d-flex align-items-center">
+                    {!showTrash && (
+                        <button className="btn btn-primary me-3" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#techModal" style={{ minWidth: '160px' }}>
+                            <i className="bi bi-person-plus-fill me-2"></i> Thêm KTV
+                        </button>
+                    )}
+                    <button className={`btn ${showTrash ? 'btn-outline-secondary' : 'btn-outline-danger'}`} onClick={() => setShowTrash(!showTrash)}>
+                        <i className={`bi ${showTrash ? 'bi-arrow-left-circle' : 'bi-archive'} me-2`}></i>
+                        {showTrash ? 'Quay lại Danh sách' : 'Danh sách đã xóa'}
+                    </button>
+                </div>
             </div>
 
+            {/* BẢNG DỮ LIỆU */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
                         <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
+                    ) : technicians.length === 0 ? (
+                        <div className="text-center p-5 text-muted">{showTrash ? 'Không có tài khoản nào bị xóa.' : 'Chưa có dữ liệu.'}</div>
                     ) : (
                         <div className="table-responsive">
                             <table className="table table-hover table-bordered mb-0 align-middle text-center">
-                                <thead className="table-light small fw-bold text-uppercase">
+                                <thead className="table-light">
                                     <tr>
-                                        <th>Mã TECH</th>
-                                        <th>Họ và Tên</th>
+                                        <th>STT</th>
+                                        <th>Mã NV</th>
+                                        <th className="text-start">Họ và Tên</th>
                                         <th>Liên hệ</th>
-                                        <th>CCCD</th>
-                                        <th>Tình trạng việc</th>
-                                        <th>Tài khoản</th>
-                                        <th>Thao tác</th>
+                                        <th>Trạng thái Hệ thống</th>
+                                        <th>Tình trạng CV</th>
+                                        <th>Hành động</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {technicians.length > 0 ? (
-                                        technicians.map((t) => (
-                                            <tr key={t.accountId}>
-                                                <td className="fw-bold text-secondary">{t.code || 'N/A'}</td>
-                                                <td className="fw-bold text-primary text-start ps-3">{t.fullName}</td>
-                                                <td className="text-start">
-                                                    <div><i className="bi bi-telephone-fill text-success me-1"></i> {t.phoneNumber}</div>
-                                                    <div><i className="bi bi-envelope-fill text-muted me-1"></i> {t.email}</div>
-                                                </td>
-                                                <td>{t.identityCard}</td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        className={`btn btn-sm rounded-pill fw-bold ${t.techAvailability === 1 ? 'btn-info text-dark' : 'btn-warning text-dark'}`}
-                                                        onClick={() => handleToggleAvailability(t.accountId)}
-                                                        title="Nhấn để đổi trạng thái nhanh"
-                                                        style={{ minWidth: '90px' }}
+                                    {technicians.map((tech, idx) => (
+                                        <tr key={tech.accountId}>
+                                            <td>{idx + 1}</td>
+                                            <td className={`fw-bold ${showTrash ? 'text-muted' : 'text-primary'}`}>{tech.code}</td>
+                                            <td className="text-start">
+                                                <div className={`fw-semibold ${showTrash ? 'text-muted text-decoration-line-through' : ''}`}>{tech.fullName}</div>
+                                                <div className="small text-muted">@{tech.userName}</div>
+                                            </td>
+                                            <td>
+                                                <div className="small">{tech.phoneNumber}</div>
+                                                <div className="small text-muted">{tech.email}</div>
+                                            </td>
+
+                                            {/* Cột Trạng thái Hệ thống (Khóa / Mở) */}
+                                            <td>
+                                                {showTrash ? <span className="badge bg-danger">Đã xóa</span> : (
+                                                    <span
+                                                        className={`badge rounded-pill ${tech.status === 1 ? 'bg-success' : 'bg-secondary'}`}
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={() => handleToggleStatus(tech.accountId)}
+                                                        title="Click để Đóng/Mở khóa"
                                                     >
-                                                        {t.techAvailability === 1 ? 'Rảnh rỗi' : 'Đang bận'}
-                                                    </button>
-                                                </td>
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        className={`btn btn-sm rounded-pill fw-bold text-white ${t.status === 1 ? 'btn-success' : 'btn-danger'}`}
-                                                        onClick={() => handleToggleStatus(t.accountId)}
-                                                        title="Nhấn để Khóa/Mở khóa tài khoản"
-                                                        style={{ minWidth: '90px' }}
+                                                        {tech.status === 1 ? 'Đang hoạt động' : 'Đã khóa'}
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            {/* Cột Tình trạng Công việc (Rảnh / Bận) */}
+                                            <td>
+                                                {!showTrash && (
+                                                    <span
+                                                        className={`badge ${tech.techAvailability === 1 ? 'bg-info text-dark' : 'bg-warning text-dark'}`}
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={() => handleToggleAvailability(tech.accountId)}
+                                                        title="Click để đổi Rảnh/Bận"
                                                     >
-                                                        {t.status === 1 ? 'Hoạt động' : 'Đã khóa'}
-                                                    </button>
-                                                </td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-outline-warning me-2 mb-1" title="Sửa thông tin" onClick={() => handleOpenModal(t)} data-bs-toggle="modal" data-bs-target="#techModal">
-                                                        Sửa
-                                                    </button>
-                                                    <button className="btn btn-sm btn-outline-danger mb-1" title="Xóa" onClick={() => handleDelete(t.accountId, t.fullName)}>
-                                                        Xóa
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr><td colSpan="7" className="p-5 text-muted">Chưa có dữ liệu kỹ thuật viên được liên kết.</td></tr>
-                                    )}
+                                                        {tech.techAvailability === 1 ? 'Rảnh rỗi' : 'Đang bận'}
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            {/* Cột Hành động */}
+                                            <td>
+                                                {showTrash ? (
+                                                    <>
+                                                        <button className="btn btn-sm btn-outline-success me-2" onClick={() => handleRestore(tech.accountId)}>Khôi phục</button>
+                                                        <button className="btn btn-sm btn-danger" onClick={() => handleHardDelete(tech.accountId, tech.fullName)}>Xóa hẳn</button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(tech)} data-bs-toggle="modal" data-bs-target="#techModal">
+                                                            <i className="bi bi-pencil-square me-1"></i> Cập nhật
+                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(tech.accountId, tech.fullName)}>
+                                                            <i className="bi bi-x-circle me-1"></i> Xóa
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
@@ -223,57 +249,72 @@ const TechnicianManagement = () => {
                 </div>
             </div>
 
-            {/* MODAL DÙNG CHUNG CHO THÊM VÀ SỬA */}
+            {/* MODAL THÊM / SỬA */}
             <div className="modal fade" id="techModal" tabIndex="-1" aria-hidden="true">
-                <div className="modal-dialog modal-lg modal-dialog-centered">
-                    <div className="modal-content border-0">
+                <div className="modal-dialog modal-lg">
+                    <div className="modal-content">
                         <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
-                            <h5 className="modal-title fw-bold">{editId ? 'Chỉnh Sửa Hồ Sơ' : 'Thêm Kỹ Thuật Viên Mới'}</h5>
+                            <h5 className="modal-title fw-bold">{editId ? 'Cập Nhật Kỹ Thuật Viên' : 'Thêm Kỹ Thuật Viên Mới'}</h5>
                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeTechModal"></button>
                         </div>
+
                         <form onSubmit={handleSubmit}>
-                            <div className="modal-body p-4 text-start">
+                            <div className="modal-body">
                                 <div className="row g-3">
+                                    {/* THÔNG TIN TÀI KHOẢN (Chỉ hiện khi Thêm mới) */}
+                                    <div className="col-12"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">1. Thông tin tài khoản</h6></div>
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold small">Tên đăng nhập (*)</label>
-                                        <input type="text" className="form-control" name="userName" value={formData.userName} onChange={handleInputChange} required disabled={!!editId} />
+                                        <label className="form-label fw-semibold">Tên đăng nhập (Username) {editId ? '' : '(*)'}</label>
+                                        <input type="text" className="form-control" name="userName" value={formData.userName} onChange={handleInputChange} required={!editId} disabled={!!editId} placeholder={editId ? 'Không được phép đổi Username' : ''} />
                                     </div>
-                                    {!editId && (
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-bold small">Mật khẩu khởi tạo (*)</label>
-                                            <input type="password" className="form-control" name="password" value={formData.password} onChange={handleInputChange} required />
-                                        </div>
-                                    )}
-                                    <div className="col-md-12">
-                                        <label className="form-label fw-bold small">Họ và Tên (*)</label>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Mật khẩu {editId ? '' : '(*)'}</label>
+                                        <input type="password" className="form-control" name="password" value={formData.password} onChange={handleInputChange} required={!editId} disabled={!!editId} placeholder={editId ? 'Không đổi mật khẩu ở đây' : ''} />
+                                    </div>
+
+                                    {/* THÔNG TIN CÁ NHÂN */}
+                                    <div className="col-12 mt-4"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">2. Thông tin cá nhân & Liên hệ</h6></div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Họ và Tên (*)</label>
                                         <input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required />
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold small">Email liên hệ (*)</label>
+                                        <label className="form-label fw-semibold">Số CCCD (12 số) (*)</label>
+                                        <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} pattern="\d{12}" title="CCCD phải bao gồm đúng 12 chữ số" required />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Số điện thoại (*)</label>
+                                        <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} pattern="\d{10}" title="Số điện thoại VN gồm 10 số" required />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Email (@gmail.com) (*)</label>
                                         <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-bold small">Số điện thoại (*)</label>
-                                        <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} required />
+
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-semibold">Quốc gia</label>
+                                        <input type="text" className="form-control" name="country" value={formData.country} onChange={handleInputChange} />
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-bold small">Số CCCD (*)</label>
-                                        <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-bold small">Tỉnh / Thành phố</label>
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-semibold">Tỉnh/Thành phố</label>
                                         <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} />
                                     </div>
-                                    <div className="col-md-12">
-                                        <label className="form-label fw-bold small">Địa chỉ thường trú</label>
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
                                         <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} />
                                     </div>
+
+                                    {!editId && (
+                                        <div className="col-12 mt-2">
+                                            <small className="text-muted fst-italic">* Mã KTV (TECH-...) sẽ được hệ thống tạo tự động.</small>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="modal-footer bg-light">
                                 <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" className="btn btn-primary px-4" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Đang xử lý...' : 'Lưu thông tin'}
+                                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Đang xử lý...' : 'Lưu Thông Tin'}
                                 </button>
                             </div>
                         </form>
