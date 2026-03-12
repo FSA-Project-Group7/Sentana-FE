@@ -5,7 +5,7 @@ const ServiceManagement = () => {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // --- STATE CHO FORM THÊM/SỬA ---
+    
     const [showForm, setShowForm] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [currentId, setCurrentId] = useState(null);
@@ -13,10 +13,10 @@ const ServiceManagement = () => {
         serviceName: '',
         description: '',
         serviceFee: '',
-        status: 1 // Giả sử 1 là Active
+        status: 1 
     });
 
-    // --- LẤY DỮ LIỆU ---
+    
     const fetchServices = async () => {
         try {
             setLoading(true);
@@ -35,7 +35,7 @@ const ServiceManagement = () => {
     }, []);
 
     const handleDelete = async (id) => {
-        // Kiểm tra xem có nhận được ID không
+        
         if (!id) {
             alert("Không tìm thấy ID dịch vụ hợp lệ!");
             return;
@@ -45,11 +45,11 @@ const ServiceManagement = () => {
             try {
                 await api.delete(`/Service/${id}`);
                 alert("Xóa dịch vụ thành công!");
-                fetchServices(); // Gọi lại API để cập nhật bảng
+                fetchServices(); 
             } catch (error) {
                 console.error("Lỗi xóa dịch vụ:", error);
 
-                // Bắt và hiển thị câu thông báo lỗi chi tiết từ Back-end
+                
                 const errorMessage = error.response?.data?.message || "Đã xảy ra lỗi hệ thống!";
 
                 if (errorMessage === "Service is already inactive.") {
@@ -61,7 +61,7 @@ const ServiceManagement = () => {
         }
     };
 
-    // --- HÀM HIỂN THỊ FORM ---
+    
     const handleShowAdd = () => {
         setIsEdit(false);
         setFormData({ serviceName: '', description: '', serviceFee: '', status: 1 });
@@ -83,12 +83,12 @@ const ServiceManagement = () => {
     const handleInputChange = (e) => {
         const { name, value } = e.target;
 
-        // Nếu trường đang nhập là status hoặc serviceFee, ép kiểu nó về dạng Số (Number)
+        
         let parsedValue = value;
         if (name === 'status') {
             parsedValue = parseInt(value, 10);
         } else if (name === 'serviceFee') {
-            // serviceFee có thể để chuỗi tạm thời trong ô input, nhưng nếu muốn an toàn khi gửi thì ép về float/number
+            
             parsedValue = value ? Number(value) : '';
         }
 
@@ -99,7 +99,7 @@ const ServiceManagement = () => {
         e.preventDefault();
         try {
             if (isEdit) {
-                // Cần đảm bảo BE có endpoint PUT /api/Service/{id}
+                
                 await api.put(`/Service/${currentId}`, formData);
                 alert("Cập nhật thành công!");
             } else {
@@ -114,7 +114,7 @@ const ServiceManagement = () => {
         }
     };
 
-    // --- CÁC HÀM FORMAT (Giữ nguyên của bạn) ---
+    
     const formatCurrency = (amount) => {
         if (!amount && amount !== 0) return '---';
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
