@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
+import CreateAccountForm from '../../components/common/CreateAccountForm';
 
 const ResidentManagement = () => {
     const [residents, setResidents] = useState([]);
@@ -286,61 +287,78 @@ const ResidentManagement = () => {
 
             {/* 1. MODAL THÊM / SỬA CƯ DÂN */}
             <div className="modal fade" id="residentModal" tabIndex="-1" aria-hidden="true">
-                <div className="modal-dialog modal-lg">
-                    <div className="modal-content">
-                        <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
-                            <h5 className="modal-title fw-bold">{editId ? 'Cập Nhật Hồ Sơ Cư Dân' : 'Thêm Cư Dân Mới'}</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeResModal"></button>
-                        </div>
-                        <form onSubmit={handleSubmit}>
-                            <div className="modal-body">
-                                <div className="row g-3">
-                                    <div className="col-12"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin tài khoản</h6></div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Tên đăng nhập {editId ? '' : '(*)'}</label>
-                                        <input type="text" className="form-control" name="userName" value={formData.userName} onChange={handleInputChange} required={!editId} disabled={!!editId} />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Mật khẩu {editId ? '' : '(*)'}</label>
-                                        <input type="password" className="form-control" name="password" value={formData.password} onChange={handleInputChange} required={!editId} disabled={!!editId} />
-                                    </div>
+                <div className={`modal-dialog ${editId ? 'modal-lg' : 'modal-lg modal-dialog-scrollable'}`}>
+                    <div className="modal-content border-0">
 
-                                    <div className="col-12 mt-4"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin cá nhân</h6></div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Họ và Tên (*)</label>
-                                        <input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Số CCCD (*)</label>
-                                        <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} pattern="\d{12}" title="Gồm đúng 12 chữ số" required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Số điện thoại (*)</label>
-                                        <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} pattern="\d{10}" title="Số điện thoại VN 10 số" required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Email (*)</label>
-                                        <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Quốc gia</label>
-                                        <input type="text" className="form-control" name="country" value={formData.country} onChange={handleInputChange} />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Thành phố</label>
-                                        <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
-                                        <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} />
-                                    </div>
+                        {/* ── CREATE MODE: dùng CreateAccountForm thông minh ── */}
+                        {!editId && (
+                            <CreateAccountForm
+                                type="resident"
+                                onSuccess={() => {
+                                    fetchData();
+                                    document.getElementById('closeResModal').click();
+                                }}
+                                onCancel={() => document.getElementById('closeResModal').click()}
+                            />
+                        )}
+
+                        {/* Nút đóng ẩn dùng để đóng modal từ JS */}
+                        <button
+                            type="button"
+                            id="closeResModal"
+                            data-bs-dismiss="modal"
+                            style={{ display: 'none' }}
+                            aria-hidden="true"
+                        />
+
+                        {/* ── EDIT MODE: form cập nhật đơn giản ── */}
+                        {!!editId && (
+                            <>
+                                <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
+                                    <h5 className="modal-title fw-bold">Cập Nhật Hồ Sơ Cư Dân</h5>
+                                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                 </div>
-                            </div>
-                            <div className="modal-footer bg-light">
-                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>Lưu Cư Dân</button>
-                            </div>
-                        </form>
+                                <form onSubmit={handleSubmit}>
+                                    <div className="modal-body">
+                                        <div className="row g-3">
+                                            <div className="col-12"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin cá nhân</h6></div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Họ và Tên (*)</label>
+                                                <input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Email (*)</label>
+                                                <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Số CCCD</label>
+                                                <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Số điện thoại</label>
+                                                <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label fw-semibold">Quốc gia</label>
+                                                <input type="text" className="form-control" name="country" value={formData.country} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label fw-semibold">Thành phố</label>
+                                                <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
+                                                <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer bg-light">
+                                        <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>Lưu Thay Đổi</button>
+                                    </div>
+                                </form>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

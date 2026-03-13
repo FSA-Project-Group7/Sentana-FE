@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
+import CreateAccountForm from '../../components/common/CreateAccountForm';
 
 const TechnicianManagement = () => {
     const [technicians, setTechnicians] = useState([]);
@@ -8,21 +9,17 @@ const TechnicianManagement = () => {
     const [editId, setEditId] = useState(null);
     const [showTrash, setShowTrash] = useState(false);
 
-
     const initialFormState = {
         email: '', userName: '', password: '', fullName: '',
         phoneNumber: '', identityCard: '', country: 'Việt Nam', city: 'Hà Nội', address: ''
     };
     const [formData, setFormData] = useState(initialFormState);
 
-
     const fetchTechnicians = async () => {
         try {
             setLoading(true);
             const endpoint = showTrash ? '/Technicians/Deleted' : '/Technicians';
             const response = await api.get(endpoint);
-
-
             const dataList = response.data.data ? response.data.data : response.data;
             setTechnicians(Array.isArray(dataList) ? dataList : []);
         } catch (error) {
@@ -40,7 +37,6 @@ const TechnicianManagement = () => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
-
 
     const handleOpenModal = (tech = null) => {
         if (tech) {
@@ -62,13 +58,11 @@ const TechnicianManagement = () => {
         }
     };
 
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
             if (editId) {
-
                 const updatePayload = {
                     email: formData.email, fullName: formData.fullName,
                     phoneNumber: formData.phoneNumber, identityCard: formData.identityCard,
@@ -76,10 +70,6 @@ const TechnicianManagement = () => {
                 };
                 const res = await api.put(`/Technicians/UpdateTechnician/${editId}`, updatePayload);
                 alert(res.data?.message || "Cập nhật thành công!");
-            } else {
-
-                const res = await api.post('/Technicians/CreateTechnician', formData);
-                alert(res.data?.message || "Thêm Kỹ thuật viên thành công!");
             }
             fetchTechnicians();
             document.getElementById('closeTechModal').click();
@@ -90,7 +80,6 @@ const TechnicianManagement = () => {
             setIsSubmitting(false);
         }
     };
-
 
     const handleToggleStatus = async (id) => {
         try {
@@ -107,7 +96,6 @@ const TechnicianManagement = () => {
             fetchTechnicians();
         } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể thực hiện.")); }
     };
-
 
     const handleDelete = async (id, name) => {
         if (window.confirm(`Xác nhận đưa KTV "${name}" vào danh sách đã xóa?`)) {
@@ -145,7 +133,6 @@ const TechnicianManagement = () => {
                     <h2 className="fw-bold mb-0">{showTrash ? 'Danh sách đã xóa: Kỹ thuật viên' : 'Quản lý Kỹ thuật viên'}</h2>
                     {showTrash && <div className="text-danger small mt-2">Các tài khoản bị vô hiệu hóa và xóa mềm lưu trữ tại đây</div>}
                 </div>
-
                 <div className="d-flex align-items-center">
                     {!showTrash && (
                         <button className="btn btn-primary me-3" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#techModal" style={{ minWidth: '160px' }}>
@@ -193,8 +180,6 @@ const TechnicianManagement = () => {
                                                 <div className="small">{tech.phoneNumber}</div>
                                                 <div className="small text-muted">{tech.email}</div>
                                             </td>
-
-                                            {/* Cột Trạng thái Hệ thống (Khóa / Mở) */}
                                             <td>
                                                 {showTrash ? <span className="badge bg-danger">Đã xóa</span> : (
                                                     <span
@@ -207,8 +192,6 @@ const TechnicianManagement = () => {
                                                     </span>
                                                 )}
                                             </td>
-
-                                            {/* Cột Tình trạng Công việc (Rảnh / Bận) */}
                                             <td>
                                                 {!showTrash && (
                                                     <span
@@ -221,8 +204,6 @@ const TechnicianManagement = () => {
                                                     </span>
                                                 )}
                                             </td>
-
-                                            {/* Cột Hành động */}
                                             <td>
                                                 {showTrash ? (
                                                     <>
@@ -251,73 +232,80 @@ const TechnicianManagement = () => {
 
             {/* MODAL THÊM / SỬA */}
             <div className="modal fade" id="techModal" tabIndex="-1" aria-hidden="true">
-                <div className="modal-dialog modal-lg">
-                    <div className="modal-content">
-                        <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
-                            <h5 className="modal-title fw-bold">{editId ? 'Cập Nhật Kỹ Thuật Viên' : 'Thêm Kỹ Thuật Viên Mới'}</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeTechModal"></button>
-                        </div>
+                <div className={`modal-dialog ${editId ? 'modal-lg' : 'modal-lg modal-dialog-scrollable'}`}>
+                    <div className="modal-content border-0">
 
-                        <form onSubmit={handleSubmit}>
-                            <div className="modal-body">
-                                <div className="row g-3">
-                                    {/* THÔNG TIN TÀI KHOẢN (Chỉ hiện khi Thêm mới) */}
-                                    <div className="col-12"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">1. Thông tin tài khoản</h6></div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Tên đăng nhập (Username) {editId ? '' : '(*)'}</label>
-                                        <input type="text" className="form-control" name="userName" value={formData.userName} onChange={handleInputChange} required={!editId} disabled={!!editId} placeholder={editId ? 'Không được phép đổi Username' : ''} />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Mật khẩu {editId ? '' : '(*)'}</label>
-                                        <input type="password" className="form-control" name="password" value={formData.password} onChange={handleInputChange} required={!editId} disabled={!!editId} placeholder={editId ? 'Không đổi mật khẩu ở đây' : ''} />
-                                    </div>
+                        {/* ── CREATE MODE: dùng CreateAccountForm thông minh ── */}
+                        {!editId && (
+                            <CreateAccountForm
+                                type="technician"
+                                onSuccess={() => {
+                                    fetchTechnicians();
+                                    document.getElementById('closeTechModal').click();
+                                }}
+                                onCancel={() => document.getElementById('closeTechModal').click()}
+                            />
+                        )}
 
-                                    {/* THÔNG TIN CÁ NHÂN */}
-                                    <div className="col-12 mt-4"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">2. Thông tin cá nhân & Liên hệ</h6></div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Họ và Tên (*)</label>
-                                        <input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Số CCCD (12 số) (*)</label>
-                                        <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} pattern="\d{12}" title="CCCD phải bao gồm đúng 12 chữ số" required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Số điện thoại (*)</label>
-                                        <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} pattern="\d{10}" title="Số điện thoại VN gồm 10 số" required />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold">Email (@gmail.com) (*)</label>
-                                        <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
-                                    </div>
+                        {/* Nút đóng ẩn dùng để đóng modal từ JS */}
+                        <button
+                            type="button"
+                            id="closeTechModal"
+                            data-bs-dismiss="modal"
+                            style={{ display: 'none' }}
+                            aria-hidden="true"
+                        />
 
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Quốc gia</label>
-                                        <input type="text" className="form-control" name="country" value={formData.country} onChange={handleInputChange} />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Tỉnh/Thành phố</label>
-                                        <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} />
-                                    </div>
-                                    <div className="col-md-4">
-                                        <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
-                                        <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} />
-                                    </div>
-
-                                    {!editId && (
-                                        <div className="col-12 mt-2">
-                                            <small className="text-muted fst-italic">* Mã KTV (TECH-...) sẽ được hệ thống tạo tự động.</small>
-                                        </div>
-                                    )}
+                        {/* ── EDIT MODE: form cập nhật đơn giản ── */}
+                        {!!editId && (
+                            <>
+                                <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
+                                    <h5 className="modal-title fw-bold">Cập Nhật Kỹ Thuật Viên</h5>
+                                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                 </div>
-                            </div>
-                            <div className="modal-footer bg-light">
-                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Đang xử lý...' : 'Lưu Thông Tin'}
-                                </button>
-                            </div>
-                        </form>
+                                <form onSubmit={handleSubmit}>
+                                    <div className="modal-body">
+                                        <div className="row g-3">
+                                            <div className="col-12 mt-2"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin cá nhân &amp; Liên hệ</h6></div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Họ và Tên (*)</label>
+                                                <input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Số CCCD (12 số) (*)</label>
+                                                <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} pattern="\d{12}" title="CCCD phải bao gồm đúng 12 chữ số" required />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Số điện thoại (*)</label>
+                                                <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} pattern="\d{10}" title="Số điện thoại VN gồm 10 số" required />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Email (@gmail.com) (*)</label>
+                                                <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label fw-semibold">Quốc gia</label>
+                                                <input type="text" className="form-control" name="country" value={formData.country} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label fw-semibold">Tỉnh/Thành phố</label>
+                                                <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
+                                                <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer bg-light">
+                                        <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                                            {isSubmitting ? 'Đang xử lý...' : 'Lưu Thay Đổi'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

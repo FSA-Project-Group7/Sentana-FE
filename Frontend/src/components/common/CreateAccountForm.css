@@ -1,0 +1,508 @@
+/* =============================================================
+   CreateAccountForm.css — Premium form styling  v2
+   Prefix: caf- (CreateAccountForm)
+   ============================================================= */
+
+/* ── Bootstrap modal-content override ────────────────────── */
+/* Khi modal chứa form này → ẩn nền trắng của Bootstrap  */
+.modal-content:has(.caf-wrapper) {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+
+/* ── Root wrapper ─────────────────────────────────────────── */
+.caf-wrapper {
+  background: #ffffff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(18, 34, 64, 0.14);
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+.caf-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #0f1f45 0%, #1a3560 100%);
+  color: #ffffff;
+  position: relative;
+}
+
+.caf-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+}
+
+.caf-header__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  flex: 1;
+}
+
+/* ── Header close button (X) ──────────────────────────────── */
+.caf-header__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.caf-header__close:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.55);
+  transform: scale(1.08);
+}
+
+.caf-header__close:active {
+  transform: scale(0.96);
+}
+
+/* ── Sections ─────────────────────────────────────────────── */
+.caf-section {
+  padding: 18px 22px 6px;
+}
+
+.caf-section + .caf-section {
+  padding-top: 14px;
+}
+
+.caf-section__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #0f1f45;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e4eaf3;
+  margin-bottom: 14px;
+}
+
+.caf-section__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, #0f1f45 0%, #1a3560 100%);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(18, 34, 64, 0.3);
+}
+
+/* ── Labels ───────────────────────────────────────────────── */
+.caf-label {
+  font-size: 0.81rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.caf-required {
+  color: #e53e3e;
+  font-size: 0.9em;
+}
+
+.caf-hint {
+  font-size: 0.71rem;
+  color: #a0aec0;
+  font-weight: 400;
+  margin-left: auto;
+}
+
+/* ── Inputs ───────────────────────────────────────────────── */
+.caf-input {
+  border-radius: 8px !important;
+  border: 1.5px solid #cbd5e0 !important;
+  font-size: 0.875rem !important;
+  padding: 9px 12px !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background-color: #fff !important;
+  color: #1a202c !important;
+}
+
+.caf-input:focus {
+  border-color: #1a3560 !important;
+  box-shadow: 0 0 0 3px rgba(26, 53, 96, 0.13) !important;
+  outline: none;
+}
+
+.caf-input.is-invalid {
+  border-color: #e53e3e !important;
+  background-image: none !important;
+}
+
+.caf-input.is-invalid:focus {
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15) !important;
+}
+
+.caf-input.is-valid {
+  border-color: #38a169 !important;
+  background-image: none !important;
+}
+
+/* Locked (info from system) */
+.caf-input--locked {
+  background-color: #edf2f7 !important;
+  color: #4a5568 !important;
+  cursor: not-allowed;
+  border: 1.5px dashed #b2c2d8 !important;
+}
+
+/* CCCD status borders */
+.caf-input--found    { border-color: #38a169 !important; }
+.caf-input--notfound { border-color: #e69c24 !important; }
+
+/* ── Field validation error ─────────────────────────────── */
+.caf-field-error {
+  font-size: 0.74rem;
+  color: #e53e3e;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.caf-field-error::before {
+  content: "⚠";
+  font-size: 0.7rem;
+}
+
+/* ── Password wrapper ──────────────────────────────────── */
+.caf-password-wrapper {
+  position: relative;
+}
+
+.caf-password-wrapper .caf-input {
+  padding-right: 42px !important;
+}
+
+.caf-password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #9ca3af;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.caf-password-toggle:hover {
+  color: #374151;
+}
+
+/* ── CCCD wrapper ────────────────────────────────────────── */
+.caf-cccd-wrapper {
+  position: relative;
+}
+
+.caf-cccd-wrapper .caf-input {
+  padding-right: 40px !important;
+}
+
+.caf-cccd-spinner,
+.caf-cccd-status {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+}
+
+.caf-cccd-status {
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.caf-cccd-status--found    { background: #38a169; color: #fff; }
+.caf-cccd-status--notfound { background: #e69c24; color: #fff; }
+
+/* ── Spinner ─────────────────────────────────────────────── */
+.caf-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(18, 34, 64, 0.15);
+  border-top-color: #1a3560;
+  border-radius: 50%;
+  animation: caf-spin 0.65s linear infinite;
+  display: inline-block;
+}
+
+.caf-spinner--sm {
+  width: 15px;
+  height: 15px;
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  vertical-align: middle;
+}
+
+@keyframes caf-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Locked info badge ───────────────────────────────────── */
+.caf-badge-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.69rem;
+  background: #ebf8f0;
+  color: #276749;
+  border: 1px solid #c6f6d5;
+  border-radius: 20px;
+  padding: 3px 9px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ACTIONS FOOTER
+   ═══════════════════════════════════════════════════════════ */
+.caf-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px 18px;
+  background: #f7f9fc;
+  border-top: 1.5px solid #e4eaf3;
+  margin-top: 18px;
+}
+
+/* ── Cancel button ───────────────────────────────────────── */
+.caf-btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 8px 18px;
+  background: transparent;
+  color: #64748b;
+  border: 1.5px solid #cbd5e0;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.caf-btn-cancel:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #b91c1c;
+}
+
+.caf-btn-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Reset button ─────────────────────────────────────────── */
+.caf-btn-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 8px 18px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1.5px solid #cbd5e0;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.caf-btn-reset:hover:not(:disabled) {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.caf-btn-reset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Submit button — VIBRANT PRIMARY ─────────────────────── */
+.caf-btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 9px 24px;
+
+  /* Vivid blue-indigo gradient — easily readable */
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 60%, #1e40af 100%);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+
+  box-shadow:
+    0 4px 14px rgba(37, 99, 235, 0.45),
+    0 1px 3px rgba(37, 99, 235, 0.25);
+  transition: filter 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+
+.caf-btn-submit:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 20px rgba(37, 99, 235, 0.55),
+    0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+.caf-btn-submit:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.97);
+  box-shadow:
+    0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.caf-btn-submit:disabled {
+  background: linear-gradient(135deg, #93c5fd 0%, #6096e8 100%);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOAST NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════ */
+.caf-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  max-width: 380px;
+  width: 100%;
+}
+
+.caf-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border-left: 4px solid transparent;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  pointer-events: all;
+  animation: caf-toast-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 0.845rem;
+  line-height: 1.45;
+}
+
+@keyframes caf-toast-in {
+  from { opacity: 0; transform: translateX(40px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.caf-toast--success { border-left-color: #38a169; background: #f0fff4; }
+.caf-toast--error   { border-left-color: #e53e3e; background: #fff5f5; }
+.caf-toast--info    { border-left-color: #3182ce; background: #ebf8ff; }
+.caf-toast--warning { border-left-color: #d69e2e; background: #fffff0; }
+
+.caf-toast__icon {
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.caf-toast--success .caf-toast__icon { color: #38a169; }
+.caf-toast--error   .caf-toast__icon { color: #e53e3e; }
+.caf-toast--info    .caf-toast__icon { color: #3182ce; }
+.caf-toast--warning .caf-toast__icon { color: #d69e2e; }
+
+.caf-toast__message {
+  flex: 1;
+  color: #2d3748;
+}
+
+.caf-toast__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: #9ca3af;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.caf-toast__close:hover { color: #374151; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 576px) {
+  .caf-wrapper { border-radius: 10px; }
+
+  .caf-header,
+  .caf-section,
+  .caf-actions {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .caf-actions { flex-wrap: wrap; }
+
+  .caf-btn-submit { flex: 1; justify-content: center; }
+
+  .caf-toast-container {
+    right: 10px;
+    left: 10px;
+    max-width: unset;
+  }
+}
