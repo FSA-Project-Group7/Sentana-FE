@@ -1,14 +1,29 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import api from '../utils/axiosConfig'; 
 import News from '../components/News';
-const ResidentPage = () => {
-    const navigate = useNavigate();
-    
-    const [activeMenu, setActiveMenu] = useState('dashboard');
 
-    const handleLogout = () => {
-        
-        navigate('/login');
+const ResidentPage = () => {
+    const [activeMenu, setActiveMenu] = useState('dashboard');
+    const [isLoggingOut, setIsLoggingOut] = useState(false); 
+
+    const handleLogout = async () => {
+        if (isLoggingOut) return; 
+        setIsLoggingOut(true);
+
+        try {
+            await api.post('/Auth/logout'); 
+            console.log("Đã hủy Token ở Backend thành công!");
+        } catch (error) {
+            console.error("Lỗi khi gọi API Đăng xuất:", error);
+        } finally {
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
+            
+            // Nếu bạn có lưu refreshToken ở LocalStorage thì nhớ xóa luôn nhé:
+            // localStorage.removeItem('refreshToken');
+
+            window.location.href = '/login'; 
+        }
     };
 
     const navyColor = '#122240';
@@ -44,28 +59,30 @@ const ResidentPage = () => {
                 </div>
 
                 <div className="p-3 border-top border-secondary">
-                    <button onClick={handleLogout} className="btn btn-outline-light w-100 fw-bold">
-                        Đăng xuất
+                    {/* NÚT ĐĂNG XUẤT HIỂN THỊ TRẠNG THÁI LOADING */}
+                    <button 
+                        onClick={handleLogout} 
+                        disabled={isLoggingOut}
+                        className="btn btn-outline-light w-100 fw-bold"
+                    >
+                        {isLoggingOut ? 'Đang thoát...' : 'Đăng xuất'}
                     </button>
                 </div>
             </div>
+            
             <div className="flex-grow-1 d-flex flex-column" style={{ overflowY: 'auto' }}>
-
                 <div className="bg-white shadow-sm p-3 d-flex justify-content-between align-items-center sticky-top">
                     <h5 className="mb-0 fw-bold" style={{ color: navyColor }}>Xin chào, Nguyễn Văn A (Phòng 12A05)</h5>
                     <div className="d-flex gap-3 align-items-center">
                         <button className="btn btn-light position-relative rounded-circle">
                             🔔
-                            <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                2
-                            </span>
+                            <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">2</span>
                         </button>
                         <div className="bg-secondary rounded-circle" style={{ width: '40px', height: '40px' }}></div>
                     </div>
                 </div>
 
                 <div className="p-4">
-
                     <div className="row mb-4">
                         <div className="col-md-4">
                             <div className="card shadow-sm border-0" style={{ borderRadius: '10px', borderLeft: '5px solid #dc3545' }}>
@@ -102,10 +119,8 @@ const ResidentPage = () => {
                         </h4>
                         <News />
                     </div>
-
                 </div>
             </div>
-
         </div>
     );
 };
