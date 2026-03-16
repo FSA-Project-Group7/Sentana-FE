@@ -12,6 +12,7 @@ import TechnicianManagement from './pages/admin/TechnicianManagement';
 import AccountManagement from './pages/admin/AccountManagement';
 import ResidentManagement from './pages/admin/ResidentManagement';
 import UtilityManagement from './pages/admin/UtilityManagement';
+import ContractManagement from './pages/admin/ContractManagement';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           <Route path="technicians" element={<TechnicianManagement />} />
           <Route path="residents" element={<ResidentManagement />} />
           <Route path="/admin/utilities" element={<UtilityManagement />} />
+          <Route path="contracts" element={<ContractManagement />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -20,6 +20,7 @@ const AdminLayout = () => {
         { path: '/admin/technicians', label: 'Kỹ thuật viên', icon: 'bi-person-gear' },
         { path: '/admin/services', label: 'Dịch vụ tiện ích', icon: 'bi-tools' },
         { path: '/admin/utilities', label: 'Quản lý Điện Nước', icon: 'bi-lightning-charge-fill text-warning' },
+        { path: '/admin/contracts', label: 'Quản lý Hợp đồng', icon: 'bi-file-earmark-text-fill text-success' },
     ];
 
     return (
