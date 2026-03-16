@@ -1,14 +1,31 @@
-import React from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Outlet, Link, useLocation } from 'react-router-dom'; // Đã gỡ useNavigate
+import api from '../utils/axiosConfig'; // Nhúng API vào để gọi Logout
 import styles from '../styles/AdminLayout.module.css';
 
 const AdminLayout = () => {
-    const navigate = useNavigate();
     const location = useLocation();
+    const [isLoggingOut, setIsLoggingOut] = useState(false); // State chống spam click
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        navigate('/login');
+    // NÂNG CẤP HÀM ĐĂNG XUẤT
+    const handleLogout = async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+
+        try {
+            // 1. Tiêu diệt Refresh Token ở DB
+            await api.post('/Auth/Logout');
+            console.log("Đã hủy Token Admin ở Backend thành công!");
+        } catch (error) {
+            console.error("Lỗi khi gọi API Đăng xuất:", error);
+        } finally {
+            // 2. Xóa dấu vết cục bộ
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
+            
+            // 3. Đá văng về trang đăng nhập
+            window.location.href = '/login';
+        }
     };
 
     const navItems = [
@@ -48,9 +65,17 @@ const AdminLayout = () => {
                     </nav>
                 </div>
 
-                <div className={styles.logoutBtn} onClick={handleLogout}>
+                {/* Gắn sự kiện và hiệu ứng loading cho nút Đăng xuất */}
+                <div 
+                    className={styles.logoutBtn} 
+                    onClick={handleLogout}
+                    style={{ 
+                        cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+                        opacity: isLoggingOut ? 0.6 : 1
+                    }}
+                >
                     <i className="bi bi-box-arrow-left me-3"></i>
-                    <span className="fw-bold">Đăng xuất</span>
+                    <span className="fw-bold">{isLoggingOut ? 'Đang thoát...' : 'Đăng xuất'}</span>
                 </div>
             </aside>
 
