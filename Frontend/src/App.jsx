@@ -41,8 +41,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Home />} />
         <Route element={<PublicRoute />}>
-          <Route path="/" element={<Home />} />
+          
           <Route path="/login" element={<Login />} />
         </Route>
         {/*Role Resident*/}
