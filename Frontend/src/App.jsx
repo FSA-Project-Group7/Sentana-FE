@@ -42,16 +42,16 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+
+        <Route path="/" element={<Home />} />
+
         <Route element={<PublicRoute />}>
-          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
         </Route>
-        {/*Role Resident*/}
         <Route element={<ProtectedRoute allowedRole="Resident" />}>
           <Route path="/resident" element={<ResidentPage />} />
         </Route>
 
-        {/*Role admin*/}
         <Route element={<ProtectedRoute allowedRole="Manager" />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
