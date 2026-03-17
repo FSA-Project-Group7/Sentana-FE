@@ -1,29 +1,29 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom'; // Đã gỡ useNavigate
-import api from '../utils/axiosConfig'; // Nhúng API vào để gọi Logout
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import api from '../utils/axiosConfig';
 import styles from '../styles/AdminLayout.module.css';
 
 const AdminLayout = () => {
     const location = useLocation();
-    const [isLoggingOut, setIsLoggingOut] = useState(false); // State chống spam click
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-    // NÂNG CẤP HÀM ĐĂNG XUẤT
+
     const handleLogout = async () => {
         if (isLoggingOut) return;
         setIsLoggingOut(true);
 
         try {
-            // 1. Tiêu diệt Refresh Token ở DB
+
             await api.post('/Auth/Logout');
             console.log("Đã hủy Token Admin ở Backend thành công!");
         } catch (error) {
             console.error("Lỗi khi gọi API Đăng xuất:", error);
         } finally {
-            // 2. Xóa dấu vết cục bộ
+
             localStorage.removeItem('token');
             localStorage.removeItem('role');
-            
-            // 3. Đá văng về trang đăng nhập
+
+
             window.location.href = '/login';
         }
     };
@@ -33,11 +33,13 @@ const AdminLayout = () => {
         { path: '/admin/buildings', label: 'Tòa nhà', icon: 'bi-building' },
         { path: '/admin/apartments', label: 'Danh sách phòng', icon: 'bi-door-open' },
         { path: '/admin/residents', label: 'Quản lý Cư dân', icon: 'bi-people-fill' },
-        { path: '/admin/accounts', label: 'Tài khoản hệ thống', icon: 'bi-person-lock' },
         { path: '/admin/technicians', label: 'Kỹ thuật viên', icon: 'bi-person-gear' },
+        { path: '/admin/accounts', label: 'Tài khoản hệ thống', icon: 'bi-person-lock' },
         { path: '/admin/services', label: 'Dịch vụ tiện ích', icon: 'bi-tools' },
         { path: '/admin/utilities', label: 'Quản lý Điện Nước', icon: 'bi-lightning-charge-fill text-warning' },
         { path: '/admin/contracts', label: 'Quản lý Hợp đồng', icon: 'bi-file-earmark-text-fill text-success' },
+        { path: '/admin/invoices', label: 'Quản lý Hóa đơn', icon: 'bi-receipt text-danger' },
+        { path: '/admin/payments', label: 'Xét duyệt Thanh toán', icon: 'bi-wallet2 text-info' },
     ];
 
     return (
@@ -67,10 +69,10 @@ const AdminLayout = () => {
                 </div>
 
                 {/* Gắn sự kiện và hiệu ứng loading cho nút Đăng xuất */}
-                <div 
-                    className={styles.logoutBtn} 
+                <div
+                    className={styles.logoutBtn}
                     onClick={handleLogout}
-                    style={{ 
+                    style={{
                         cursor: isLoggingOut ? 'not-allowed' : 'pointer',
                         opacity: isLoggingOut ? 0.6 : 1
                     }}

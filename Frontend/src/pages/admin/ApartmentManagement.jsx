@@ -156,6 +156,31 @@ const ApartmentManagement = () => {
         }
     };
 
+    const getStatusBadge = (status, hasTenant) => {
+        switch (status) {
+            case 1:
+                return <span className="badge bg-success">Trống</span>;
+            case 2:
+                return <span className="badge bg-warning text-dark">Đang thuê</span>;
+            case 3:
+                if (hasTenant) {
+                    return (
+                        <span className="badge bg-secondary d-inline-flex align-items-center">
+                            Bảo trì
+                            <span
+                                className="bg-danger rounded-circle ms-2 shadow-sm"
+                                style={{ width: '8px', height: '8px' }}
+                                title="Phòng đang có người thuê"
+                            ></span>
+                        </span>
+                    );
+                }
+                return <span className="badge bg-secondary">Bảo trì</span>;
+            default:
+                return <span className="badge bg-secondary">Không xác định</span>;
+        }
+    };
+
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 
@@ -163,7 +188,6 @@ const ApartmentManagement = () => {
 
     return (
         <div className="container-fluid p-0">
-            {/* TIÊU ĐỀ VÀ CÁC NÚT (Đồng bộ style với Tòa nhà) */}
             <div className="d-flex justify-content-between align-items-start mb-4">
                 <div>
                     <h2 className="fw-bold mb-0">{showTrash ? 'Danh sách đã xóa: Căn hộ' : 'Quản lý Căn hộ'}</h2>
@@ -207,7 +231,6 @@ const ApartmentManagement = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {/* Render mảng currentApartments thay vì apartments */}
                                         {currentApartments.map((apt, idx) => {
                                             const derivedRoomNumber = extractApartmentNumber(apt.apartmentCode);
 
@@ -222,13 +245,7 @@ const ApartmentManagement = () => {
                                                     <td>{apt.floorNumber}</td>
                                                     <td>{apt.area} m²</td>
                                                     <td>
-                                                        {showTrash ? (
-                                                            <span className="badge bg-danger">Đã xóa</span>
-                                                        ) : (
-                                                            <span className={`badge ${apt.status === 1 ? 'bg-success' : apt.status === 2 ? 'bg-warning text-dark' : 'bg-secondary'}`}>
-                                                                {apt.status === 1 ? 'Trống' : apt.status === 2 ? 'Đang thuê' : 'Bảo trì'}
-                                                            </span>
-                                                        )}
+                                                        {getStatusBadge(apt.status, apt.hasTenant)}
                                                     </td>
                                                     <td>
                                                         {showTrash ? (

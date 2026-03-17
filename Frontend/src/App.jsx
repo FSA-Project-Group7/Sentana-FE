@@ -15,6 +15,8 @@ import UtilityManagement from './pages/admin/UtilityManagement';
 import ContractManagement from './pages/admin/ContractManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
+import InvoiceManagement from './pages/admin/InvoiceManagement';
+import PaymentManagement from './pages/admin/PaymentManagement';
 
 function App() {
   useEffect(() => {
@@ -63,6 +65,8 @@ function App() {
             <Route path="residents" element={<ResidentManagement />} />
             <Route path="utilities" element={<UtilityManagement />} />
             <Route path="contracts" element={<ContractManagement />} />
+            <Route path="invoices" element={<InvoiceManagement />} />
+            <Route path="payments" element={<PaymentManagement />} />
           </Route>
         </Route>
       </Routes>
