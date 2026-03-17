@@ -43,23 +43,21 @@ const AccountManagement = () => {
     }, [activeTab]);
 
     const handleToggleStatus = async (id) => {
-        // Hiện tại Backend mới chỉ có API Toggle nhanh cho KTV
-        if (activeTab === 'resident') {
-            alert("Tính năng Khóa/Mở nhanh tài khoản Cư dân đang được cập nhật ở Backend. Vui lòng sử dụng chức năng Sửa ở mục Quản lý Cư dân.");
-            return;
-        }
-
         try {
-            await api.put(`/Technicians/toggleStatus/${id}`);
+            const endpoint = activeTab === 'technician'
+                ? `/Technicians/toggleStatus/${id}`
+                : `/Residents/toggleStatus/${id}`;
+
+            const res = await api.put(endpoint);
+
+            alert(res.data?.message || "Cập nhật trạng thái thành công!");
+
             await fetchAccounts();
         } catch (error) {
             alert("LỖI: " + (error.response?.data?.message || "Thao tác thất bại."));
         }
     };
 
-    // ==========================================
-    // TOÁN HỌC PHÂN TRANG (PAGINATION)
-    // ==========================================
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentAccounts = accounts.slice(indexOfFirstItem, indexOfLastItem);
@@ -133,23 +131,15 @@ const AccountManagement = () => {
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        {activeTab === 'technician' ? (
-                                                            // Đối với KTV: Hiển thị dạng nút bấm để có thể Toggle nhanh
-                                                            <button
-                                                                type="button"
-                                                                className={`btn btn-sm rounded-pill fw-bold text-white ${acc.status === 1 ? 'btn-success' : 'btn-danger'}`}
-                                                                onClick={() => handleToggleStatus(acc.accountId)}
-                                                                title="Nhấn để Khóa/Mở khóa tài khoản"
-                                                                style={{ minWidth: '110px' }}
-                                                            >
-                                                                {acc.status === 1 ? 'Hoạt động' : 'Đã khóa'}
-                                                            </button>
-                                                        ) : (
-                                                            // Đối với Cư Dân: Hiển thị dạng thẻ Badge (Do BE chưa có API toggle riêng)
-                                                            <span className={`badge rounded-pill ${acc.status === 1 ? 'bg-success' : 'bg-danger'}`} style={{ padding: '8px 12px', minWidth: '110px' }}>
-                                                                {acc.status === 1 ? 'Hoạt động' : 'Đã khóa'}
-                                                            </span>
-                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm rounded-pill fw-bold text-white ${acc.status === 1 ? 'btn-success' : 'btn-danger'}`}
+                                                            onClick={() => handleToggleStatus(acc.accountId)}
+                                                            title="Nhấn để Khóa/Mở khóa tài khoản"
+                                                            style={{ minWidth: '110px' }}
+                                                        >
+                                                            {acc.status === 1 ? 'Hoạt động' : 'Đã khóa'}
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             );

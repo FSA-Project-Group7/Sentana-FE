@@ -5,15 +5,15 @@ import CreateAccountForm from '../../components/common/CreateAccountForm';
 
 const ResidentManagement = () => {
     const [residents, setResidents] = useState([]);
-    const [apartments, setApartments] = useState([]); 
+    const [apartments, setApartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    
+
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
 
-    
+
     const [editId, setEditId] = useState(null);
     const initialFormState = {
         email: '', userName: '', password: '', fullName: '',
@@ -21,21 +21,21 @@ const ResidentManagement = () => {
     };
     const [formData, setFormData] = useState(initialFormState);
 
-    
+
     const [selectedResident, setSelectedResident] = useState(null);
     const [selectedApartmentId, setSelectedApartmentId] = useState('');
 
-    
+
     const [importFile, setImportFile] = useState(null);
     const [importResult, setImportResult] = useState(null);
 
-    
+
     const fetchData = async () => {
         try {
             setLoading(true);
             const [resData, aptData] = await Promise.all([
                 api.get('/Residents/GetAllResidents'),
-                api.get('/Apartments') 
+                api.get('/Apartments')
             ]);
 
             const rList = resData.data.data ? resData.data.data : resData.data;
@@ -44,7 +44,7 @@ const ResidentManagement = () => {
             setResidents(Array.isArray(rList) ? rList : []);
             setApartments(Array.isArray(aList) ? aList : []);
 
-            
+
             setCurrentPage(1);
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu:", error);
@@ -62,14 +62,14 @@ const ResidentManagement = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    
+
     const handleOpenModal = (resident = null) => {
         if (resident) {
             setEditId(resident.accountId);
             setFormData({
                 email: resident.email || '',
                 userName: resident.userName || '',
-                password: '', 
+                password: '',
                 fullName: resident.fullName || '',
                 phoneNumber: resident.phoneNumber || '',
                 identityCard: resident.identityCard || '',
@@ -104,7 +104,7 @@ const ResidentManagement = () => {
         } catch (error) {
             let errorMessage = "Lỗi đầu vào, vui lòng kiểm tra lại!";
 
-            
+
             if (error.response?.data?.errors) {
                 const firstErrorKey = Object.keys(error.response.data.errors)[0];
                 errorMessage = error.response.data.errors[firstErrorKey][0];
@@ -118,7 +118,16 @@ const ResidentManagement = () => {
         }
     };
 
-    
+    const handleToggleStatus = async (id) => {
+        try {
+            const res = await api.put(`/Residents/toggleStatus/${id}`);
+            alert(res.data?.message || "Đã thay đổi trạng thái!");
+            fetchData();
+        } catch (error) {
+            alert("LỖI: " + (error.response?.data?.message || "Không thể đổi trạng thái."));
+        }
+    };
+
     const handleOpenAssignModal = (resident) => {
         setSelectedResident(resident);
         setSelectedApartmentId('');
@@ -158,7 +167,7 @@ const ResidentManagement = () => {
         }
     };
 
-    
+
     const handleFileChange = (e) => {
         setImportFile(e.target.files[0]);
         setImportResult(null);
@@ -186,12 +195,12 @@ const ResidentManagement = () => {
         }
     };
 
-    
-    
-    
+
+
+
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    
+
     const currentResidents = residents.slice(indexOfFirstItem, indexOfLastItem);
 
     return (
@@ -237,7 +246,7 @@ const ResidentManagement = () => {
                                     <tbody>
                                         {/* Render mảng currentResidents thay vì residents */}
                                         {currentResidents.map((res, idx) => {
-                                            
+
                                             const stt = indexOfFirstItem + idx + 1;
 
                                             return (
@@ -254,9 +263,15 @@ const ResidentManagement = () => {
                                                     </td>
                                                     <td>{res.identityCard}</td>
                                                     <td>
-                                                        <span className={`badge rounded-pill ${res.status === 1 ? 'bg-success' : 'bg-secondary'}`}>
-                                                            {res.status === 1 ? 'Đang hoạt động' : 'Vô hiệu hóa'}
-                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm rounded-pill fw-bold text-white ${res.status === 1 ? 'btn-success' : 'btn-danger'}`}
+                                                            onClick={() => handleToggleStatus(res.accountId)}
+                                                            title="Nhấn để Khóa/Mở khóa tài khoản"
+                                                            style={{ minWidth: '110px' }}
+                                                        >
+                                                            {res.status === 1 ? 'Hoạt động' : 'Đã khóa'}
+                                                        </button>
                                                     </td>
                                                     <td>
                                                         <button className="btn btn-sm btn-outline-info me-2" onClick={() => handleOpenAssignModal(res)} data-bs-toggle="modal" data-bs-target="#assignModal" title="Xử lý phòng ở">
