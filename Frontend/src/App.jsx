@@ -12,11 +12,14 @@ import TechnicianManagement from './pages/admin/TechnicianManagement';
 import AccountManagement from './pages/admin/AccountManagement';
 import ResidentManagement from './pages/admin/ResidentManagement';
 import UtilityManagement from './pages/admin/UtilityManagement';
+import ContractManagement from './pages/admin/ContractManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
+import InvoiceManagement from './pages/admin/InvoiceManagement';
+import PaymentManagement from './pages/admin/PaymentManagement';
 
 function App() {
-    useEffect(() => {
+  useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'role') {
         const newRole = e.newValue;
@@ -41,16 +44,16 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+
+        <Route path="/" element={<Home />} />
+
         <Route element={<PublicRoute />}>
-          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
         </Route>
-        {/*Role Resident*/}
         <Route element={<ProtectedRoute allowedRole="Resident" />}>
           <Route path="/resident" element={<ResidentPage />} />
         </Route>
 
-        {/*Role admin*/}
         <Route element={<ProtectedRoute allowedRole="Manager" />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
@@ -61,6 +64,9 @@ function App() {
             <Route path="technicians" element={<TechnicianManagement />} />
             <Route path="residents" element={<ResidentManagement />} />
             <Route path="utilities" element={<UtilityManagement />} />
+            <Route path="contracts" element={<ContractManagement />} />
+            <Route path="invoices" element={<InvoiceManagement />} />
+            <Route path="payments" element={<PaymentManagement />} />
           </Route>
         </Route>
       </Routes>
