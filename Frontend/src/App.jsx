@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
-import ResidentPage from './pages/ResidentPage';
+import ResidentPage from './pages/resident/ResidentPage';
 import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import BuildingManagement from './pages/admin/BuildingManagement';
@@ -18,6 +18,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 import InvoiceManagement from './pages/admin/InvoiceManagement';
 import PaymentManagement from './pages/admin/PaymentManagement';
+import ResidentDashboard from './pages/resident/ResidentDashboard';
+import ResidentLayout from './components/ResidentLayout';
+import ResidentProfile from './pages/resident/ResidentProfile';
 
 
 function App() {
@@ -53,7 +56,12 @@ function App() {
           <Route path="/login" element={<Login />} />
         </Route>
         <Route element={<ProtectedRoute allowedRole="Resident" />}>
-          <Route path="/resident" element={<ResidentPage />} />
+          <Route path="/resident" element={<ResidentLayout />}>
+            <Route index element={<ResidentPage />} />
+            <Route path="dashboard" element={<ResidentDashboard />} />
+            <Route path="profile" element={<ResidentProfile />} />
+
+          </Route>
         </Route>
 
         <Route element={<ProtectedRoute allowedRole="Manager" />}>
