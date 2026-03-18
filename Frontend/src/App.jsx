@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import ResidentPage from './pages/ResidentPage';
 import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -17,6 +18,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 import InvoiceManagement from './pages/admin/InvoiceManagement';
 import PaymentManagement from './pages/admin/PaymentManagement';
+
 
 function App() {
   useEffect(() => {
@@ -46,7 +48,7 @@ function App() {
       <Routes>
 
         <Route path="/" element={<Home />} />
-
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<Login />} />
         </Route>

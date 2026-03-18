@@ -93,3 +93,35 @@
     background-color: #999;
     cursor: not-allowed;
 }
+/* Styling cho nút Back */
+.back-home-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: none;
+  border: none;
+  color: #adb5bd; /* Màu xám nhạt */
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  padding: 0;
+  transition: color 0.2s ease-in-out;
+}
+
+.back-home-btn:hover {
+  color: #ffffff; /* Sáng lên khi hover */
+  text-decoration: none;
+}
+
+/* Styling cho link Quên mật khẩu */
+.forgot-password-link {
+  font-size: 0.85rem;
+  color: #0dcaf0; /* Màu cyan nổi bật trên nền tối */
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.forgot-password-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
