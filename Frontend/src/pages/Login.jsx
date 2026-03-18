@@ -9,8 +9,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
-  // State bật/tắt hiển thị mật khẩu
+
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
@@ -49,18 +48,17 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-form-card position-relative">
-        
-        {/* NÚT BACK VỀ TRANG CHỦ */}
-        <button 
-          type="button" 
-          onClick={() => navigate('/')} 
+
+        <button
+          type="button"
+          onClick={() => navigate('/')}
           className="back-home-btn"
           title="Về trang chủ"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-            <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16">
+            <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
           </svg>
-          <span className="ms-2">Trang chủ</span>
+          <span className="text-dark ms-2">Trang chủ</span>
         </button>
 
         <h2 className="login-title text-center mt-3">ĐĂNG NHẬP</h2>
@@ -69,7 +67,7 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="login-form mt-4">
           <div className="login-input-group mb-3">
-            <label className="fw-bold text-light mb-1">Tài khoản:</label>
+            <label className="fw-bold mb-1">Tài khoản:</label>
             <input
               type="text"
               value={username}
@@ -82,13 +80,12 @@ const Login = () => {
 
           <div className="login-input-group mb-4">
             <div className="d-flex justify-content-between align-items-center mb-1">
-              <label className="fw-bold text-light mb-0">Mật khẩu:</label>
+              <label className="fw-bold mb-0">Mật khẩu:</label>
               <Link to="/forgot-password" className="forgot-password-link">
                 Quên mật khẩu?
               </Link>
             </div>
-            
-            {/* KHUNG NHẬP MẬT KHẨU CÓ NÚT CON MẮT */}
+
             <div className="position-relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -96,19 +93,19 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="Nhập Password..."
-                className="login-input form-control pe-5" 
+                className="login-input form-control pe-5"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="btn position-absolute top-50 end-0 translate-middle-y border-0 text-secondary"
                 style={{ background: 'transparent' }}
-                tabIndex="-1" // Tránh việc focus nhầm bằng phím Tab
+                tabIndex="-1"
               >
                 {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/><path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z" /><path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z" /></svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" /><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" /></svg>
                 )}
               </button>
             </div>

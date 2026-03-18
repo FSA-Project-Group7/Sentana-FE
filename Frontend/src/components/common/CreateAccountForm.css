@@ -1,10 +1,4 @@
-/* =============================================================
-   CreateAccountForm.css — Premium form styling  v2
-   Prefix: caf- (CreateAccountForm)
-   ============================================================= */
 
-/* ── Bootstrap modal-content override ────────────────────── */
-/* Khi modal chứa form này → ẩn nền trắng của Bootstrap  */
 .modal-content:has(.caf-wrapper) {
   background: transparent !important;
   border: none !important;
@@ -13,7 +7,7 @@
   box-shadow: none !important;
 }
 
-/* ── Root wrapper ─────────────────────────────────────────── */
+
 .caf-wrapper {
   background: #ffffff;
   border-radius: 14px;
@@ -21,7 +15,6 @@
   box-shadow: 0 8px 32px rgba(18, 34, 64, 0.14);
 }
 
-/* ── Header ───────────────────────────────────────────────── */
 .caf-header {
   display: flex;
   align-items: center;
@@ -52,7 +45,6 @@
   flex: 1;
 }
 
-/* ── Header close button (X) ──────────────────────────────── */
 .caf-header__close {
   display: flex;
   align-items: center;
@@ -80,7 +72,6 @@
   transform: scale(0.96);
 }
 
-/* ── Sections ─────────────────────────────────────────────── */
 .caf-section {
   padding: 18px 22px 6px;
 }
