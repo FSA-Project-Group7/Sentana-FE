@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
 import CreateAccountForm from '../../components/common/CreateAccountForm';
@@ -28,11 +28,11 @@ const ResidentManagement = () => {
     const [importFile, setImportFile] = useState(null);
     const [importResult, setImportResult] = useState(null);
 
-    // --- THÊM STATE CHO Danh sách đã xóa ---
+    // --- STATE CHO DANH SÁCH ĐÃ XÓA ---
     const [isTrashMode, setIsTrashMode] = useState(false);
     const [deletedResidents, setDeletedResidents] = useState([]);
 
-    // --- API LẤY DATA CHÍNH ---
+    // --- API LẤY DATA ---
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -40,13 +40,10 @@ const ResidentManagement = () => {
                 api.get('/Residents/GetAllResidents'),
                 api.get('/Apartments')
             ]);
-
             const rList = resData.data?.data || resData.data;
             const aList = aptData.data?.data || aptData.data;
-
             setResidents(Array.isArray(rList) ? rList : []);
             setApartments(Array.isArray(aList) ? aList : []);
-
             setCurrentPage(1);
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu:", error);
@@ -56,11 +53,6 @@ const ResidentManagement = () => {
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    // --- CÁC HÀM XỬ LÝ THÙNG RÁC ---
     const fetchDeletedData = async () => {
         try {
             setLoading(true);
@@ -75,14 +67,21 @@ const ResidentManagement = () => {
         }
     };
 
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    // --- CÁC HÀM XỬ LÝ XÓA / KHÔI PHỤC (Đã cập nhật đón lỗi từ BE) ---
     const handleSoftDelete = async (id) => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa cư dân này ?")) {
+        if (window.confirm("Bạn có chắc chắn muốn chuyển cư dân này vào danh sách đã xóa?")) {
             try {
                 const res = await api.delete(`/Residents/DeleteResident/${id}`);
                 alert(res.data?.message || "Đã chuyển vào Danh sách đã xóa!");
                 fetchData();
             } catch (error) {
-                alert("LỖI: " + (error.response?.data?.message || "Không thể xóa."));
+                // Đón đúng câu thông báo lỗi cực chuẩn từ Backend
+                const errorMsg = error.response?.data?.message || error.response?.data || "Không thể xóa. Cư dân có thể đang ở trong phòng.";
+                alert("LỖI: " + errorMsg);
             }
         }
     };
@@ -94,7 +93,8 @@ const ResidentManagement = () => {
             fetchDeletedData();
             fetchData();
         } catch (error) {
-            alert("LỖI: " + (error.response?.data?.message || "Không thể khôi phục."));
+            const errorMsg = error.response?.data?.message || error.response?.data || "Không thể khôi phục.";
+            alert("LỖI: " + errorMsg);
         }
     };
 
@@ -105,12 +105,24 @@ const ResidentManagement = () => {
                 alert(res.data?.message || "Đã xóa vĩnh viễn thành công!");
                 fetchDeletedData();
             } catch (error) {
-                alert("LỖI: " + (error.response?.data?.message || "Không thể xóa vĩnh viễn."));
+                const errorMsg = error.response?.data?.message || error.response?.data || "Không thể xóa vĩnh viễn.";
+                alert("LỖI: " + errorMsg);
             }
         }
     };
 
-    // --- CÁC HÀM XỬ LÝ FORM & MODAL ---
+    const handleToggleStatus = async (id) => {
+        try {
+            const res = await api.put(`/Residents/toggleStatus/${id}`);
+            alert(res.data?.message || "Đã thay đổi trạng thái!");
+            fetchData();
+        } catch (error) {
+            const errorMsg = error.response?.data?.message || error.response?.data || "Không thể đổi trạng thái.";
+            alert("LỖI: " + errorMsg);
+        }
+    };
+
+    // --- CÁC HÀM FORM & MODAL ---
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -119,52 +131,23 @@ const ResidentManagement = () => {
     const handleOpenModal = (resident = null) => {
         if (resident) {
             setEditId(resident.accountId);
-
-            // Lấy birthDay từ các field có thể
             let birthDay = '';
-            if (resident.info?.birthday) {
-                birthDay = resident.info.birthday.split('T')[0];
-            } else if (resident.birthDay) {
-                birthDay = resident.birthDay.split('T')[0];
-            } else if (resident.dayOfBirth) {
-                birthDay = resident.dayOfBirth.split('T')[0];
-            } else if (resident._dayOfBirth) {
-                birthDay = resident._dayOfBirth.split('T')[0];
-            } else if (resident.BirthDay) {
-                birthDay = resident.BirthDay.split('T')[0];
-            }
+            if (resident.info?.birthday) birthDay = resident.info.birthday.split('T')[0];
+            else if (resident.birthDay) birthDay = resident.birthDay.split('T')[0];
+            else if (resident.dayOfBirth) birthDay = resident.dayOfBirth.split('T')[0];
 
-            // Lấy sex từ các field có thể
             let sex = '';
-            if (resident.info?.sex !== null && resident.info?.sex !== undefined) {
-                sex = resident.info.sex.toString();
-            } else if (resident.sex !== null && resident.sex !== undefined) {
-                sex = resident.sex.toString();
-            } else if (resident.Sex !== null && resident.Sex !== undefined) {
-                sex = resident.Sex.toString();
-            } else if (resident.gender !== null && resident.gender !== undefined) {
-                sex = resident.gender.toString();
-            }
+            if (resident.info?.sex !== null && resident.info?.sex !== undefined) sex = resident.info.sex.toString();
+            else if (resident.sex !== null && resident.sex !== undefined) sex = resident.sex.toString();
 
-            // Lấy country
             const country = resident.info?.country || resident.country || resident.Country || '';
-
-            // Lấy city
             const city = resident.info?.city || resident.city || resident.City || '';
 
-
             setFormData({
-                email: resident.email || '',
-                userName: resident.userName || '',
-                password: '',
-                fullName: resident.fullName || '',
-                phoneNumber: resident.phoneNumber || '',
-                identityCard: resident.identityCard || '',
-                country: country,
-                city: city,
-                address: resident.address || '',
-                birthDay: birthDay,
-                sex: sex
+                email: resident.email || '', userName: resident.userName || '', password: '',
+                fullName: resident.fullName || '', phoneNumber: resident.phoneNumber || '',
+                identityCard: resident.identityCard || '', country, city, address: resident.address || '',
+                birthDay, sex
             });
         } else {
             setEditId(null);
@@ -178,14 +161,10 @@ const ResidentManagement = () => {
         try {
             if (editId) {
                 const updatePayload = {
-                    email: formData.email.trim() || null,
-                    fullName: formData.fullName,
-                    phoneNumber: formData.phoneNumber.trim() || null,
-                    identityCard: formData.identityCard,
-                    country: formData.country.trim() || null,
-                    city: formData.city.trim() || null,
-                    address: formData.address.trim() || null,
-                    birthDay: formData.birthDay || null,
+                    email: formData.email.trim() || null, fullName: formData.fullName,
+                    phoneNumber: formData.phoneNumber.trim() || null, identityCard: formData.identityCard,
+                    country: formData.country.trim() || null, city: formData.city.trim() || null,
+                    address: formData.address.trim() || null, birthDay: formData.birthDay || null,
                     sex: formData.sex !== '' ? Number(formData.sex) : null
                 };
                 const res = await api.put(`/Residents/UpdateResident/${editId}`, updatePayload);
@@ -201,22 +180,10 @@ const ResidentManagement = () => {
             if (error.response?.data?.errors) {
                 const firstErrorKey = Object.keys(error.response.data.errors)[0];
                 errorMessage = error.response.data.errors[firstErrorKey][0];
-            } else if (error.response?.data?.message) {
-                errorMessage = error.response.data.message;
-            }
+            } else if (error.response?.data?.message) errorMessage = error.response.data.message;
             alert("LỖI: " + errorMessage);
         } finally {
             setIsSubmitting(false);
-        }
-    };
-
-    const handleToggleStatus = async (id) => {
-        try {
-            const res = await api.put(`/Residents/toggleStatus/${id}`);
-            alert(res.data?.message || "Đã thay đổi trạng thái!");
-            fetchData();
-        } catch (error) {
-            alert("LỖI: " + (error.response?.data?.message || "Không thể đổi trạng thái."));
         }
     };
 
@@ -245,7 +212,6 @@ const ResidentManagement = () => {
     const handleRemoveRoom = async () => {
         const targetAptId = selectedResident?.apartmentId;
         if (!targetAptId) return alert("Cư dân này hiện chưa có phòng!");
-
         if (window.confirm(`CẢNH BÁO: Gỡ cư dân sẽ làm vô hiệu hóa Hợp đồng, chuyển phòng thành Trống và khóa tài khoản Cư dân. Bạn có chắc chắn?`)) {
             setIsSubmitting(true);
             try {
@@ -262,7 +228,7 @@ const ResidentManagement = () => {
         }
     };
 
-    // --- XỬ LÝ EXCEL ---
+    // --- XỬ LÝ IMPORT EXCEL ---
     const handleFileChange = (e) => {
         setImportFile(e.target.files[0]);
         setImportResult(null);
@@ -271,15 +237,11 @@ const ResidentManagement = () => {
     const handleImportExcel = async (e) => {
         e.preventDefault();
         if (!importFile) return alert("Vui lòng chọn file Excel!");
-
         setIsSubmitting(true);
         const formPayload = new FormData();
         formPayload.append('File', importFile);
-
         try {
-            const res = await api.post('/Residents/import', formPayload, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const res = await api.post('/Residents/import', formPayload, { headers: { 'Content-Type': 'multipart/form-data' } });
             setImportResult(res.data.data);
             alert(res.data?.message || "Import hoàn tất!");
             fetchData();
@@ -290,8 +252,7 @@ const ResidentManagement = () => {
         }
     };
 
-    // --- LOGIC PHÂN TRANG THÔNG MINH ---
-    // Khắc phục triệt để lỗi undefine "length" bằng fallback mảng rỗng []
+    // --- LOGIC PHÂN TRANG ---
     const activeList = isTrashMode ? (deletedResidents || []) : (residents || []);
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -308,11 +269,9 @@ const ResidentManagement = () => {
                     <button className="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#importModal" onClick={() => { setImportFile(null); setImportResult(null); }}>
                         <i className="bi bi-file-earmark-excel me-2"></i> Import Excel
                     </button>
-
                     <button className="btn btn-primary me-2" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#residentModal" style={{ minWidth: '150px' }}>
                         <i className="bi bi-person-plus-fill me-2"></i> Thêm Cư dân
                     </button>
-
                     <button
                         className={`btn ${isTrashMode ? 'btn-secondary' : 'btn-outline-danger'}`}
                         onClick={() => {
@@ -355,22 +314,23 @@ const ResidentManagement = () => {
                                         {currentItems.map((res, idx) => {
                                             const stt = indexOfFirstItem + idx + 1;
                                             return (
-                                                <tr key={res.accountId}>
+                                                <tr key={res.accountId} className={isTrashMode ? "bg-light" : ""}>
                                                     <td>{stt}</td>
-                                                    <td className="fw-bold text-primary">{res.code}</td>
+                                                    <td className={`fw-bold ${isTrashMode ? 'text-muted' : 'text-primary'}`}>{res.code}</td>
                                                     <td className="text-start">
-                                                        <div className="fw-semibold">{res.fullName}</div>
+                                                        {/* Thêm hiệu ứng gạch ngang tên nếu đã bị xóa */}
+                                                        <div className={`fw-semibold ${isTrashMode ? 'text-decoration-line-through text-muted' : ''}`}>{res.fullName}</div>
                                                         <div className="small text-muted">@{res.userName}</div>
                                                     </td>
                                                     <td>
                                                         <div className="small">{res.phoneNumber}</div>
                                                         <div className="small text-muted">{res.email}</div>
                                                     </td>
-                                                    <td>{res.identityCard}</td>
+                                                    <td className={isTrashMode ? 'text-muted' : ''}>{res.identityCard}</td>
 
                                                     <td>
                                                         {res.apartmentCode ? (
-                                                            <span className="badge bg-info text-dark border">
+                                                            <span className={`badge border ${isTrashMode ? 'bg-light text-muted' : 'bg-info text-dark'}`}>
                                                                 <i className="bi bi-door-open-fill me-1"></i> {res.apartmentCode}
                                                             </span>
                                                         ) : (
@@ -378,18 +338,25 @@ const ResidentManagement = () => {
                                                         )}
                                                     </td>
 
+                                                    {/* NÂNG CẤP HIỂN THỊ CỘT TRẠNG THÁI */}
                                                     <td>
-                                                        <button
-                                                            type="button"
-                                                            className={`btn btn-sm rounded-pill fw-bold text-white ${res.status === 1 ? 'btn-success' : 'btn-danger'}`}
-                                                            onClick={() => handleToggleStatus(res.accountId)}
-                                                            title="Nhấn để Khóa/Mở khóa tài khoản"
-                                                            style={{ minWidth: '110px' }}
-                                                            disabled={isTrashMode}
-                                                        >
-                                                            {res.status === 1 ? 'Hoạt động' : 'Đã khóa'}
-                                                        </button>
+                                                        {isTrashMode ? (
+                                                            <span className="badge bg-secondary px-3 py-2 border">
+                                                                <i className="bi bi-lock-fill me-1"></i> Đã khóa (Đã xóa)
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className={`btn btn-sm rounded-pill fw-bold text-white ${res.status === 1 ? 'btn-success' : 'btn-danger'}`}
+                                                                onClick={() => handleToggleStatus(res.accountId)}
+                                                                title="Nhấn để Khóa/Mở khóa tài khoản"
+                                                                style={{ minWidth: '110px' }}
+                                                            >
+                                                                {res.status === 1 ? 'Hoạt động' : 'Đã khóa'}
+                                                            </button>
+                                                        )}
                                                     </td>
+                                                    
                                                     <td>
                                                         {!isTrashMode ? (
                                                             <div className="d-flex justify-content-center gap-2">
@@ -399,7 +366,7 @@ const ResidentManagement = () => {
                                                                 <button className="btn btn-sm btn-outline-warning" onClick={() => handleOpenModal(res)} data-bs-toggle="modal" data-bs-target="#residentModal" title="Sửa thông tin">
                                                                     <i className="bi bi-pencil-square me-1"></i> Sửa
                                                                 </button>
-                                                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleSoftDelete(res.accountId)} title="Chuyển vào danh sách đã xóa">
+                                                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleSoftDelete(res.accountId)} title="Chuyển vào Danh sách đã xóa">
                                                                     <i className="bi bi-trash me-1"></i> Xóa
                                                                 </button>
                                                             </div>
@@ -420,34 +387,20 @@ const ResidentManagement = () => {
                                     </tbody>
                                 </table>
                             </div>
-
-                            <Pagination
-                                totalItems={activeList.length}
-                                itemsPerPage={itemsPerPage}
-                                currentPage={currentPage}
-                                onPageChange={setCurrentPage}
-                            />
+                            <Pagination totalItems={activeList.length} itemsPerPage={itemsPerPage} currentPage={currentPage} onPageChange={setCurrentPage} />
                         </>
                     )}
                 </div>
             </div>
 
+            {/* MODAL THÊM / SỬA CƯ DÂN */}
             <div className="modal fade" id="residentModal" tabIndex="-1" aria-hidden="true">
                 <div className={`modal-dialog ${editId ? 'modal-lg' : 'modal-lg modal-dialog-scrollable'}`}>
                     <div className="modal-content border-0">
                         {!editId && (
-                            <CreateAccountForm
-                                type="resident"
-                                onSuccess={() => {
-                                    fetchData();
-                                    document.getElementById('closeResModal').click();
-                                }}
-                                onCancel={() => document.getElementById('closeResModal').click()}
-                            />
+                            <CreateAccountForm type="resident" onSuccess={() => { fetchData(); document.getElementById('closeResModal').click(); }} onCancel={() => document.getElementById('closeResModal').click()} />
                         )}
-
                         <button type="button" id="closeResModal" data-bs-dismiss="modal" style={{ display: 'none' }} aria-hidden="true" />
-
                         {!!editId && (
                             <>
                                 <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
@@ -476,23 +429,11 @@ const ResidentManagement = () => {
                                             </div>
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Ngày sinh</label>
-                                                <input
-                                                    type="date"
-                                                    className="form-control"
-                                                    name="birthDay"
-                                                    value={formData.birthDay}
-                                                    onChange={handleInputChange}
-                                                    max={new Date().toISOString().split('T')[0]}
-                                                />
+                                                <input type="date" className="form-control" name="birthDay" value={formData.birthDay} onChange={handleInputChange} max={new Date().toISOString().split('T')[0]} />
                                             </div>
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Giới tính</label>
-                                                <select
-                                                    className="form-select"
-                                                    name="sex"
-                                                    value={formData.sex}
-                                                    onChange={handleInputChange}
-                                                >
+                                                <select className="form-select" name="sex" value={formData.sex} onChange={handleInputChange}>
                                                     <option value="">-- Chọn giới tính --</option>
                                                     <option value="0">Nam</option>
                                                     <option value="1">Nữ</option>
@@ -524,8 +465,7 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* 2. MODAL GÁN / GỠ PHÒNG */}
-            {/* 2. MODAL GÁN / GỠ PHÒNG */}
+            {/* MODAL GÁN / GỠ PHÒNG KẾT HỢP REACT-SELECT */}
             <div className="modal fade" id="assignModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog">
                     <div className="modal-content">
@@ -556,22 +496,16 @@ const ResidentManagement = () => {
                             ) : (
                                 <>
                                     <label className="form-label fw-semibold">Tìm và Chọn Căn Hộ Mục Tiêu</label>
-
-                                    {/* --- BẮT ĐẦU: SỬ DỤNG REACT-SELECT TẠI ĐÂY --- */}
                                     <Select
                                         className="mb-3"
                                         placeholder="-- Gõ tên phòng hoặc tầng để tìm --"
                                         noOptionsMessage={() => "Không tìm thấy phòng nào phù hợp"}
                                         isClearable={true}
                                         isSearchable={true}
-
-                                        // 1. Map data từ BE thành chuẩn của react-select
                                         options={apartments.map(apt => ({
                                             value: apt.apartmentId,
                                             label: `${apt.apartmentCode} - ${apt.apartmentName} (Tầng ${apt.floorNumber})`
                                         }))}
-
-                                        // 2. Map giá trị đang chọn để hiển thị
                                         value={
                                             selectedApartmentId
                                                 ? {
@@ -582,13 +516,7 @@ const ResidentManagement = () => {
                                                 }
                                                 : null
                                         }
-
-                                        // 3. Xử lý khi chọn/xóa
-                                        onChange={(selectedOption) => {
-                                            setSelectedApartmentId(selectedOption ? selectedOption.value : '');
-                                        }}
-
-                                        // 4. Chỉnh màu sắc cho viền đồng bộ với theme
+                                        onChange={(selectedOption) => setSelectedApartmentId(selectedOption ? selectedOption.value : '')}
                                         styles={{
                                             control: (baseStyles, state) => ({
                                                 ...baseStyles,
@@ -598,8 +526,6 @@ const ResidentManagement = () => {
                                             }),
                                         }}
                                     />
-                                    {/* --- KẾT THÚC: SỬ DỤNG REACT-SELECT --- */}
-
                                     <div className="text-muted small mb-3">
                                         <i className="bi bi-info-circle text-primary"></i> <strong>Gán Cư Dân:</strong> Đưa cư dân vào phòng này. Hệ thống sẽ tự cập nhật trạng thái phòng.
                                     </div>
@@ -621,7 +547,7 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* 3. MODAL IMPORT EXCEL */}
+            {/* MODAL IMPORT EXCEL */}
             <div className="modal fade" id="importModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-lg">
                     <div className="modal-content">
@@ -639,14 +565,12 @@ const ResidentManagement = () => {
                                     <strong>Cấu trúc file bắt buộc (Từ cột A đến I):</strong><br />
                                     Email | UserName | FullName | Phone | CCCD | Country | City | Address | ApartmentCode (Mã phòng: Tùy chọn)
                                 </div>
-
                                 {importResult && (
                                     <div className="mt-4 p-3 border rounded bg-light">
                                         <h6 className="fw-bold mb-2">Kết quả xử lý:</h6>
                                         <p className="mb-1 text-primary">Tổng số dòng đã quét: <strong>{importResult.totalRows}</strong></p>
                                         <p className="mb-1 text-success">Thành công: <strong>{importResult.successCount}</strong></p>
                                         <p className="mb-2 text-danger">Thất bại: <strong>{importResult.failedCount}</strong></p>
-
                                         {importResult.errors && importResult.errors.length > 0 && (
                                             <div className="bg-white p-2 border border-danger rounded" style={{ maxHeight: '150px', overflowY: 'auto' }}>
                                                 {importResult.errors.map((err, i) => (
@@ -667,7 +591,6 @@ const ResidentManagement = () => {
                     </div>
                 </div>
             </div>
-
         </div>
     );
 };

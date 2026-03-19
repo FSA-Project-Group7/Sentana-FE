@@ -12,6 +12,22 @@ const BuildingManagement = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editId, setEditId] = useState(null);
 
+    const suggestBuildingInfo = () => {
+        const existingCodes = buildings.map(b => b.buildingCode);
+        let nextChar = 'A';
+        for (let i = 0; i < 26; i++) {
+            let char = String.fromCharCode(65 + i);
+            if (!existingCodes.includes(`SEN-${char}`)) {
+                nextChar = char;
+                break;
+            }
+        }
+        return {
+            code: `SEN-${nextChar}`,
+            name: `Chung cư SENTANA Tòa ${nextChar}`
+        };
+    };
+
     const fetchBuildings = async () => {
         try {
             setLoading(true);
@@ -39,7 +55,16 @@ const BuildingManagement = () => {
 
     const handleOpenAdd = () => {
         setEditId(null);
-        setFormData({ buildingCode: '', buildingName: '', address: '', city: 'Hà Nội', floorNumber: 0, apartmentNumber: 0, status: 1 });
+        const suggestion = suggestBuildingInfo();
+        setFormData({
+            buildingCode: suggestion.code,
+            buildingName: suggestion.name,
+            address: '',
+            city: 'Hà Nội',
+            floorNumber: 0,
+            apartmentNumber: 0,
+            status: 1
+        });
     };
 
     const handleOpenEdit = (building) => {
@@ -65,7 +90,14 @@ const BuildingManagement = () => {
                 await api.put(`/Buildings/${editId}`, updatePayload);
                 alert("Cập nhật thông tin thành công!");
             } else {
-                const createPayload = { buildingCode: "AUTO", buildingName: "AUTO", apartmentNumber: 0, floorNumber: formData.floorNumber, city: formData.city, address: formData.address };
+                const createPayload = {
+                    buildingCode: formData.buildingCode,
+                    buildingName: formData.buildingName,
+                    apartmentNumber: 0,
+                    floorNumber: formData.floorNumber,
+                    city: formData.city,
+                    address: formData.address
+                };
                 await api.post('/Buildings', createPayload);
                 alert("Thêm tòa nhà thành công!");
             }
@@ -208,14 +240,30 @@ const BuildingManagement = () => {
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
                                 <div className="row g-3">
-                                    {editId && (
+                                    {editId ? (
                                         <div className="col-12">
                                             <div className="alert alert-info py-2 mb-0">
                                                 Đang chỉnh sửa: <strong className="text-primary">{formData.buildingName} ({formData.buildingCode})</strong>
-                                                <br /><small className="text-muted">Mã và Tên tòa nhà được quản lý tự động bởi hệ thống.</small>
+                                                <br /><small className="text-muted">Bạn có thể đổi tên, nhưng hãy cẩn thận để không trùng lặp.</small>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="col-12">
+                                            <div className="alert alert-success py-2 mb-0">
+                                                <i className="bi bi-magic me-2"></i>Hệ thống đã tự động gợi ý tên Tòa nhà tiếp theo. Bạn hoàn toàn có thể chỉnh sửa lại nếu muốn!
                                             </div>
                                         </div>
                                     )}
+
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Mã Tòa Nhà (*)</label>
+                                        <input type="text" className="form-control border-primary" name="buildingCode" value={formData.buildingCode} onChange={handleInputChange} required />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold">Tên Tòa Nhà (*)</label>
+                                        <input type="text" className="form-control border-primary" name="buildingName" value={formData.buildingName} onChange={handleInputChange} required />
+                                    </div>
+
                                     <div className="col-md-4">
                                         <label className="form-label fw-semibold">Thành phố (*)</label>
                                         <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} required />
@@ -235,11 +283,6 @@ const BuildingManagement = () => {
                                                 <option value={1}>Hoạt động</option>
                                                 <option value={0}>Bảo trì</option>
                                             </select>
-                                        </div>
-                                    )}
-                                    {!editId && (
-                                        <div className="col-12 mt-2">
-                                            <small className="text-muted fst-italic">* Lưu ý: Mã tòa nhà, Tên tòa nhà và Tổng số lượng căn hộ sẽ được hệ thống tính toán tự động.</small>
                                         </div>
                                     )}
                                 </div>
