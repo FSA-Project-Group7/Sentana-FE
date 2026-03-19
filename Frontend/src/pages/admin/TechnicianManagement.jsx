@@ -42,9 +42,7 @@ const TechnicianManagement = () => {
     const handleOpenModal = (tech = null) => {
         if (tech) {
             setEditId(tech.accountId);
-            console.log('🔍 Tech data:', tech);
-            console.log('📊 All keys in tech object:', Object.keys(tech));
-            
+
             // Lấy birthDay từ các field có thể
             let birthDay = '';
             if (tech.info?.birthday) {
@@ -58,7 +56,7 @@ const TechnicianManagement = () => {
             } else if (tech.BirthDay) {
                 birthDay = tech.BirthDay.split('T')[0];
             }
-            
+
             // Lấy sex từ các field có thể
             let sex = '';
             if (tech.info?.sex !== null && tech.info?.sex !== undefined) {
@@ -70,15 +68,14 @@ const TechnicianManagement = () => {
             } else if (tech.gender !== null && tech.gender !== undefined) {
                 sex = tech.gender.toString();
             }
-            
+
             // Lấy country
             const country = tech.info?.country || tech.country || tech.Country || '';
-            
+
             // Lấy city
             const city = tech.info?.city || tech.city || tech.City || '';
-            
-            console.log('📋 Extracted:', { birthDay, sex, country, city });
-            
+
+
             setFormData({
                 email: tech.email || '',
                 userName: tech.userName || '',
@@ -203,15 +200,15 @@ const TechnicianManagement = () => {
                         <div className="table-responsive">
                             <table className="table table-hover table-bordered mb-0 align-middle text-center">
                                 <thead className="table-light">
-                                     <tr>
-                                         <th>STT</th>
-                                         <th>Mã NV</th>
-                                         <th className="text-start">Họ và Tên</th>
-                                         <th>Liên hệ</th>
-                                         <th>Trạng thái Hệ thống</th>
-                                         <th>Tình trạng CV</th>
-                                         <th>Hành động</th>
-                                     </tr>
+                                    <tr>
+                                        <th>STT</th>
+                                        <th>Mã NV</th>
+                                        <th className="text-start">Họ và Tên</th>
+                                        <th>Liên hệ</th>
+                                        <th>Trạng thái Hệ thống</th>
+                                        <th>Tình trạng CV</th>
+                                        <th>Hành động</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {technicians.map((tech, idx) => (

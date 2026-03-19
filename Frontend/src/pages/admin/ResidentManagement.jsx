@@ -50,7 +50,7 @@ const ResidentManagement = () => {
             setCurrentPage(1);
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu:", error);
-            setResidents([]); // Đảm bảo luôn là mảng nếu lỗi
+            setResidents([]);
         } finally {
             setLoading(false);
         }
@@ -119,9 +119,7 @@ const ResidentManagement = () => {
     const handleOpenModal = (resident = null) => {
         if (resident) {
             setEditId(resident.accountId);
-            console.log('🔍 Resident data:', resident);
-            console.log('📊 All keys in resident object:', Object.keys(resident));
-            
+
             // Lấy birthDay từ các field có thể
             let birthDay = '';
             if (resident.info?.birthday) {
@@ -135,7 +133,7 @@ const ResidentManagement = () => {
             } else if (resident.BirthDay) {
                 birthDay = resident.BirthDay.split('T')[0];
             }
-            
+
             // Lấy sex từ các field có thể
             let sex = '';
             if (resident.info?.sex !== null && resident.info?.sex !== undefined) {
@@ -147,15 +145,14 @@ const ResidentManagement = () => {
             } else if (resident.gender !== null && resident.gender !== undefined) {
                 sex = resident.gender.toString();
             }
-            
+
             // Lấy country
             const country = resident.info?.country || resident.country || resident.Country || '';
-            
+
             // Lấy city
             const city = resident.info?.city || resident.city || resident.City || '';
-            
-            console.log('📋 Extracted:', { birthDay, sex, country, city });
-            
+
+
             setFormData({
                 email: resident.email || '',
                 userName: resident.userName || '',
