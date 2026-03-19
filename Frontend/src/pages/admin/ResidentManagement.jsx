@@ -2,17 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
 import CreateAccountForm from '../../components/common/CreateAccountForm';
+import Select from 'react-select';
 
 const ResidentManagement = () => {
+    // --- STATES CƠ BẢN ---
     const [residents, setResidents] = useState([]);
     const [apartments, setApartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
-
 
     const [editId, setEditId] = useState(null);
     const initialFormState = {
@@ -21,15 +21,17 @@ const ResidentManagement = () => {
     };
     const [formData, setFormData] = useState(initialFormState);
 
-
     const [selectedResident, setSelectedResident] = useState(null);
     const [selectedApartmentId, setSelectedApartmentId] = useState('');
-
 
     const [importFile, setImportFile] = useState(null);
     const [importResult, setImportResult] = useState(null);
 
+    // --- THÊM STATE CHO Danh sách đã xóa ---
+    const [isTrashMode, setIsTrashMode] = useState(false);
+    const [deletedResidents, setDeletedResidents] = useState([]);
 
+    // --- API LẤY DATA CHÍNH ---
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -38,16 +40,16 @@ const ResidentManagement = () => {
                 api.get('/Apartments')
             ]);
 
-            const rList = resData.data.data ? resData.data.data : resData.data;
-            const aList = aptData.data.data ? aptData.data.data : aptData.data;
+            const rList = resData.data?.data || resData.data;
+            const aList = aptData.data?.data || aptData.data;
 
             setResidents(Array.isArray(rList) ? rList : []);
             setApartments(Array.isArray(aList) ? aList : []);
 
-
             setCurrentPage(1);
         } catch (error) {
             console.error("Lỗi khi tải dữ liệu:", error);
+            setResidents([]); // Đảm bảo luôn là mảng nếu lỗi
         } finally {
             setLoading(false);
         }
@@ -57,11 +59,61 @@ const ResidentManagement = () => {
         fetchData();
     }, []);
 
+    // --- CÁC HÀM XỬ LÝ THÙNG RÁC ---
+    const fetchDeletedData = async () => {
+        try {
+            setLoading(true);
+            const res = await api.get('/Residents/Deleted');
+            const list = res.data?.data || res.data;
+            setDeletedResidents(Array.isArray(list) ? list : []);
+        } catch (error) {
+            console.error("Lỗi tải danh sách đã xóa:", error);
+            setDeletedResidents([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSoftDelete = async (id) => {
+        if (window.confirm("Bạn có chắc chắn muốn xóa cư dân này ?")) {
+            try {
+                const res = await api.delete(`/Residents/DeleteResident/${id}`);
+                alert(res.data?.message || "Đã chuyển vào Danh sách đã xóa!");
+                fetchData();
+            } catch (error) {
+                alert("LỖI: " + (error.response?.data?.message || "Không thể xóa."));
+            }
+        }
+    };
+
+    const handleRestore = async (id) => {
+        try {
+            const res = await api.put(`/Residents/Restore/${id}`);
+            alert(res.data?.message || "Đã khôi phục tài khoản thành công!");
+            fetchDeletedData();
+            fetchData();
+        } catch (error) {
+            alert("LỖI: " + (error.response?.data?.message || "Không thể khôi phục."));
+        }
+    };
+
+    const handleHardDelete = async (id) => {
+        if (window.confirm("CẢNH BÁO ĐỎ: Hành động này sẽ xóa vĩnh viễn cư dân khỏi hệ thống và không thể khôi phục! Bạn chắc chắn chứ?")) {
+            try {
+                const res = await api.delete(`/Residents/HardDelete/${id}`);
+                alert(res.data?.message || "Đã xóa vĩnh viễn thành công!");
+                fetchDeletedData();
+            } catch (error) {
+                alert("LỖI: " + (error.response?.data?.message || "Không thể xóa vĩnh viễn."));
+            }
+        }
+    };
+
+    // --- CÁC HÀM XỬ LÝ FORM & MODAL ---
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
-
 
     const handleOpenModal = (resident = null) => {
         if (resident) {
@@ -103,15 +155,12 @@ const ResidentManagement = () => {
             document.getElementById('closeResModal').click();
         } catch (error) {
             let errorMessage = "Lỗi đầu vào, vui lòng kiểm tra lại!";
-
-
             if (error.response?.data?.errors) {
                 const firstErrorKey = Object.keys(error.response.data.errors)[0];
                 errorMessage = error.response.data.errors[firstErrorKey][0];
             } else if (error.response?.data?.message) {
                 errorMessage = error.response.data.message;
             }
-
             alert("LỖI: " + errorMessage);
         } finally {
             setIsSubmitting(false);
@@ -128,6 +177,7 @@ const ResidentManagement = () => {
         }
     };
 
+    // --- XỬ LÝ GÁN / GỠ PHÒNG ---
     const handleOpenAssignModal = (resident) => {
         setSelectedResident(resident);
         setSelectedApartmentId('');
@@ -150,11 +200,13 @@ const ResidentManagement = () => {
     };
 
     const handleRemoveRoom = async () => {
-        if (!selectedApartmentId) return alert("Vui lòng chọn căn hộ muốn gỡ!");
+        const targetAptId = selectedResident?.apartmentId;
+        if (!targetAptId) return alert("Cư dân này hiện chưa có phòng!");
+
         if (window.confirm(`CẢNH BÁO: Gỡ cư dân sẽ làm vô hiệu hóa Hợp đồng, chuyển phòng thành Trống và khóa tài khoản Cư dân. Bạn có chắc chắn?`)) {
             setIsSubmitting(true);
             try {
-                const payload = { accountId: selectedResident.accountId, apartmentId: Number(selectedApartmentId), relationshipId: null };
+                const payload = { accountId: selectedResident.accountId, apartmentId: Number(targetAptId), relationshipId: null };
                 const res = await api.post('/Residents/remove', payload);
                 alert(res.data?.message || "Đã gỡ cư dân khỏi phòng!");
                 document.getElementById('closeAssignModal').click();
@@ -167,7 +219,7 @@ const ResidentManagement = () => {
         }
     };
 
-
+    // --- XỬ LÝ EXCEL ---
     const handleFileChange = (e) => {
         setImportFile(e.target.files[0]);
         setImportResult(null);
@@ -195,39 +247,51 @@ const ResidentManagement = () => {
         }
     };
 
-
-
-
+    // --- LOGIC PHÂN TRANG THÔNG MINH ---
+    // Khắc phục triệt để lỗi undefine "length" bằng fallback mảng rỗng []
+    const activeList = isTrashMode ? (deletedResidents || []) : (residents || []);
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-
-    const currentResidents = residents.slice(indexOfFirstItem, indexOfLastItem);
+    const currentItems = activeList.slice(indexOfFirstItem, indexOfLastItem);
 
     return (
         <div className="container-fluid p-0">
-            {/* TIÊU ĐỀ & NÚT */}
             <div className="d-flex justify-content-between align-items-start mb-4">
                 <div>
                     <h2 className="fw-bold mb-0">Quản lý Cư dân</h2>
                     <div className="text-muted small mt-2">Quản lý hồ sơ và điều phối phòng ở cho cư dân</div>
                 </div>
                 <div className="d-flex align-items-center">
-                    <button className="btn btn-success me-3" data-bs-toggle="modal" data-bs-target="#importModal" onClick={() => { setImportFile(null); setImportResult(null); }}>
+                    <button className="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#importModal" onClick={() => { setImportFile(null); setImportResult(null); }}>
                         <i className="bi bi-file-earmark-excel me-2"></i> Import Excel
                     </button>
-                    <button className="btn btn-primary" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#residentModal" style={{ minWidth: '150px' }}>
+
+                    <button className="btn btn-primary me-2" onClick={() => handleOpenModal()} data-bs-toggle="modal" data-bs-target="#residentModal" style={{ minWidth: '150px' }}>
                         <i className="bi bi-person-plus-fill me-2"></i> Thêm Cư dân
+                    </button>
+
+                    <button
+                        className={`btn ${isTrashMode ? 'btn-secondary' : 'btn-outline-danger'}`}
+                        onClick={() => {
+                            if (!isTrashMode) fetchDeletedData();
+                            setIsTrashMode(!isTrashMode);
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <i className={`bi ${isTrashMode ? 'bi-arrow-left' : 'bi-trash'} me-2`}></i>
+                        {isTrashMode ? 'Quay lại' : 'Danh sách đã xóa'}
                     </button>
                 </div>
             </div>
 
-            {/* BẢNG DỮ LIỆU */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
                         <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
-                    ) : residents.length === 0 ? (
-                        <div className="text-center p-5 text-muted">Chưa có dữ liệu Cư dân nào.</div>
+                    ) : activeList.length === 0 ? (
+                        <div className="text-center p-5 text-muted">
+                            {isTrashMode ? "Danh sách đã xóa đang trống." : "Chưa có dữ liệu Cư dân nào."}
+                        </div>
                     ) : (
                         <>
                             <div className="table-responsive">
@@ -239,16 +303,14 @@ const ResidentManagement = () => {
                                             <th className="text-start">Họ và Tên</th>
                                             <th>Thông tin liên hệ</th>
                                             <th>CCCD</th>
+                                            <th>Phòng ở</th>
                                             <th>Trạng thái Hệ thống</th>
                                             <th>Hành động</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {/* Render mảng currentResidents thay vì residents */}
-                                        {currentResidents.map((res, idx) => {
-
+                                        {currentItems.map((res, idx) => {
                                             const stt = indexOfFirstItem + idx + 1;
-
                                             return (
                                                 <tr key={res.accountId}>
                                                     <td>{stt}</td>
@@ -262,6 +324,17 @@ const ResidentManagement = () => {
                                                         <div className="small text-muted">{res.email}</div>
                                                     </td>
                                                     <td>{res.identityCard}</td>
+
+                                                    <td>
+                                                        {res.apartmentCode ? (
+                                                            <span className="badge bg-info text-dark border">
+                                                                <i className="bi bi-door-open-fill me-1"></i> {res.apartmentCode}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="badge bg-light text-muted border">Chưa xếp</span>
+                                                        )}
+                                                    </td>
+
                                                     <td>
                                                         <button
                                                             type="button"
@@ -269,17 +342,34 @@ const ResidentManagement = () => {
                                                             onClick={() => handleToggleStatus(res.accountId)}
                                                             title="Nhấn để Khóa/Mở khóa tài khoản"
                                                             style={{ minWidth: '110px' }}
+                                                            disabled={isTrashMode}
                                                         >
                                                             {res.status === 1 ? 'Hoạt động' : 'Đã khóa'}
                                                         </button>
                                                     </td>
                                                     <td>
-                                                        <button className="btn btn-sm btn-outline-info me-2" onClick={() => handleOpenAssignModal(res)} data-bs-toggle="modal" data-bs-target="#assignModal" title="Xử lý phòng ở">
-                                                            <i className="bi bi-house-door me-1"></i> Xử lý Phòng
-                                                        </button>
-                                                        <button className="btn btn-sm btn-outline-warning" onClick={() => handleOpenModal(res)} data-bs-toggle="modal" data-bs-target="#residentModal">
-                                                            <i className="bi bi-pencil-square me-1"></i> Sửa
-                                                        </button>
+                                                        {!isTrashMode ? (
+                                                            <div className="d-flex justify-content-center gap-2">
+                                                                <button className="btn btn-sm btn-outline-info" onClick={() => handleOpenAssignModal(res)} data-bs-toggle="modal" data-bs-target="#assignModal" title="Xử lý phòng ở">
+                                                                    <i className="bi bi-house-door me-1"></i> Phòng
+                                                                </button>
+                                                                <button className="btn btn-sm btn-outline-warning" onClick={() => handleOpenModal(res)} data-bs-toggle="modal" data-bs-target="#residentModal" title="Sửa thông tin">
+                                                                    <i className="bi bi-pencil-square me-1"></i> Sửa
+                                                                </button>
+                                                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleSoftDelete(res.accountId)} title="Chuyển vào danh sách đã xóa">
+                                                                    <i className="bi bi-trash me-1"></i> Xóa
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="d-flex justify-content-center gap-2">
+                                                                <button className="btn btn-sm btn-success" onClick={() => handleRestore(res.accountId)} title="Khôi phục tài khoản">
+                                                                    <i className="bi bi-arrow-counterclockwise me-1"></i> Khôi phục
+                                                                </button>
+                                                                <button className="btn btn-sm btn-danger" onClick={() => handleHardDelete(res.accountId)} title="Xóa vĩnh viễn">
+                                                                    <i className="bi bi-x-octagon me-1"></i> Xóa cứng
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );
@@ -288,9 +378,8 @@ const ResidentManagement = () => {
                                 </table>
                             </div>
 
-                            {/* NHÚNG COMPONENT PHÂN TRANG VÀO ĐÂY */}
                             <Pagination
-                                totalItems={residents.length}
+                                totalItems={activeList.length}
                                 itemsPerPage={itemsPerPage}
                                 currentPage={currentPage}
                                 onPageChange={setCurrentPage}
@@ -300,12 +389,9 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* 1. MODAL THÊM / SỬA CƯ DÂN */}
             <div className="modal fade" id="residentModal" tabIndex="-1" aria-hidden="true">
                 <div className={`modal-dialog ${editId ? 'modal-lg' : 'modal-lg modal-dialog-scrollable'}`}>
                     <div className="modal-content border-0">
-
-                        {/* ── CREATE MODE: dùng CreateAccountForm thông minh ── */}
                         {!editId && (
                             <CreateAccountForm
                                 type="resident"
@@ -317,16 +403,8 @@ const ResidentManagement = () => {
                             />
                         )}
 
-                        {/* Nút đóng ẩn dùng để đóng modal từ JS */}
-                        <button
-                            type="button"
-                            id="closeResModal"
-                            data-bs-dismiss="modal"
-                            style={{ display: 'none' }}
-                            aria-hidden="true"
-                        />
+                        <button type="button" id="closeResModal" data-bs-dismiss="modal" style={{ display: 'none' }} aria-hidden="true" />
 
-                        {/* ── EDIT MODE: form cập nhật đơn giản ── */}
                         {!!editId && (
                             <>
                                 <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
@@ -379,6 +457,7 @@ const ResidentManagement = () => {
             </div>
 
             {/* 2. MODAL GÁN / GỠ PHÒNG */}
+            {/* 2. MODAL GÁN / GỠ PHÒNG */}
             <div className="modal fade" id="assignModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog">
                     <div className="modal-content">
@@ -389,31 +468,86 @@ const ResidentManagement = () => {
                         <div className="modal-body">
                             {selectedResident && (
                                 <div className="alert alert-secondary mb-3">
-                                    Đang xử lý cho: <strong>{selectedResident.fullName}</strong> ({selectedResident.code})
+                                    Cư dân: <strong className="text-primary">{selectedResident.fullName}</strong> ({selectedResident.code})
                                 </div>
                             )}
-                            <label className="form-label fw-semibold">Chọn Căn Hộ Mục Tiêu</label>
-                            <select className="form-select border-info mb-3" value={selectedApartmentId} onChange={(e) => setSelectedApartmentId(e.target.value)}>
-                                <option value="">-- Chọn một căn hộ --</option>
-                                {apartments.map(apt => (
-                                    <option key={apt.apartmentId} value={apt.apartmentId}>
-                                        {apt.apartmentCode} - {apt.apartmentName} (Tầng {apt.floorNumber})
-                                    </option>
-                                ))}
-                            </select>
 
-                            <div className="text-muted small mb-3">
-                                <i className="bi bi-info-circle text-primary"></i> <strong>Gán Cư Dân:</strong> Sẽ đưa cư dân vào phòng này. Nếu phòng đang Trống, sẽ tự động chuyển sang Đang Thuê.<br /><br />
-                                <i className="bi bi-exclamation-triangle text-danger"></i> <strong>Gỡ Cư Dân:</strong> (Chỉ dùng khi trả phòng/hết hợp đồng). Hệ thống sẽ Vô hiệu hóa hợp đồng, chuyển phòng về Trống và Khóa tài khoản cư dân.
-                            </div>
+                            {selectedResident?.apartmentCode ? (
+                                <div className="alert alert-warning border-warning">
+                                    <h6 className="fw-bold text-danger mb-2">
+                                        <i className="bi bi-exclamation-triangle-fill me-2"></i> Đang cư trú tại: {selectedResident.apartmentCode}
+                                    </h6>
+                                    <p className="small mb-0">
+                                        Bạn chỉ có thể thực hiện thao tác <strong>Gỡ cư dân</strong> khỏi phòng này.
+                                        Việc gỡ sẽ tự động:
+                                        <br />- Vô hiệu hóa hợp đồng hiện tại.
+                                        <br />- Chuyển trạng thái phòng về Trống.
+                                        <br />- Khóa tài khoản cư dân.
+                                    </p>
+                                </div>
+                            ) : (
+                                <>
+                                    <label className="form-label fw-semibold">Tìm và Chọn Căn Hộ Mục Tiêu</label>
+
+                                    {/* --- BẮT ĐẦU: SỬ DỤNG REACT-SELECT TẠI ĐÂY --- */}
+                                    <Select
+                                        className="mb-3"
+                                        placeholder="-- Gõ tên phòng hoặc tầng để tìm --"
+                                        noOptionsMessage={() => "Không tìm thấy phòng nào phù hợp"}
+                                        isClearable={true}
+                                        isSearchable={true}
+
+                                        // 1. Map data từ BE thành chuẩn của react-select
+                                        options={apartments.map(apt => ({
+                                            value: apt.apartmentId,
+                                            label: `${apt.apartmentCode} - ${apt.apartmentName} (Tầng ${apt.floorNumber})`
+                                        }))}
+
+                                        // 2. Map giá trị đang chọn để hiển thị
+                                        value={
+                                            selectedApartmentId
+                                                ? {
+                                                    value: selectedApartmentId,
+                                                    label: apartments.find(a => a.apartmentId === Number(selectedApartmentId))
+                                                        ? `${apartments.find(a => a.apartmentId === Number(selectedApartmentId)).apartmentCode} - ${apartments.find(a => a.apartmentId === Number(selectedApartmentId)).apartmentName}`
+                                                        : 'Đã chọn'
+                                                }
+                                                : null
+                                        }
+
+                                        // 3. Xử lý khi chọn/xóa
+                                        onChange={(selectedOption) => {
+                                            setSelectedApartmentId(selectedOption ? selectedOption.value : '');
+                                        }}
+
+                                        // 4. Chỉnh màu sắc cho viền đồng bộ với theme
+                                        styles={{
+                                            control: (baseStyles, state) => ({
+                                                ...baseStyles,
+                                                borderColor: state.isFocused ? '#0dcaf0' : '#0dcaf0',
+                                                boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(13, 202, 240, 0.25)' : 'none',
+                                                '&:hover': { borderColor: '#0dcaf0' }
+                                            }),
+                                        }}
+                                    />
+                                    {/* --- KẾT THÚC: SỬ DỤNG REACT-SELECT --- */}
+
+                                    <div className="text-muted small mb-3">
+                                        <i className="bi bi-info-circle text-primary"></i> <strong>Gán Cư Dân:</strong> Đưa cư dân vào phòng này. Hệ thống sẽ tự cập nhật trạng thái phòng.
+                                    </div>
+                                </>
+                            )}
                         </div>
-                        <div className="modal-footer bg-light d-flex justify-content-between">
-                            <button type="button" className="btn btn-outline-danger" onClick={handleRemoveRoom} disabled={isSubmitting || !selectedApartmentId}>
-                                <i className="bi bi-box-arrow-right"></i> Gỡ Cư Dân
-                            </button>
-                            <button type="button" className="btn btn-info text-white fw-bold" onClick={handleAssignRoom} disabled={isSubmitting || !selectedApartmentId}>
-                                <i className="bi bi-house-add"></i> Gán Cư Dân Vào Phòng
-                            </button>
+                        <div className="modal-footer bg-light p-2">
+                            {selectedResident?.apartmentCode ? (
+                                <button type="button" className="btn btn-danger w-100 fw-bold" onClick={handleRemoveRoom} disabled={isSubmitting}>
+                                    <i className="bi bi-box-arrow-right me-2"></i> Xác nhận Gỡ Cư Dân khỏi {selectedResident.apartmentCode}
+                                </button>
+                            ) : (
+                                <button type="button" className="btn btn-info text-white fw-bold w-100" onClick={handleAssignRoom} disabled={isSubmitting || !selectedApartmentId}>
+                                    <i className="bi bi-house-add me-2"></i> Thực hiện Gán Phòng
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -438,7 +572,6 @@ const ResidentManagement = () => {
                                     Email | UserName | FullName | Phone | CCCD | Country | City | Address | ApartmentCode (Mã phòng: Tùy chọn)
                                 </div>
 
-                                {/* Báo cáo kết quả Import */}
                                 {importResult && (
                                     <div className="mt-4 p-3 border rounded bg-light">
                                         <h6 className="fw-bold mb-2">Kết quả xử lý:</h6>
