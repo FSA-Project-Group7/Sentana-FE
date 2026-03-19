@@ -17,7 +17,8 @@ const ResidentManagement = () => {
     const [editId, setEditId] = useState(null);
     const initialFormState = {
         email: '', userName: '', password: '', fullName: '',
-        phoneNumber: '', identityCard: '', country: 'Việt Nam', city: 'Hà Nội', address: ''
+        phoneNumber: '', identityCard: '', country: '', city: '', address: '',
+        birthDay: '', sex: ''
     };
     const [formData, setFormData] = useState(initialFormState);
 
@@ -118,6 +119,43 @@ const ResidentManagement = () => {
     const handleOpenModal = (resident = null) => {
         if (resident) {
             setEditId(resident.accountId);
+            console.log('🔍 Resident data:', resident);
+            console.log('📊 All keys in resident object:', Object.keys(resident));
+            
+            // Lấy birthDay từ các field có thể
+            let birthDay = '';
+            if (resident.info?.birthday) {
+                birthDay = resident.info.birthday.split('T')[0];
+            } else if (resident.birthDay) {
+                birthDay = resident.birthDay.split('T')[0];
+            } else if (resident.dayOfBirth) {
+                birthDay = resident.dayOfBirth.split('T')[0];
+            } else if (resident._dayOfBirth) {
+                birthDay = resident._dayOfBirth.split('T')[0];
+            } else if (resident.BirthDay) {
+                birthDay = resident.BirthDay.split('T')[0];
+            }
+            
+            // Lấy sex từ các field có thể
+            let sex = '';
+            if (resident.info?.sex !== null && resident.info?.sex !== undefined) {
+                sex = resident.info.sex.toString();
+            } else if (resident.sex !== null && resident.sex !== undefined) {
+                sex = resident.sex.toString();
+            } else if (resident.Sex !== null && resident.Sex !== undefined) {
+                sex = resident.Sex.toString();
+            } else if (resident.gender !== null && resident.gender !== undefined) {
+                sex = resident.gender.toString();
+            }
+            
+            // Lấy country
+            const country = resident.info?.country || resident.country || resident.Country || '';
+            
+            // Lấy city
+            const city = resident.info?.city || resident.city || resident.City || '';
+            
+            console.log('📋 Extracted:', { birthDay, sex, country, city });
+            
             setFormData({
                 email: resident.email || '',
                 userName: resident.userName || '',
@@ -125,9 +163,11 @@ const ResidentManagement = () => {
                 fullName: resident.fullName || '',
                 phoneNumber: resident.phoneNumber || '',
                 identityCard: resident.identityCard || '',
-                country: resident.country || 'Việt Nam',
-                city: resident.city || 'Hà Nội',
-                address: resident.address || ''
+                country: country,
+                city: city,
+                address: resident.address || '',
+                birthDay: birthDay,
+                sex: sex
             });
         } else {
             setEditId(null);
@@ -141,9 +181,15 @@ const ResidentManagement = () => {
         try {
             if (editId) {
                 const updatePayload = {
-                    email: formData.email, fullName: formData.fullName,
-                    phoneNumber: formData.phoneNumber, identityCard: formData.identityCard,
-                    country: formData.country, city: formData.city, address: formData.address
+                    email: formData.email.trim() || null,
+                    fullName: formData.fullName,
+                    phoneNumber: formData.phoneNumber.trim() || null,
+                    identityCard: formData.identityCard,
+                    country: formData.country.trim() || null,
+                    city: formData.city.trim() || null,
+                    address: formData.address.trim() || null,
+                    birthDay: formData.birthDay || null,
+                    sex: formData.sex !== '' ? Number(formData.sex) : null
                 };
                 const res = await api.put(`/Residents/UpdateResident/${editId}`, updatePayload);
                 alert(res.data?.message || "Cập nhật thành công!");
@@ -430,6 +476,31 @@ const ResidentManagement = () => {
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Số điện thoại</label>
                                                 <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Ngày sinh</label>
+                                                <input
+                                                    type="date"
+                                                    className="form-control"
+                                                    name="birthDay"
+                                                    value={formData.birthDay}
+                                                    onChange={handleInputChange}
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Giới tính</label>
+                                                <select
+                                                    className="form-select"
+                                                    name="sex"
+                                                    value={formData.sex}
+                                                    onChange={handleInputChange}
+                                                >
+                                                    <option value="">-- Chọn giới tính --</option>
+                                                    <option value="0">Nam</option>
+                                                    <option value="1">Nữ</option>
+                                                    <option value="2">Khác</option>
+                                                </select>
                                             </div>
                                             <div className="col-md-4">
                                                 <label className="form-label fw-semibold">Quốc gia</label>
