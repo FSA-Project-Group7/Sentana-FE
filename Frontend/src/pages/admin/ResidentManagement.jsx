@@ -4,6 +4,7 @@ import Pagination from '../../components/common/Pagination';
 import CreateAccountForm from '../../components/common/CreateAccountForm';
 import Select from 'react-select';
 
+
 const ResidentManagement = () => {
     // --- STATES CƠ BẢN ---
     const [residents, setResidents] = useState([]);
