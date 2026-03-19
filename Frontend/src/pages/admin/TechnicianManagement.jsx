@@ -11,7 +11,8 @@ const TechnicianManagement = () => {
 
     const initialFormState = {
         email: '', userName: '', password: '', fullName: '',
-        phoneNumber: '', identityCard: '', country: 'Việt Nam', city: 'Hà Nội', address: ''
+        phoneNumber: '', identityCard: '', country: '', city: '', address: '',
+        birthDay: '', sex: ''
     };
     const [formData, setFormData] = useState(initialFormState);
 
@@ -41,6 +42,43 @@ const TechnicianManagement = () => {
     const handleOpenModal = (tech = null) => {
         if (tech) {
             setEditId(tech.accountId);
+            console.log('🔍 Tech data:', tech);
+            console.log('📊 All keys in tech object:', Object.keys(tech));
+            
+            // Lấy birthDay từ các field có thể
+            let birthDay = '';
+            if (tech.info?.birthday) {
+                birthDay = tech.info.birthday.split('T')[0];
+            } else if (tech.birthDay) {
+                birthDay = tech.birthDay.split('T')[0];
+            } else if (tech.dayOfBirth) {
+                birthDay = tech.dayOfBirth.split('T')[0];
+            } else if (tech._dayOfBirth) {
+                birthDay = tech._dayOfBirth.split('T')[0];
+            } else if (tech.BirthDay) {
+                birthDay = tech.BirthDay.split('T')[0];
+            }
+            
+            // Lấy sex từ các field có thể
+            let sex = '';
+            if (tech.info?.sex !== null && tech.info?.sex !== undefined) {
+                sex = tech.info.sex.toString();
+            } else if (tech.sex !== null && tech.sex !== undefined) {
+                sex = tech.sex.toString();
+            } else if (tech.Sex !== null && tech.Sex !== undefined) {
+                sex = tech.Sex.toString();
+            } else if (tech.gender !== null && tech.gender !== undefined) {
+                sex = tech.gender.toString();
+            }
+            
+            // Lấy country
+            const country = tech.info?.country || tech.country || tech.Country || '';
+            
+            // Lấy city
+            const city = tech.info?.city || tech.city || tech.City || '';
+            
+            console.log('📋 Extracted:', { birthDay, sex, country, city });
+            
             setFormData({
                 email: tech.email || '',
                 userName: tech.userName || '',
@@ -48,9 +86,11 @@ const TechnicianManagement = () => {
                 fullName: tech.fullName || '',
                 phoneNumber: tech.phoneNumber || '',
                 identityCard: tech.identityCard || '',
-                country: tech.country || 'Việt Nam',
-                city: tech.city || 'Hà Nội',
-                address: tech.address || ''
+                country: country,
+                city: city,
+                address: tech.address || '',
+                birthDay: birthDay,
+                sex: sex
             });
         } else {
             setEditId(null);
@@ -64,9 +104,15 @@ const TechnicianManagement = () => {
         try {
             if (editId) {
                 const updatePayload = {
-                    email: formData.email, fullName: formData.fullName,
-                    phoneNumber: formData.phoneNumber, identityCard: formData.identityCard,
-                    country: formData.country, city: formData.city, address: formData.address
+                    email: formData.email.trim() || null,
+                    fullName: formData.fullName,
+                    phoneNumber: formData.phoneNumber.trim() || null,
+                    identityCard: formData.identityCard,
+                    country: formData.country.trim() || null,
+                    city: formData.city.trim() || null,
+                    address: formData.address.trim() || null,
+                    birthDay: formData.birthDay || null,
+                    sex: formData.sex !== '' ? Number(formData.sex) : null
                 };
                 const res = await api.put(`/Technicians/UpdateTechnician/${editId}`, updatePayload);
                 alert(res.data?.message || "Cập nhật thành công!");
@@ -157,15 +203,15 @@ const TechnicianManagement = () => {
                         <div className="table-responsive">
                             <table className="table table-hover table-bordered mb-0 align-middle text-center">
                                 <thead className="table-light">
-                                    <tr>
-                                        <th>STT</th>
-                                        <th>Mã NV</th>
-                                        <th className="text-start">Họ và Tên</th>
-                                        <th>Liên hệ</th>
-                                        <th>Trạng thái Hệ thống</th>
-                                        <th>Tình trạng CV</th>
-                                        <th>Hành động</th>
-                                    </tr>
+                                     <tr>
+                                         <th>STT</th>
+                                         <th>Mã NV</th>
+                                         <th className="text-start">Họ và Tên</th>
+                                         <th>Liên hệ</th>
+                                         <th>Trạng thái Hệ thống</th>
+                                         <th>Tình trạng CV</th>
+                                         <th>Hành động</th>
+                                     </tr>
                                 </thead>
                                 <tbody>
                                     {technicians.map((tech, idx) => (
@@ -282,6 +328,31 @@ const TechnicianManagement = () => {
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Email (@gmail.com) (*)</label>
                                                 <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Ngày sinh</label>
+                                                <input
+                                                    type="date"
+                                                    className="form-control"
+                                                    name="birthDay"
+                                                    value={formData.birthDay}
+                                                    onChange={handleInputChange}
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold">Giới tính</label>
+                                                <select
+                                                    className="form-select"
+                                                    name="sex"
+                                                    value={formData.sex}
+                                                    onChange={handleInputChange}
+                                                >
+                                                    <option value="">-- Chọn giới tính --</option>
+                                                    <option value="0">Nam</option>
+                                                    <option value="1">Nữ</option>
+                                                    <option value="2">Khác</option>
+                                                </select>
                                             </div>
                                             <div className="col-md-4">
                                                 <label className="form-label fw-semibold">Quốc gia</label>
