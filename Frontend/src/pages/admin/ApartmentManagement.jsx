@@ -9,10 +9,101 @@ const ApartmentManagement = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editId, setEditId] = useState(null);
     const [showTrash, setShowTrash] = useState(false);
-
-
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
+    const [showServiceModal, setShowServiceModal] = useState(false);
+    const [selectedApartment, setSelectedApartment] = useState(null);
+    const [allServices, setAllServices] = useState([]);
+    const [roomServices, setRoomServices] = useState([]);
+    const [assignForm, setAssignForm] = useState({ serviceId: '', price: '' });
+    const [editingPrices, setEditingPrices] = useState({});
+
+    const fetchServicesForRoom = async (apartmentId) => {
+        try {
+            const res = await api.get(`/Service/room/${apartmentId}`);
+            const dataList = res.data?.data || res.data || [];
+            setRoomServices(Array.isArray(dataList) ? dataList : []);
+        } catch (error) {
+            console.error("Lỗi lấy dịch vụ phòng:", error);
+            setRoomServices([]);
+        }
+    };
+
+    const handleOpenServiceModal = async (apartment) => {
+        setSelectedApartment(apartment);
+        setShowServiceModal(true);
+        setAssignForm({ serviceId: '', price: '' });
+        setEditingPrices({});
+
+        try {
+            const resAll = await api.get('/Service');
+            const activeServices = (resAll.data?.data || resAll.data || []).filter(s => s.status === 1 || s.Status === 1);
+            setAllServices(activeServices);
+            await fetchServicesForRoom(apartment.apartmentId);
+        } catch (error) {
+            console.error("Lỗi:", error);
+        }
+    };
+
+    const handleAssignService = async (e) => {
+        e.preventDefault();
+        if (!assignForm.serviceId) return alert("Vui lòng chọn dịch vụ!");
+
+        try {
+            const payload = {
+                apartmentId: selectedApartment.apartmentId,
+                serviceId: Number(assignForm.serviceId)
+            };
+
+            await api.post('/Service/room', payload);
+
+            if (assignForm.price) {
+                await api.put('/Service/room/price', {
+                    apartmentId: selectedApartment.apartmentId,
+                    serviceId: Number(assignForm.serviceId),
+                    actualPrice: Number(assignForm.price)
+                });
+            }
+
+            alert("Gán dịch vụ thành công!");
+            setAssignForm({ serviceId: '', price: '' });
+            fetchServicesForRoom(selectedApartment.apartmentId);
+        } catch (error) {
+            alert("LỖI: " + (error.response?.data?.message || "Không thể gán dịch vụ."));
+        }
+    };
+
+    const handleUpdateServicePrice = async (serviceId) => {
+        const newPrice = editingPrices[serviceId];
+        if (newPrice === undefined || newPrice === '') return alert("Vui lòng nhập giá mới!");
+
+        try {
+            await api.put('/Service/room/price', {
+                apartmentId: selectedApartment.apartmentId,
+                serviceId: serviceId,
+                actualPrice: Number(newPrice)
+            });
+            alert("Cập nhật giá thành công!");
+            fetchServicesForRoom(selectedApartment.apartmentId);
+        } catch (error) {
+            alert("LỖI: " + (error.response?.data?.message || "Không thể cập nhật giá."));
+        }
+    };
+
+    const handleRemoveService = async (serviceId) => {
+        if (!window.confirm("Bạn có chắc chắn muốn gỡ dịch vụ này khỏi phòng?")) return;
+        try {
+            await api.delete('/Service/room', {
+                data: {
+                    apartmentId: selectedApartment.apartmentId,
+                    serviceId: serviceId
+                }
+            });
+            fetchServicesForRoom(selectedApartment.apartmentId);
+        } catch (error) {
+            alert("LỖI: " + (error.response?.data?.message || "Không thể gỡ dịch vụ."));
+        }
+    };
 
     const initialFormState = {
         buildingId: '',
@@ -259,6 +350,13 @@ const ApartmentManagement = () => {
                                                             </>
                                                         ) : (
                                                             <>
+                                                                <button
+                                                                    className="btn btn-sm btn-outline-info me-1"
+                                                                    onClick={() => handleOpenServiceModal(apt)}
+                                                                    title="Quản lý dịch vụ"
+                                                                >
+                                                                    <i className="bi bi-box-seam me-1"></i> Dịch vụ
+                                                                </button>
                                                                 <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(apt)} data-bs-toggle="modal" data-bs-target="#apartmentModal">
                                                                     <i className="bi bi-pencil-square me-1"></i> Cập nhật
                                                                 </button>
@@ -275,7 +373,7 @@ const ApartmentManagement = () => {
                                 </table>
                             </div>
 
-                            {/* NHÚNG COMPONENT PHÂN TRANG VÀO ĐÂY */}
+
                             <Pagination
                                 totalItems={apartments.length}
                                 itemsPerPage={itemsPerPage}
@@ -287,7 +385,6 @@ const ApartmentManagement = () => {
                 </div>
             </div>
 
-            {/* MODAL (Giữ nguyên như cũ) */}
             <div className="modal fade" id="apartmentModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-lg">
                     <div className="modal-content">
@@ -357,6 +454,143 @@ const ApartmentManagement = () => {
                     </div>
                 </div>
             </div>
+            {/* === MODAL QUẢN LÝ DỊCH VỤ CỦA PHÒNG === */}
+            {showServiceModal && selectedApartment && (
+                <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div className="modal-content border-0">
+                            <div className="modal-header bg-info text-white">
+                                <h5 className="modal-title fw-bold">
+                                    <i className="bi bi-box-seam me-2"></i>
+                                    Quản lý Dịch vụ - Phòng {selectedApartment.apartmentCode}
+                                </h5>
+                                <button type="button" className="btn-close btn-close-white" onClick={() => setShowServiceModal(false)}></button>
+                            </div>
+                            <div className="modal-body bg-light">
+
+                                {/* 1. KIỂM TRA PHÒNG TRỐNG VÀ FORM GÁN DỊCH VỤ MỚI */}
+                                {selectedApartment.status === 1 ? (
+                                    <div className="alert alert-warning border-warning shadow-sm">
+                                        <h6 className="fw-bold text-danger mb-1">
+                                            <i className="bi bi-exclamation-triangle-fill me-2"></i> Phòng đang trống!
+                                        </h6>
+                                        <span className="small">Bạn chỉ có thể gán các dịch vụ (như Gửi xe, Gym...) cho những phòng <strong>Đã có cư dân thuê</strong> (Trạng thái: Đang thuê). Vui lòng làm hợp đồng cho phòng này trước!</span>
+                                    </div>
+                                ) : (
+                                    <div className="card shadow-sm border-0 mb-4">
+                                        <div className="card-header bg-white fw-bold text-primary">Gán Dịch Vụ Mới</div>
+                                        <div className="card-body">
+                                            <form className="row g-3 align-items-end" onSubmit={handleAssignService}>
+                                                <div className="col-md-5">
+                                                    <label className="form-label small fw-semibold">Chọn Dịch vụ (*)</label>
+                                                    <select
+                                                        className="form-select"
+                                                        value={assignForm.serviceId}
+                                                        onChange={e => setAssignForm({ ...assignForm, serviceId: e.target.value })}
+                                                        required
+                                                    >
+                                                        <option value="">-- Chọn dịch vụ --</option>
+                                                        {allServices
+                                                            // Lọc bỏ những dịch vụ phòng này đã đăng ký rồi
+                                                            .filter(s => !roomServices.some(rs => rs.serviceId === s.serviceId))
+                                                            .map(s => (
+                                                                <option key={s.serviceId} value={s.serviceId}>
+                                                                    {s.serviceName} (Mặc định: {s.serviceFee?.toLocaleString()} đ)
+                                                                </option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <label className="form-label small fw-semibold">Giá áp dụng (Tùy chỉnh)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control"
+                                                        placeholder="Để trống = Giá mặc định"
+                                                        value={assignForm.price}
+                                                        onChange={e => setAssignForm({ ...assignForm, price: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <button type="submit" className="btn btn-primary w-100 fw-bold">
+                                                        <i className="bi bi-plus-circle me-1"></i> Gán ngay
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 2. DANH SÁCH DỊCH VỤ ĐANG SỬ DỤNG */}
+                                <h6 className="fw-bold text-secondary mb-3">Dịch vụ đang sử dụng</h6>
+                                {roomServices.length === 0 ? (
+                                    <div className="alert alert-secondary text-center small">Phòng này chưa đăng ký dịch vụ nào.</div>
+                                ) : (
+                                    <div className="table-responsive bg-white rounded shadow-sm">
+                                        <table className="table table-hover align-middle mb-0 text-center">
+                                            <thead className="table-light text-muted small">
+                                                <tr>
+                                                    <th className="text-start">Tên Dịch Vụ</th>
+                                                    <th>Giá Mặc Định</th>
+                                                    <th>Giá Đang Áp Dụng (Riêng)</th>
+                                                    <th>Thao Tác</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {roomServices.map(rs => {
+                                                    const originalService = allServices.find(s => s.serviceId === rs.serviceId);
+                                                    const defaultPrice = originalService ? originalService.serviceFee : 0;
+                                                    const currentPrice = rs.actualPrice ? rs.actualPrice : defaultPrice;
+
+                                                    return (
+                                                        <tr key={rs.serviceId}>
+                                                            <td className="text-start fw-semibold text-primary">{rs.serviceName}</td>
+
+                                                            <td className="text-muted small fw-semibold">
+                                                                {defaultPrice?.toLocaleString()} đ
+                                                            </td>
+
+                                                            <td>
+                                                                <div className="d-flex justify-content-center">
+                                                                    <input
+                                                                        type="number"
+                                                                        className="form-control form-control-sm text-center text-danger fw-bold w-75"
+                                                                        defaultValue={currentPrice}
+                                                                        onChange={e => setEditingPrices({ ...editingPrices, [rs.serviceId]: e.target.value })}
+                                                                    />
+                                                                </div>
+                                                            </td>
+
+                                                            <td>
+                                                                <button
+                                                                    className="btn btn-sm btn-outline-success me-1"
+                                                                    title="Lưu Giá Mới"
+                                                                    onClick={() => handleUpdateServicePrice(rs.serviceId)}
+                                                                >
+                                                                    <i className="bi bi-check-lg me-1"></i> Lưu
+                                                                </button>
+                                                                <button
+                                                                    className="btn btn-sm btn-outline-danger"
+                                                                    title="Gỡ dịch vụ"
+                                                                    onClick={() => handleRemoveService(rs.serviceId)}
+                                                                >
+                                                                    <i className="bi bi-trash me-1"></i> Gỡ
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer bg-white">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowServiceModal(false)}>Đóng</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
