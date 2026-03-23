@@ -2,239 +2,240 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
 
 const ServiceManagement = () => {
+    // TABS
+    const [activeTab, setActiveTab] = useState('active'); // 'active' hoặc 'deleted'
+
+    // DATA STATES
     const [services, setServices] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [deletedServices, setDeletedServices] = useState([]);
+    const [loading, setLoading] = useState(false);
 
-    
-    const [showForm, setShowForm] = useState(false);
-    const [isEdit, setIsEdit] = useState(false);
-    const [currentId, setCurrentId] = useState(null);
-    const [formData, setFormData] = useState({
-        serviceName: '',
-        description: '',
-        serviceFee: '',
-        status: 1 
-    });
+    // FORM STATES
+    const initialForm = { serviceName: '', description: '', serviceFee: '' };
+    const [formData, setFormData] = useState(initialForm);
+    const [editingId, setEditingId] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    
+    // FETCH DATA
     const fetchServices = async () => {
+        setLoading(true);
         try {
-            setLoading(true);
-            const response = await api.get('/Service');
-            const data = response.data.data || response.data || [];
-            setServices(data);
+            if (activeTab === 'active') {
+                const res = await api.get('/Service');
+                setServices(res.data || []);
+            } else {
+                const res = await api.get('/Service/deleted');
+                setDeletedServices(res.data || []);
+            }
         } catch (error) {
-            console.error("Lỗi lấy dữ liệu dịch vụ:", error);
-        } finally {
-            setLoading(false);
+            console.error("Lỗi:", error);
+            activeTab === 'active' ? setServices([]) : setDeletedServices([]);
         }
+        setLoading(false);
     };
 
     useEffect(() => {
         fetchServices();
-    }, []);
+    }, [activeTab]);
 
-    const handleDelete = async (id) => {
-        
-        if (!id) {
-            alert("Không tìm thấy ID dịch vụ hợp lệ!");
-            return;
-        }
+    const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-        if (window.confirm("Bạn có chắc chắn muốn xóa (vô hiệu hóa) dịch vụ này không?")) {
-            try {
-                await api.delete(`/Service/${id}`);
-                alert("Xóa dịch vụ thành công!");
-                fetchServices(); 
-            } catch (error) {
-                console.error("Lỗi xóa dịch vụ:", error);
-
-                
-                const errorMessage = error.response?.data?.message || "Đã xảy ra lỗi hệ thống!";
-
-                if (errorMessage === "Service is already inactive.") {
-                    alert("Dịch vụ này đã ngừng hoạt động từ trước rồi!");
-                } else {
-                    alert(`Lỗi: ${errorMessage}`);
-                }
-            }
-        }
-    };
-
-    
-    const handleShowAdd = () => {
-        setIsEdit(false);
-        setFormData({ serviceName: '', description: '', serviceFee: '', status: 1 });
-        setShowForm(true);
-    };
-
-    const handleShowEdit = (svc) => {
-        setIsEdit(true);
-        setCurrentId(svc.serviceId || svc.ServiceId);
-        setFormData({
-            serviceName: svc.serviceName || svc.ServiceName || '',
-            description: svc.description || svc.Description || '',
-            serviceFee: svc.serviceFee ?? svc.ServiceFee ?? '',
-            status: svc.status ?? svc.Status ?? 1
-        });
-        setShowForm(true);
-    };
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-
-        
-        let parsedValue = value;
-        if (name === 'status') {
-            parsedValue = parseInt(value, 10);
-        } else if (name === 'serviceFee') {
-            
-            parsedValue = value ? Number(value) : '';
-        }
-
-        setFormData({ ...formData, [name]: parsedValue });
-    };
-
+    // SUBMIT FORM (CREATE / UPDATE)
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setIsSubmitting(true);
         try {
-            if (isEdit) {
-                
-                await api.put(`/Service/${currentId}`, formData);
+            const payload = {
+                serviceName: formData.serviceName,
+                description: formData.description,
+                serviceFee: Number(formData.serviceFee),
+                status: 1
+            };
+
+            if (editingId) {
+                await api.put(`/Service/${editingId}`, payload);
                 alert("Cập nhật thành công!");
             } else {
-                await api.post('/Service', formData);
+                await api.post('/Service', payload);
                 alert("Thêm mới thành công!");
             }
-            setShowForm(false);
+
+            document.getElementById('closeServiceModal').click();
             fetchServices();
         } catch (error) {
-            console.error("Lỗi lưu dịch vụ:", error);
-            alert("Đã xảy ra lỗi khi lưu. Vui lòng kiểm tra lại!");
+            alert("Lỗi: " + (error.response?.data?.message || "Có lỗi xảy ra"));
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    
-    const formatCurrency = (amount) => {
-        if (!amount && amount !== 0) return '---';
-        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    const handleEditClick = (srv) => {
+        setEditingId(srv.serviceId);
+        setFormData({ serviceName: srv.serviceName, description: srv.description, serviceFee: srv.serviceFee });
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return '---';
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return 'Invalid Date';
-        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const handleOpenCreate = () => {
+        setEditingId(null);
+        setFormData(initialForm);
     };
 
-    const renderStatus = (status) => {
-        if (status === 1 || status === 'Active') return <span className="badge bg-success">Hoạt động</span>;
-        return <span className="badge bg-secondary">Ngừng hoạt động</span>;
+    // NGHIỆP VỤ XÓA / KHÔI PHỤC
+    const handleSoftDelete = async (id) => {
+        if (!window.confirm("CẢNH BÁO: Xóa dịch vụ này sẽ TỰ ĐỘNG GỠ nó khỏi toàn bộ các căn hộ đang sử dụng. Bạn có chắc chắn?")) return;
+        try {
+            await api.delete(`/Service/${id}`);
+            alert("Đã ngừng cung cấp dịch vụ!");
+            fetchServices();
+        } catch (error) {
+            alert("Lỗi: " + (error.response?.data?.message || "Không thể xóa"));
+        }
+    };
+
+    const handleRestore = async (id) => {
+        try {
+            await api.put(`/Service/${id}/restore`);
+            alert("Đã khôi phục dịch vụ!");
+            fetchServices();
+        } catch (error) {
+            alert("Lỗi: " + (error.response?.data?.message || "Không thể khôi phục"));
+        }
+    };
+
+    const handleHardDelete = async (id) => {
+        if (!window.confirm("CẢNH BÁO NGUY HIỂM: Hành động này sẽ xóa vĩnh viễn dữ liệu và không thể hoàn tác. Tiếp tục?")) return;
+        try {
+            const res = await api.delete(`/Service/${id}/hard`);
+            alert(res.data?.message || "Xóa vĩnh viễn thành công!");
+            fetchServices();
+        } catch (error) {
+            alert("KHÔNG THỂ XÓA: " + (error.response?.data?.message || "Có lỗi xảy ra"));
+        }
     };
 
     return (
-        <div className="container mt-4">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3 className="fw-bold">Quản lý Dịch vụ</h3>
-                {!showForm && (
-                    <button className="btn btn-success" onClick={handleShowAdd}>
-                        + Thêm dịch vụ
+        <div className="container-fluid p-0">
+            {/* Header & Tabs */}
+            <div className="d-flex justify-content-between align-items-end mb-4 border-bottom pb-3">
+                <div>
+                    <h2 className="fw-bold mb-3 text-primary">Quản lý Dịch vụ Tòa nhà</h2>
+                    <ul className="nav nav-pills">
+                        <li className="nav-item me-2">
+                            <button className={`nav-link fw-semibold ${activeTab === 'active' ? 'active bg-primary' : 'bg-light text-dark'}`} onClick={() => setActiveTab('active')}>
+                                <i className="bi bi-list-check me-2"></i>Đang hoạt động
+                            </button>
+                        </li>
+                        <li className="nav-item">
+                            <button className={`nav-link fw-semibold ${activeTab === 'deleted' ? 'active bg-danger' : 'bg-light text-dark'}`} onClick={() => setActiveTab('deleted')}>
+                                <i className="bi bi-trash3-fill me-2"></i>Đã ngừng cấp
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                {activeTab === 'active' && (
+                    <button className="btn btn-primary fw-bold" onClick={handleOpenCreate} data-bs-toggle="modal" data-bs-target="#serviceModal">
+                        <i className="bi bi-plus-lg me-2"></i>Thêm Dịch Vụ Mới
                     </button>
                 )}
             </div>
 
-            {/* --- KHU VỰC HIỂN THỊ FORM THÊM/SỬA --- */}
-            {showForm && (
-                <div className="card mb-4 shadow-sm border-0">
-                    <div className="card-header bg-white fw-bold text-primary">
-                        {isEdit ? 'Chỉnh sửa dịch vụ' : 'Thêm dịch vụ mới'}
-                    </div>
-                    <div className="card-body">
+            {/* Bảng Dữ Liệu */}
+            <div className="card shadow-sm border-0">
+                <div className="card-body p-0">
+                    {loading ? (
+                        <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
+                    ) : (
+                        <div className="table-responsive">
+                            <table className="table table-hover align-middle text-center mb-0">
+                                <thead className="table-light text-muted">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th className="text-start">Tên Dịch Vụ</th>
+                                        <th className="text-start">Mô Tả</th>
+                                        <th>Đơn Giá (Mặc định)</th>
+                                        <th>Trạng Thái</th>
+                                        <th>Hành Động</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(activeTab === 'active' ? services : deletedServices).map((srv) => (
+                                        <tr key={srv.serviceId}>
+                                            <td className="fw-bold text-muted">#{srv.serviceId}</td>
+                                            <td className="text-start fw-semibold text-primary">{srv.serviceName}</td>
+                                            <td className="text-start small text-muted" style={{ maxWidth: '300px' }}>{srv.description}</td>
+                                            <td className="fw-bold text-danger">{srv.serviceFee?.toLocaleString()} đ</td>
+                                            <td>
+                                                {activeTab === 'active' ? (
+                                                    <span className="badge bg-success">Đang cấp</span>
+                                                ) : (
+                                                    <span className="badge bg-secondary">Ngừng cấp</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {activeTab === 'active' ? (
+                                                    <>
+                                                        <button className="btn btn-sm btn-outline-info me-2 fw-semibold" onClick={() => handleEditClick(srv)} data-bs-toggle="modal" data-bs-target="#serviceModal">
+                                                            <i className="bi bi-pencil-square me-1"></i>Sửa
+                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-danger fw-semibold" onClick={() => handleSoftDelete(srv.serviceId)}>
+                                                            <i className="bi bi-trash me-1"></i>Ngừng cấp
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button className="btn btn-sm btn-outline-success me-2 fw-semibold" onClick={() => handleRestore(srv.serviceId)}>
+                                                            <i className="bi bi-arrow-counterclockwise me-1"></i>Khôi phục
+                                                        </button>
+                                                        <button className="btn btn-sm btn-danger fw-semibold" onClick={() => handleHardDelete(srv.serviceId)}>
+                                                            <i className="bi bi-x-circle me-1"></i>Xóa cứng
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {(activeTab === 'active' ? services : deletedServices).length === 0 && (
+                                        <tr><td colSpan="6" className="text-center py-4 text-muted">Chưa có dữ liệu.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Modal Thêm/Sửa */}
+            <div className="modal fade" id="serviceModal" tabIndex="-1">
+                <div className="modal-dialog">
+                    <div className="modal-content">
+                        <div className="modal-header bg-primary text-white">
+                            <h5 className="modal-title fw-bold">{editingId ? 'Cập Nhật Dịch Vụ' : 'Thêm Dịch Vụ Mới'}</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeServiceModal"></button>
+                        </div>
                         <form onSubmit={handleSubmit}>
-                            <div className="row mb-3">
-                                <div className="col-md-6">
-                                    <label className="form-label">Tên dịch vụ</label>
+                            <div className="modal-body">
+                                <div className="mb-3">
+                                    <label className="form-label fw-semibold">Tên dịch vụ (*)</label>
                                     <input type="text" className="form-control" name="serviceName" value={formData.serviceName} onChange={handleInputChange} required />
                                 </div>
-                                <div className="col-md-6">
-                                    <label className="form-label">Phí dịch vụ (VNĐ)</label>
-                                    <input type="number" className="form-control" name="serviceFee" value={formData.serviceFee} onChange={handleInputChange} required />
+                                <div className="mb-3">
+                                    <label className="form-label fw-semibold">Mô tả</label>
+                                    <textarea className="form-control" name="description" rows="3" value={formData.description} onChange={handleInputChange}></textarea>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label fw-semibold">Phí dịch vụ mặc định (VNĐ) (*)</label>
+                                    <input type="number" className="form-control" name="serviceFee" value={formData.serviceFee} onChange={handleInputChange} min="0" required />
                                 </div>
                             </div>
-                            <div className="mb-3">
-                                <label className="form-label">Mô tả</label>
-                                <textarea className="form-control" name="description" rows="2" value={formData.description} onChange={handleInputChange}></textarea>
-                            </div>
-                            <div className="mb-3">
-                                <label className="form-label">Trạng thái</label>
-                                <select className="form-select" name="status" value={formData.status} onChange={handleInputChange}>
-                                    <option value={1}>Hoạt động</option>
-                                    <option value={0}>Ngừng hoạt động</option>
-                                </select>
-                            </div>
-                            <div className="text-end">
-                                <button type="button" className="btn btn-secondary me-2" onClick={() => setShowForm(false)}>Hủy</button>
-                                <button type="submit" className="btn btn-primary">Lưu thông tin</button>
+                            <div className="modal-footer bg-light">
+                                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" className="btn btn-primary fw-bold" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Tạo mới')}
+                                </button>
                             </div>
                         </form>
                     </div>
                 </div>
-            )}
-
-            {/* --- KHU VỰC BẢNG HIỂN THỊ (Ẩn đi khi đang load) --- */}
-            {loading ? (
-                <div className="text-center">Đang tải dữ liệu...</div>
-            ) : (
-                <div className="table-responsive">
-                    <table className="table table-hover align-middle">
-                        <thead className="table-light">
-                            <tr>
-                                <th>ID</th>
-                                <th>Tên dịch vụ</th>
-                                <th>Mô tả</th>
-                                <th>Phí dịch vụ</th>
-                                <th>Trạng thái</th>
-                                <th>Ngày tạo</th>
-                                <th>Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {services.length > 0 ? services.map((svc) => (
-                                <tr key={svc.serviceId || svc.ServiceId}>
-                                    <td className="fw-bold">{svc.serviceId || svc.ServiceId}</td>
-                                    <td>{svc.serviceName || svc.ServiceName || '---'}</td>
-                                    <td>{svc.description || svc.Description || '---'}</td>
-                                    <td className="text-danger fw-semibold">
-                                        {formatCurrency(svc.serviceFee ?? svc.ServiceFee)}
-                                    </td>
-                                    <td>{renderStatus(svc.status ?? svc.Status)}</td>
-                                    <td>{formatDate(svc.createdAt || svc.CreatedAt)}</td>
-                                    <td>
-                                        <button
-                                            className="btn btn-sm btn-outline-primary me-2"
-                                            onClick={() => handleShowEdit(svc)}
-                                        >
-                                            Sửa
-                                        </button>
-                                        <button
-                                            className="btn btn-sm btn-outline-danger"
-                                            onClick={() => handleDelete(svc.serviceId || svc.ServiceId)}
-                                        >
-                                            Xóa
-                                        </button>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan="7" className="text-center text-muted py-4">
-                                        Chưa có dịch vụ nào trong hệ thống.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            </div>
         </div>
     );
 };
