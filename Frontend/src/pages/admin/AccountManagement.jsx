@@ -1,25 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
-import Pagination from '../../components/common/Pagination'; // Import component phân trang dùng chung
+import Pagination from '../../components/common/Pagination';
 
 const AccountManagement = () => {
     const [activeTab, setActiveTab] = useState('technician');
-
-    // Gộp chung 1 state để chứa danh sách tài khoản (đỡ phải tạo 2 state thừa)
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // State phục vụ phân trang
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
 
-    // Hàm gọi dữ liệu động dựa trên Tab đang active
     const fetchAccounts = async () => {
         try {
             setLoading(true);
             let response;
 
-            // Nếu là Tab KTV thì gọi API KTV, nếu Tab Cư dân thì gọi API Cư dân
             if (activeTab === 'technician') {
                 response = await api.get('/Technicians');
             } else {
