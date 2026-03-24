@@ -233,63 +233,99 @@ const ContractManagement = () => {
                 </div>
             </div>
 
+            {/* Modal Giao Diện Đã Được Chỉnh Sửa */}
             <div className="modal fade" id="createContractModal" tabIndex="-1">
-                <div className="modal-dialog modal-lg">
+                <div className="modal-dialog modal-lg modal-dialog-centered">
                     <div className="modal-content">
-                        <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
-                            <h5 className="modal-title fw-bold">Tạo Hợp Đồng Thuê Phòng</h5>
+                        <div className="modal-header text-white" style={{ backgroundColor: '#1b2a47' }}>
+                            <h5 className="modal-title fw-bold">Tạo Hợp Đồng Thuê</h5>
                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeCreateModal"></button>
                         </div>
 
                         <form onSubmit={handleCreateContract}>
-                            <div className="modal-body">
+                            <div className="modal-body p-4">
+                                
+                                {/* Banner Lưu ý */}
+                                <div className="alert alert-info py-2 px-3 mb-4" style={{ backgroundColor: '#e8f4fd', border: 'none', color: '#5b82a1', fontSize: '0.9rem' }}>
+                                    <strong>Lưu ý quan trọng:</strong> Chỉ những Phòng trống và Cư dân chưa có phòng mới được hiển thị ở đây. Khi tạo hợp đồng thành công, Cư dân sẽ tự động được gán vào phòng và phòng sẽ chuyển sang trạng thái "Đang thuê".
+                                </div>
 
-                                <Select
-                                    placeholder="-- Tìm cư dân --"
-                                    noOptionsMessage={() => "Không có cư dân nào khả dụng"}
-                                    isClearable
-                                    isSearchable
-                                    options={activeResidents.map(r => ({
-                                        value: r.accountId,
-                                        label: `${r.fullName || r.userName} - CCCD: ${r.identityCard || 'N/A'}`
-                                    }))}
-                                    onChange={(opt) =>
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            residentAccountId: opt ? opt.value : ''
-                                        }))
-                                    }
-                                />
+                                {/* Row 1: Cư dân & Căn hộ */}
+                                <div className="row mb-3">
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold text-muted small">Cư dân thuê (*)</label>
+                                        <Select
+                                            placeholder="-- Chọn cư dân --"
+                                            noOptionsMessage={() => "Không có cư dân nào khả dụng"}
+                                            isClearable
+                                            isSearchable
+                                            options={activeResidents.map(r => ({
+                                                value: r.accountId,
+                                                label: `${r.fullName || r.userName} - CCCD: ${r.identityCard || 'N/A'}`
+                                            }))}
+                                            onChange={(opt) => setFormData(prev => ({ ...prev, residentAccountId: opt ? opt.value : '' }))}
+                                            value={activeResidents.find(r => r.accountId === formData.residentAccountId) ? { label: `${activeResidents.find(r => r.accountId === formData.residentAccountId).fullName || activeResidents.find(r => r.accountId === formData.residentAccountId).userName} - CCCD: ${activeResidents.find(r => r.accountId === formData.residentAccountId).identityCard || 'N/A'}`, value: formData.residentAccountId } : null}
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold text-muted small">Chọn Căn hộ trống (*)</label>
+                                        <Select
+                                            placeholder="-- Chọn Căn hộ trống --"
+                                            noOptionsMessage={() => "Không có phòng trống"}
+                                            isClearable
+                                            isSearchable
+                                            options={vacantApartments.map(a => ({
+                                                value: a.apartmentId,
+                                                label: `${a.apartmentCode} - Phòng ${a.apartmentCode.replace(/[^0-9]/g, '')} Tòa ${a.apartmentName || 'B'}`
+                                            }))}
+                                            onChange={(opt) => setFormData(prev => ({ ...prev, apartmentId: opt ? opt.value : '' }))}
+                                            value={vacantApartments.find(a => a.apartmentId === formData.apartmentId) ? { label: `${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentCode} - ${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentName}`, value: formData.apartmentId } : null}
+                                        />
+                                    </div>
+                                </div>
 
-                                <Select
-                                    placeholder="-- Tìm phòng trống --"
-                                    noOptionsMessage={() => "Không có phòng trống"}
-                                    isClearable
-                                    isSearchable
-                                    options={vacantApartments.map(a => ({
-                                        value: a.apartmentId,
-                                        label: `${a.apartmentCode} - ${a.apartmentName}`
-                                    }))}
-                                    onChange={(opt) =>
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            apartmentId: opt ? opt.value : ''
-                                        }))
-                                    }
-                                />
+                                {/* Row 2: Ngày bắt đầu & kết thúc */}
+                                <div className="row mb-3">
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold text-muted small">Ngày bắt đầu (*)</label>
+                                        <input type="date" className="form-control" name="startDay" value={formData.startDay} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold text-muted small">Ngày kết thúc (*)</label>
+                                        <input type="date" className="form-control" name="endDay" value={formData.endDay} onChange={handleInputChange} />
+                                    </div>
+                                </div>
 
-                                <input type="date" name="startDay" value={formData.startDay} onChange={handleInputChange} />
-                                <input type="date" name="endDay" value={formData.endDay} onChange={handleInputChange} />
+                                {/* Row 3: Giá thuê & Tiền cọc */}
+                                <div className="row mb-3">
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold text-muted small">Giá thuê hàng tháng (VNĐ)</label>
+                                        <input type="number" className="form-control" name="monthlyRent" value={formData.monthlyRent} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-semibold text-muted small">Tiền cọc (VNĐ)</label>
+                                        <input type="number" className="form-control" name="deposit" value={formData.deposit} onChange={handleInputChange} />
+                                    </div>
+                                </div>
 
-                                <input type="file" onChange={handleFileChange} />
+                                {/* Row 4: File hợp đồng */}
+                                <div className="mb-3">
+                                    <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
+                                    <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf,.jpg,.png" />
+                                    <div className="form-text mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
+                                        Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Chỉ nhận PDF, JPG, PNG).
+                                    </div>
+                                </div>
 
                             </div>
 
-                            <div className="modal-footer">
-                                <button type="submit" disabled={isSubmitting}>Tạo</button>
+                            <div className="modal-footer" style={{ borderTop: 'none', backgroundColor: '#f8f9fa' }}>
+                                <button type="button" className="btn btn-secondary px-4" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" className="btn btn-primary px-4" disabled={isSubmitting} style={{ backgroundColor: '#4a7fb8', border: 'none' }}>
+                                    {isSubmitting ? 'Đang tạo...' : 'Tạo Hợp Đồng'}
+                                </button>
                             </div>
                         </form>
-
                     </div>
                 </div>
             </div>
