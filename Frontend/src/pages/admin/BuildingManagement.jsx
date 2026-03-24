@@ -28,18 +28,26 @@ const BuildingManagement = () => {
         };
     };
 
-    const fetchBuildings = async () => {
-        try {
-            setLoading(true);
-            const endpoint = showTrash ? '/Buildings/deleted' : '/Buildings';
-            const response = await api.get(endpoint);
-            setBuildings(response.data);
-        } catch (error) {
-            console.error("Lỗi khi tải danh sách:", error);
-        } finally {
-            setLoading(false);
+const fetchBuildings = async () => {
+    try {
+        setLoading(true);
+        const endpoint = showTrash ? '/Buildings/deleted' : '/Buildings';
+        const response = await api.get(endpoint);
+        const actualData = response.data?.data || response.data;
+        if (Array.isArray(actualData)) {
+            setBuildings(actualData);
+        } else {
+            console.error("Dữ liệu trả về không phải là mảng:", actualData);
+            setBuildings([]);
         }
+    } catch (error) {
+        console.error("Lỗi khi tải danh sách:", error);
+        setBuildings([]);
+    } finally {
+        setLoading(false);
+    }
     };
+
 
     useEffect(() => {
         fetchBuildings();
@@ -91,15 +99,17 @@ const BuildingManagement = () => {
                 alert("Cập nhật thông tin thành công!");
             } else {
                 const createPayload = {
-                    buildingCode: formData.buildingCode,
-                    buildingName: formData.buildingName,
-                    apartmentNumber: 0,
-                    floorNumber: formData.floorNumber,
-                    city: formData.city,
-                    address: formData.address
+                    BuildingCode: formData.buildingCode,
+                    BuildingName: formData.buildingName,
+                    ApartmentNumber: 1,
+                    FloorNumber: formData.floorNumber,
+                    City: formData.city,
+                    Address: formData.address
                 };
-                await api.post('/Buildings', createPayload);
+                const response = await api.post('/Buildings', createPayload);
+                if (response.data?.success) {
                 alert("Thêm tòa nhà thành công!");
+                }
             }
             fetchBuildings();
             document.getElementById('closeModal').click();
