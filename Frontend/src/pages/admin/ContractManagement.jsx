@@ -26,6 +26,12 @@ const ContractManagement = () => {
     const [formData, setFormData] = useState(initialFormState);
     const [selectedContract, setSelectedContract] = useState(null);
 
+    // 1. THÊM STATE CHẤM DỨT HỢP ĐỒNG
+    const [terminationDate, setTerminationDate] = useState('');
+    const [additionalCost, setAdditionalCost] = useState(0);
+    const [terminateResult, setTerminateResult] = useState(null);
+    const [selectedTerminateId, setSelectedTerminateId] = useState(null);
+
     const fetchData = async () => {
         setLoading(true);
 
@@ -108,16 +114,19 @@ const ContractManagement = () => {
         }
     };
 
-    const handleTerminate = async (id) => {
-        if (window.confirm("CẢNH BÁO: Việc chấm dứt hợp đồng sẽ làm phòng chuyển về trạng thái TRỐNG và cư dân sẽ bị mất phòng. Bạn có chắc chắn không?")) {
-            try {
-                const res = await api.post(`/Contract/${id}/terminate`, {});
-                alert(res.data?.message || "Đã chấm dứt hợp đồng!");
-                fetchData();
-            } catch (error) {
-                const errorMsg = error.response?.data?.message || "Không thể chấm dứt hợp đồng.";
-                alert("LỖI: " + errorMsg);
-            }
+    // 2. SỬA FUNCTION TERMINATE
+    const handleTerminate = async () => {
+        try {
+            const res = await api.put(`/contract/${selectedTerminateId}/terminate`, {
+                terminationDate,
+                additionalCost: Number(additionalCost)
+            });
+
+            setTerminateResult(res.data.data || res.data); // Đề phòng cấu trúc response linh hoạt
+            fetchData();
+        } catch (error) {
+            const errorMsg = error.response?.data?.message || "Không thể chấm dứt hợp đồng.";
+            alert("LỖI: " + errorMsg);
         }
     };
 
@@ -210,8 +219,19 @@ const ContractManagement = () => {
                                                     )}
                                                 </td>
                                                 <td>
+                                                    {/* 3. SỬA NÚT CHẤM DỨT */}
                                                     {contract.status === 1 && (
-                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleTerminate(contract.contractId)}>
+                                                        <button
+                                                            className="btn btn-sm btn-outline-danger"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#terminateModal"
+                                                            onClick={() => {
+                                                                setSelectedTerminateId(contract.contractId);
+                                                                setTerminateResult(null);
+                                                                setTerminationDate('');
+                                                                setAdditionalCost(0);
+                                                            }}
+                                                        >
                                                             Chấm dứt
                                                         </button>
                                                     )}
@@ -233,7 +253,7 @@ const ContractManagement = () => {
                 </div>
             </div>
 
-            {/* Modal Giao Diện Đã Được Chỉnh Sửa */}
+            {/* Modal Giao Diện Tạo Hợp Đồng */}
             <div className="modal fade" id="createContractModal" tabIndex="-1">
                 <div className="modal-dialog modal-lg modal-dialog-centered">
                     <div className="modal-content">
@@ -244,13 +264,10 @@ const ContractManagement = () => {
 
                         <form onSubmit={handleCreateContract}>
                             <div className="modal-body p-4">
-                                
-                                {/* Banner Lưu ý */}
                                 <div className="alert alert-info py-2 px-3 mb-4" style={{ backgroundColor: '#e8f4fd', border: 'none', color: '#5b82a1', fontSize: '0.9rem' }}>
                                     <strong>Lưu ý quan trọng:</strong> Chỉ những Phòng trống và Cư dân chưa có phòng mới được hiển thị ở đây. Khi tạo hợp đồng thành công, Cư dân sẽ tự động được gán vào phòng và phòng sẽ chuyển sang trạng thái "Đang thuê".
                                 </div>
 
-                                {/* Row 1: Cư dân & Căn hộ */}
                                 <div className="row mb-3">
                                     <div className="col-md-6">
                                         <label className="form-label fw-semibold text-muted small">Cư dân thuê (*)</label>
@@ -284,7 +301,6 @@ const ContractManagement = () => {
                                     </div>
                                 </div>
 
-                                {/* Row 2: Ngày bắt đầu & kết thúc */}
                                 <div className="row mb-3">
                                     <div className="col-md-6">
                                         <label className="form-label fw-semibold text-muted small">Ngày bắt đầu (*)</label>
@@ -296,7 +312,6 @@ const ContractManagement = () => {
                                     </div>
                                 </div>
 
-                                {/* Row 3: Giá thuê & Tiền cọc */}
                                 <div className="row mb-3">
                                     <div className="col-md-6">
                                         <label className="form-label fw-semibold text-muted small">Giá thuê hàng tháng (VNĐ)</label>
@@ -308,7 +323,6 @@ const ContractManagement = () => {
                                     </div>
                                 </div>
 
-                                {/* Row 4: File hợp đồng */}
                                 <div className="mb-3">
                                     <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
                                     <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf,.jpg,.png" />
@@ -316,7 +330,6 @@ const ContractManagement = () => {
                                         Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Chỉ nhận PDF, JPG, PNG).
                                     </div>
                                 </div>
-
                             </div>
 
                             <div className="modal-footer" style={{ borderTop: 'none', backgroundColor: '#f8f9fa' }}>
@@ -326,6 +339,67 @@ const ContractManagement = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            {/* 4. THÊM MODAL CHẤM DỨT */}
+            <div className="modal fade" id="terminateModal">
+                <div className="modal-dialog">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h5 className="modal-title fw-bold">Chấm dứt hợp đồng</h5>
+                            <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div className="modal-body">
+                            <label className="form-label small fw-semibold">Ngày chấm dứt:</label>
+                            <input
+                                type="date"
+                                className="form-control mb-3"
+                                value={terminationDate}
+                                onChange={e => setTerminationDate(e.target.value)}
+                            />
+
+                            <label className="form-label small fw-semibold">Chi phí phát sinh thêm:</label>
+                            <input
+                                type="number"
+                                className="form-control mb-3"
+                                value={additionalCost}
+                                onChange={e => setAdditionalCost(e.target.value)}
+                            />
+
+                            {terminateResult && (
+                                <div className="p-3 bg-light rounded border mt-3">
+                                    <h6 className="fw-bold mb-3 border-bottom pb-2">Kết quả thanh toán:</h6>
+                                    <p className="mb-1"><strong>Tổng:</strong> {formatCurrency(terminateResult.totalInvoice)}</p>
+                                    <p className="mb-1"><strong>Đã trả:</strong> {formatCurrency(terminateResult.totalPaid)}</p>
+
+                                    {terminateResult.amountToPay > 0 && (
+                                        <p className="text-danger mb-1 mt-2"><strong>Thiếu:</strong> {formatCurrency(terminateResult.amountToPay)}</p>
+                                    )}
+
+                                    {terminateResult.amountToReturn > 0 && (
+                                        <p className="text-success mb-1 mt-2"><strong>Dư (cần trả lại):</strong> {formatCurrency(terminateResult.amountToReturn)}</p>
+                                    )}
+                                    {terminateResult.amountToPay === 0 && terminateResult.amountToReturn === 0 && (
+                                        <p className="text-primary mt-2">
+                                            <strong>Đã thanh toán đủ</strong>
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-footer">
+                            <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                            <button
+                                className="btn btn-danger"
+                                onClick={handleTerminate}
+                                disabled={!terminationDate}
+                            >
+                                Xác nhận chấm dứt
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
