@@ -29,17 +29,17 @@ const AdminLayout = () => {
     };
 
     const navItems = [
-        { path: '/admin', label: 'Trang chủ', icon: 'bi-speedometer2' },
-        { path: '/admin/buildings', label: 'Tòa nhà', icon: 'bi-building' },
-        { path: '/admin/apartments', label: 'Danh sách phòng', icon: 'bi-door-open' },
-        { path: '/admin/residents', label: 'Quản lý Cư dân', icon: 'bi-people-fill' },
-        { path: '/admin/technicians', label: 'Kỹ thuật viên', icon: 'bi-person-gear' },
-        { path: '/admin/accounts', label: 'Tài khoản hệ thống', icon: 'bi-person-lock' },
-        { path: '/admin/services', label: 'Dịch vụ tiện ích', icon: 'bi-tools' },
-        { path: '/admin/utilities', label: 'Quản lý Điện Nước', icon: 'bi-lightning-charge-fill text-warning' },
-        { path: '/admin/contracts', label: 'Quản lý Hợp đồng', icon: 'bi-file-earmark-text-fill text-success' },
-        { path: '/admin/invoices', label: 'Quản lý Hóa đơn', icon: 'bi-receipt text-danger' },
-        { path: '/admin/payments', label: 'Xét duyệt Thanh toán', icon: 'bi-wallet2 text-info' },
+        { path: '/admin', label: 'Trang chủ', icon: 'bi-speedometer2 me-2' },
+        { path: '/admin/buildings', label: 'Tòa nhà', icon: 'bi-building me-2' },
+        { path: '/admin/apartments', label: 'Danh sách phòng', icon: 'bi-door-open me-2' },
+        { path: '/admin/residents', label: 'Quản lý Cư dân', icon: 'bi-people-fill me-2' },
+        { path: '/admin/technicians', label: 'Kỹ thuật viên', icon: 'bi-person-gear me-2' },
+        { path: '/admin/accounts', label: 'Tài khoản hệ thống', icon: 'bi-person-lock me-2' },
+        { path: '/admin/services', label: 'Dịch vụ tiện ích', icon: 'bi-tools me-2' },
+        { path: '/admin/utilities', label: 'Quản lý Điện Nước', icon: 'bi-lightning-charge-fill text-warning me-2' },
+        { path: '/admin/contracts', label: 'Quản lý Hợp đồng', icon: 'bi-file-earmark-text-fill text-success me-2' },
+        { path: '/admin/invoices', label: 'Quản lý Hóa đơn', icon: 'bi-receipt text-danger me-2' },
+        { path: '/admin/payments', label: 'Xét duyệt Thanh toán', icon: 'bi-wallet2 text-info me-2' },
     ];
 
     return (

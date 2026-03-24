@@ -12,6 +12,7 @@ const InvoiceManagement = () => {
     // Phân trang & Lọc (Khớp với InvoiceListRequestDto)
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
+    const availableYears = Array.from(new Array(6), (val, index) => currentYear - 3 + index);
     const [filters, setFilters] = useState({ month: currentMonth, year: currentYear, status: '' });
     const [pagination, setPagination] = useState({ pageNumber: 1, pageSize: 10, totalCount: 0 });
 
@@ -23,21 +24,21 @@ const InvoiceManagement = () => {
     // Dữ liệu Form
     const [formData, setFormData] = useState({
         genMonth: currentMonth, genYear: currentYear, genApartmentId: '', // Cho Generate
-        additionalFee: 0, note: '' // Cho Edit
+        additionalFee: 0, note: ''
     });
 
     // --- 2. FETCH DATA ---
     const fetchInvoices = async (page = pagination.pageNumber) => {
         setLoading(true);
         try {
-            // Chuẩn bị params gọi GET /api/Invoice/list
             const params = {
-                pageNumber: page,
-                pageSize: pagination.pageSize,
-                ...(filters.month && { month: filters.month }),
-                ...(filters.year && { year: filters.year }),
-                ...(filters.status && { status: filters.status })
+                PageNumber: page,
+                PageSize: pagination.pageSize,
             };
+
+            if (filters.month) params.Month = Number(filters.month);
+            if (filters.year) params.Year = Number(filters.year);
+            if (filters.status !== '') params.Status = Number(filters.status);
 
             const res = await api.get('/Invoice/list', { params });
             const data = res.data?.data;
@@ -197,8 +198,8 @@ const InvoiceManagement = () => {
                         <div className="col-md-3">
                             <label className="form-label small fw-bold text-muted mb-1">Năm</label>
                             <select className="form-select form-select-sm" name="year" value={filters.year} onChange={handleFilterChange}>
-                                <option value="">Tất cả</option>
-                                {[2024, 2025, 2026, 2027].map(y => (
+                                <option value="">Tất cả các năm</option>
+                                {availableYears.map(y => (
                                     <option key={y} value={y}>Năm {y}</option>
                                 ))}
                             </select>
@@ -374,7 +375,62 @@ const InvoiceManagement = () => {
                                             <div className="col-md-6 mt-2"><p className="mb-1 text-muted">Ngày lập:</p> <h6>{detailData.dayCreat}</h6></div>
                                         </div>
 
-                                        <h6 className="fw-bold text-primary border-bottom pb-2 mb-3">Bảng Kê Chi Tiết</h6>
+                                        {detailData.utilityHistory && (
+                                            <>
+                                                <h6 className="fw-bold text-warning border-bottom pb-2 mb-3 mt-4">
+                                                    <i className="bi bi-speedometer2 me-2"></i>Chỉ Số Tiêu Thụ Điện / Nước
+                                                </h6>
+                                                <div className="row mb-4">
+                                                    <div className="col-md-6">
+                                                        <div className="card border-info h-100">
+                                                            <div className="card-header bg-info text-dark fw-bold py-2">
+                                                                <i className="bi bi-lightning-charge-fill me-1"></i> Điện năng (kWh)
+                                                            </div>
+                                                            <div className="card-body py-2 small">
+                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                                    <span className="text-muted">Chỉ số cũ:</span>
+                                                                    <strong>{detailData.utilityHistory.oldElectricIndex}</strong>
+                                                                </div>
+                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                                    <span className="text-muted">Chỉ số mới:</span>
+                                                                    <strong>{detailData.utilityHistory.newElectricIndex}</strong>
+                                                                </div>
+                                                                <div className="d-flex justify-content-between">
+                                                                    <span className="fw-semibold text-danger">Tiêu thụ:</span>
+                                                                    <strong className="text-danger fs-6">{detailData.utilityHistory.electricUsage}</strong>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="col-md-6">
+                                                        <div className="card border-primary h-100">
+                                                            <div className="card-header bg-primary text-white fw-bold py-2">
+                                                                <i className="bi bi-droplet-fill me-1"></i> Nước sinh hoạt (m³)
+                                                            </div>
+                                                            <div className="card-body py-2 small">
+                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                                    <span className="text-muted">Chỉ số cũ:</span>
+                                                                    <strong>{detailData.utilityHistory.oldWaterIndex}</strong>
+                                                                </div>
+                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                                    <span className="text-muted">Chỉ số mới:</span>
+                                                                    <strong>{detailData.utilityHistory.newWaterIndex}</strong>
+                                                                </div>
+                                                                <div className="d-flex justify-content-between">
+                                                                    <span className="fw-semibold text-primary">Tiêu thụ:</span>
+                                                                    <strong className="text-primary fs-6">{detailData.utilityHistory.waterUsage}</strong>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        <h6 className="fw-bold text-primary border-bottom pb-2 mb-3 mt-4">
+                                            <i className="bi bi-receipt me-2"></i>Bảng Kê Chi Tiết
+                                        </h6>
                                         <table className="table table-sm table-bordered text-center">
                                             <thead className="table-light">
                                                 <tr><th>Khoản thu</th><th>Thành tiền (VNĐ)</th></tr>
