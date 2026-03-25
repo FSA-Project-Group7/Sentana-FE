@@ -7,11 +7,20 @@ const ContractManagement = () => {
     const [contracts, setContracts] = useState([]);
     const [apartments, setApartments] = useState([]);
     const [residents, setResidents] = useState([]);
+    const [systemServices, setSystemServices] = useState([]); // Đã giữ lại state dịch vụ
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
+
+    const relationships = [
+        { id: 2, name: 'Vợ/Chồng' },
+        { id: 3, name: 'Con cái' },
+        { id: 4, name: 'Anh/Chị/Em' },
+        { id: 5, name: 'Bạn cùng phòng' },
+        { id: 6, name: 'Khác' }
+    ];
 
     const initialFormState = {
         apartmentId: '',
@@ -20,7 +29,9 @@ const ContractManagement = () => {
         endDay: '',
         monthlyRent: '',
         deposit: '',
-        file: null
+        file: null,
+        additionalResidents: [], 
+        selectedServices: []     
     };
 
     const [formData, setFormData] = useState(initialFormState);
@@ -59,6 +70,15 @@ const ContractManagement = () => {
             setResidents([]);
         }
 
+        // Đã Resolve Conflict: Giữ lại tính năng lấy Dịch vụ
+        try {
+            const srvRes = await api.get('/Service');
+            const sList = srvRes.data?.data || srvRes.data;
+            setSystemServices(Array.isArray(sList) ? sList : []);
+        } catch (error) {
+            setSystemServices([]);
+        }
+
         setLoading(false);
         setCurrentPage(1);
     };
@@ -80,6 +100,47 @@ const ContractManagement = () => {
         setFormData(initialFormState);
     };
 
+    // --- HÀM XỬ LÝ DẤU (+) CHO CƯ DÂN PHỤ VÀ DỊCH VỤ ---
+    const addResidentRow = () => {
+        setFormData(prev => ({
+            ...prev,
+            additionalResidents: [...prev.additionalResidents, { accountId: '', relationshipId: '' }]
+        }));
+    };
+    
+    const removeResidentRow = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            additionalResidents: prev.additionalResidents.filter((_, i) => i !== index)
+        }));
+    };
+    
+    const handleAdditionalResidentChange = (index, field, value) => {
+        const newArr = [...formData.additionalResidents];
+        newArr[index][field] = value;
+        setFormData({ ...formData, additionalResidents: newArr });
+    };
+
+    const addServiceRow = () => {
+        setFormData(prev => ({
+            ...prev,
+            selectedServices: [...prev.selectedServices, { serviceId: '', actualPrice: '' }]
+        }));
+    };
+    
+    const removeServiceRow = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            selectedServices: prev.selectedServices.filter((_, i) => i !== index)
+        }));
+    };
+    
+    const handleServiceChange = (index, field, value) => {
+        const newArr = [...formData.selectedServices];
+        newArr[index][field] = value;
+        setFormData({ ...formData, selectedServices: newArr });
+    };
+
     const handleCreateContract = async (e) => {
         e.preventDefault();
 
@@ -98,6 +159,24 @@ const ContractManagement = () => {
         payload.append("Deposit", formData.deposit || 0);
         payload.append("File", formData.file);
 
+        // Nối mảng Cư dân phụ vào FormData
+        formData.additionalResidents.forEach((res, index) => {
+            if (res.accountId && res.relationshipId) {
+                payload.append(`AdditionalResidents[${index}].AccountId`, res.accountId);
+                payload.append(`AdditionalResidents[${index}].RelationshipId`, res.relationshipId);
+            }
+        });
+
+        // Nối mảng Dịch vụ vào FormData
+        formData.selectedServices.forEach((srv, index) => {
+            if (srv.serviceId) {
+                payload.append(`Services[${index}].ServiceId`, srv.serviceId);
+                if (srv.actualPrice) {
+                    payload.append(`Services[${index}].ActualPrice`, srv.actualPrice);
+                }
+            }
+        });
+
         try {
             const res = await api.post('/contract/create-contract', payload, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -114,7 +193,7 @@ const ContractManagement = () => {
         }
     };
 
-    // 2. SỬA FUNCTION TERMINATE
+    // 2. SỬA FUNCTION TERMINATE (Đã Resolve Conflict)
     const handleTerminate = async () => {
         try {
             const res = await api.put(`/contract/${selectedTerminateId}/terminate`, {
@@ -122,7 +201,7 @@ const ContractManagement = () => {
                 additionalCost: Number(additionalCost)
             });
 
-            setTerminateResult(res.data.data || res.data); // Đề phòng cấu trúc response linh hoạt
+            setTerminateResult(res.data?.data || res.data); // Dùng optional chaining an toàn hơn
             fetchData();
         } catch (error) {
             const errorMsg = error.response?.data?.message || "Không thể chấm dứt hợp đồng.";
@@ -219,7 +298,6 @@ const ContractManagement = () => {
                                                     )}
                                                 </td>
                                                 <td>
-                                                    {/* 3. SỬA NÚT CHẤM DỨT */}
                                                     {contract.status === 1 && (
                                                         <button
                                                             className="btn btn-sm btn-outline-danger"
@@ -255,79 +333,186 @@ const ContractManagement = () => {
 
             {/* Modal Giao Diện Tạo Hợp Đồng */}
             <div className="modal fade" id="createContractModal" tabIndex="-1">
-                <div className="modal-dialog modal-lg modal-dialog-centered">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                     <div className="modal-content">
                         <div className="modal-header text-white" style={{ backgroundColor: '#1b2a47' }}>
                             <h5 className="modal-title fw-bold">Tạo Hợp Đồng Thuê</h5>
                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeCreateModal"></button>
                         </div>
 
-                        <form onSubmit={handleCreateContract}>
-                            <div className="modal-body p-4">
+                        <form onSubmit={handleCreateContract} id="contractForm">
+                            <div className="modal-body p-4 bg-light">
                                 <div className="alert alert-info py-2 px-3 mb-4" style={{ backgroundColor: '#e8f4fd', border: 'none', color: '#5b82a1', fontSize: '0.9rem' }}>
-                                    <strong>Lưu ý quan trọng:</strong> Chỉ những Phòng trống và Cư dân chưa có phòng mới được hiển thị ở đây. Khi tạo hợp đồng thành công, Cư dân sẽ tự động được gán vào phòng và phòng sẽ chuyển sang trạng thái "Đang thuê".
+                                    <strong>Lưu ý quan trọng:</strong> Chỉ những Phòng trống và Cư dân chưa có phòng mới được hiển thị ở đây. Khi tạo hợp đồng thành công, Cư dân sẽ tự động được gán vào phòng.
                                 </div>
 
-                                <div className="row mb-3">
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Cư dân thuê (*)</label>
-                                        <Select
-                                            placeholder="-- Chọn cư dân --"
-                                            noOptionsMessage={() => "Không có cư dân nào khả dụng"}
-                                            isClearable
-                                            isSearchable
-                                            options={activeResidents.map(r => ({
-                                                value: r.accountId,
-                                                label: `${r.fullName || r.userName} - CCCD: ${r.identityCard || 'N/A'}`
-                                            }))}
-                                            onChange={(opt) => setFormData(prev => ({ ...prev, residentAccountId: opt ? opt.value : '' }))}
-                                            value={activeResidents.find(r => r.accountId === formData.residentAccountId) ? { label: `${activeResidents.find(r => r.accountId === formData.residentAccountId).fullName || activeResidents.find(r => r.accountId === formData.residentAccountId).userName} - CCCD: ${activeResidents.find(r => r.accountId === formData.residentAccountId).identityCard || 'N/A'}`, value: formData.residentAccountId } : null}
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Chọn Căn hộ trống (*)</label>
-                                        <Select
-                                            placeholder="-- Chọn Căn hộ trống --"
-                                            noOptionsMessage={() => "Không có phòng trống"}
-                                            isClearable
-                                            isSearchable
-                                            options={vacantApartments.map(a => ({
-                                                value: a.apartmentId,
-                                                label: `${a.apartmentCode} - Phòng ${a.apartmentCode.replace(/[^0-9]/g, '')} Tòa ${a.apartmentName || 'B'}`
-                                            }))}
-                                            onChange={(opt) => setFormData(prev => ({ ...prev, apartmentId: opt ? opt.value : '' }))}
-                                            value={vacantApartments.find(a => a.apartmentId === formData.apartmentId) ? { label: `${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentCode} - ${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentName}`, value: formData.apartmentId } : null}
-                                        />
+                                {/* SECTION 1: Thông tin hợp đồng cơ bản */}
+                                <div className="card shadow-sm border-0 mb-4">
+                                    <div className="card-header bg-white fw-bold">1. Thông tin Hợp đồng & Chủ hộ</div>
+                                    <div className="card-body">
+                                        <div className="row mb-3">
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold text-muted small">Cư dân thuê (*)</label>
+                                                <Select
+                                                    placeholder="-- Chọn cư dân --"
+                                                    noOptionsMessage={() => "Không có cư dân nào khả dụng"}
+                                                    isClearable
+                                                    isSearchable
+                                                    options={activeResidents.map(r => ({
+                                                        value: r.accountId,
+                                                        label: `${r.fullName || r.userName} - CCCD: ${r.identityCard || 'N/A'}`
+                                                    }))}
+                                                    onChange={(opt) => setFormData(prev => ({ ...prev, residentAccountId: opt ? opt.value : '' }))}
+                                                    value={activeResidents.find(r => r.accountId === formData.residentAccountId) ? { label: `${activeResidents.find(r => r.accountId === formData.residentAccountId).fullName || activeResidents.find(r => r.accountId === formData.residentAccountId).userName} - CCCD: ${activeResidents.find(r => r.accountId === formData.residentAccountId).identityCard || 'N/A'}`, value: formData.residentAccountId } : null}
+                                                />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label fw-semibold text-muted small">Chọn Căn hộ trống (*)</label>
+                                                <Select
+                                                    placeholder="-- Chọn Căn hộ trống --"
+                                                    noOptionsMessage={() => "Không có phòng trống"}
+                                                    isClearable
+                                                    isSearchable
+                                                    options={vacantApartments.map(a => ({
+                                                        value: a.apartmentId,
+                                                        label: `${a.apartmentCode} - Tòa ${a.apartmentName || 'B'}`
+                                                    }))}
+                                                    onChange={(opt) => setFormData(prev => ({ ...prev, apartmentId: opt ? opt.value : '' }))}
+                                                    value={vacantApartments.find(a => a.apartmentId === formData.apartmentId) ? { label: `${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentCode} - ${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentName}`, value: formData.apartmentId } : null}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="row mb-3">
+                                            <div className="col-md-3">
+                                                <label className="form-label fw-semibold text-muted small">Ngày bắt đầu (*)</label>
+                                                <input type="date" className="form-control" name="startDay" value={formData.startDay} onChange={handleInputChange} required />
+                                            </div>
+                                            {/* Đã Resolve Conflict: Khôi phục lại input Ngày kết thúc */}
+                                            <div className="col-md-3">
+                                                <label className="form-label fw-semibold text-muted small">Ngày kết thúc (*)</label>
+                                                <input type="date" className="form-control" name="endDay" value={formData.endDay} onChange={handleInputChange} required />
+                                            </div>
+                                            <div className="col-md-3">
+                                                <label className="form-label fw-semibold text-muted small">Giá thuê (VNĐ)</label>
+                                                <input type="number" className="form-control" name="monthlyRent" value={formData.monthlyRent} onChange={handleInputChange} />
+                                            </div>
+                                            <div className="col-md-3">
+                                                <label className="form-label fw-semibold text-muted small">Tiền cọc (VNĐ)</label>
+                                                <input type="number" className="form-control" name="deposit" value={formData.deposit} onChange={handleInputChange} />
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-3">
+                                            <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
+                                            <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf,.jpg,.png" required />
+                                            <div className="form-text mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
+                                                Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Chỉ nhận PDF, JPG, PNG).
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="row mb-3">
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Ngày bắt đầu (*)</label>
-                                        <input type="date" className="form-control" name="startDay" value={formData.startDay} onChange={handleInputChange} />
+                                {/* SECTION 2: Thêm cư dân phụ */}
+                                <div className="card shadow-sm border-0 mb-4">
+                                    <div className="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                                        <span>2. Thêm Thành Viên Ở Cùng</span>
+                                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={addResidentRow}>
+                                            <i className="bi bi-person-plus-fill"></i> Thêm người
+                                        </button>
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Ngày kết thúc (*)</label>
-                                        <input type="date" className="form-control" name="endDay" value={formData.endDay} onChange={handleInputChange} />
+                                    <div className="card-body">
+                                        {formData.additionalResidents.length === 0 ? (
+                                            <div className="text-muted small fst-italic">Không có thành viên phụ.</div>
+                                        ) : (
+                                            formData.additionalResidents.map((res, index) => (
+                                                <div className="row mb-2 align-items-end" key={index}>
+                                                    <div className="col-md-6">
+                                                        <label className="form-label small">Chọn Cư dân phụ</label>
+                                                        <select
+                                                            className="form-select"
+                                                            value={res.accountId}
+                                                            onChange={(e) => handleAdditionalResidentChange(index, 'accountId', e.target.value)}
+                                                        >
+                                                            <option value="">-- Chọn --</option>
+                                                            {activeResidents.filter(r => r.accountId !== Number(formData.residentAccountId)).map(r => (
+                                                                <option key={r.accountId} value={r.accountId}>
+                                                                    {r.info?.fullName || r.fullName || r.userName || 'Chưa cập nhật tên'} - CCCD: {r.info?.identityCard || r.identityCard || 'N/A'}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="col-md-4">
+                                                        <label className="form-label small">Mối quan hệ</label>
+                                                        <select
+                                                            className="form-select"
+                                                            value={res.relationshipId}
+                                                            onChange={(e) => handleAdditionalResidentChange(index, 'relationshipId', e.target.value)}
+                                                        >
+                                                            <option value="">-- Chọn --</option>
+                                                            {relationships.map(rel => (
+                                                                <option key={rel.id} value={rel.id}>{rel.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="col-md-2">
+                                                        <button type="button" className="btn btn-outline-danger w-100" onClick={() => removeResidentRow(index)}>
+                                                            <i className="bi bi-trash"></i> Xóa
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="row mb-3">
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Giá thuê hàng tháng (VNĐ)</label>
-                                        <input type="number" className="form-control" name="monthlyRent" value={formData.monthlyRent} onChange={handleInputChange} />
+                                {/* SECTION 3: Thêm dịch vụ */}
+                                <div className="card shadow-sm border-0">
+                                    <div className="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                                        <span>3. Đăng ký Dịch Vụ Cố Định</span>
+                                        <button type="button" className="btn btn-sm btn-outline-success" onClick={addServiceRow}>
+                                            <i className="bi bi-plus-circle"></i> Thêm dịch vụ
+                                        </button>
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Tiền cọc (VNĐ)</label>
-                                        <input type="number" className="form-control" name="deposit" value={formData.deposit} onChange={handleInputChange} />
-                                    </div>
-                                </div>
-
-                                <div className="mb-3">
-                                    <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
-                                    <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf,.jpg,.png" />
-                                    <div className="form-text mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
-                                        Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Chỉ nhận PDF, JPG, PNG).
+                                    <div className="card-body">
+                                        {formData.selectedServices.length === 0 ? (
+                                            <div className="text-muted small fst-italic">Phòng chưa đăng ký dịch vụ cố định nào.</div>
+                                        ) : (
+                                            formData.selectedServices.map((srv, index) => (
+                                                <div className="row mb-2 align-items-end" key={index}>
+                                                    <div className="col-md-6">
+                                                        <label className="form-label small">Dịch vụ</label>
+                                                        <select
+                                                            className="form-select"
+                                                            value={srv.serviceId}
+                                                            onChange={(e) => handleServiceChange(index, 'serviceId', e.target.value)}
+                                                        >
+                                                            <option value="">-- Chọn dịch vụ --</option>
+                                                            {systemServices.map(s => (
+                                                                <option key={s.serviceId} value={s.serviceId}>
+                                                                    {s.serviceName} - {formatCurrency(s.serviceFee)}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="col-md-4">
+                                                        <label className="form-label small">Giá tùy chỉnh (Tùy chọn)</label>
+                                                        <input
+                                                            type="number"
+                                                            className="form-control"
+                                                            placeholder="Để trống lấy giá gốc"
+                                                            value={srv.actualPrice}
+                                                            onChange={(e) => handleServiceChange(index, 'actualPrice', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="col-md-2">
+                                                        <button type="button" className="btn btn-outline-danger w-100" onClick={() => removeServiceRow(index)}>
+                                                            <i className="bi bi-trash"></i> Xóa
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -343,7 +528,7 @@ const ContractManagement = () => {
                 </div>
             </div>
 
-            {/* 4. THÊM MODAL CHẤM DỨT */}
+            {/* Modal Chấm Dứt Hợp Đồng */}
             <div className="modal fade" id="terminateModal">
                 <div className="modal-dialog">
                     <div className="modal-content">
