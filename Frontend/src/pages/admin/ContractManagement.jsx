@@ -7,13 +7,14 @@ const ContractManagement = () => {
     const [contracts, setContracts] = useState([]);
     const [apartments, setApartments] = useState([]);
     const [residents, setResidents] = useState([]);
-    const [systemServices, setSystemServices] = useState([]); // Đã giữ lại state dịch vụ
+    const [systemServices, setSystemServices] = useState([]); // State lưu danh sách dịch vụ
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
 
+    // Hardcode danh sách relationship (1 là Chủ hộ - BE đã fix cứng)
     const relationships = [
         { id: 2, name: 'Vợ/Chồng' },
         { id: 3, name: 'Con cái' },
@@ -30,14 +31,13 @@ const ContractManagement = () => {
         monthlyRent: '',
         deposit: '',
         file: null,
-        additionalResidents: [], 
-        selectedServices: []     
+        additionalResidents: [], // Mảng hứng dữ liệu thành viên thêm vào
+        selectedServices: []     // Mảng hứng dữ liệu dịch vụ thêm vào
     };
 
     const [formData, setFormData] = useState(initialFormState);
-    const [selectedContract, setSelectedContract] = useState(null);
 
-    // 1. THÊM STATE CHẤM DỨT HỢP ĐỒNG
+    // State cho việc chấm dứt hợp đồng
     const [terminationDate, setTerminationDate] = useState('');
     const [additionalCost, setAdditionalCost] = useState(0);
     const [terminateResult, setTerminateResult] = useState(null);
@@ -70,8 +70,8 @@ const ContractManagement = () => {
             setResidents([]);
         }
 
-        // Đã Resolve Conflict: Giữ lại tính năng lấy Dịch vụ
         try {
+            // Đã Resolve Conflict: Giữ lại tính năng lấy Dịch vụ chuẩn xác
             const srvRes = await api.get('/Service');
             const sList = srvRes.data?.data || srvRes.data;
             setSystemServices(Array.isArray(sList) ? sList : []);
@@ -100,7 +100,7 @@ const ContractManagement = () => {
         setFormData(initialFormState);
     };
 
-    // --- HÀM XỬ LÝ DẤU (+) CHO CƯ DÂN PHỤ VÀ DỊCH VỤ ---
+    // --- CÁC HÀM XỬ LÝ DẤU (+) CHO CƯ DÂN PHỤ ---
     const addResidentRow = () => {
         setFormData(prev => ({
             ...prev,
@@ -121,6 +121,7 @@ const ContractManagement = () => {
         setFormData({ ...formData, additionalResidents: newArr });
     };
 
+    // --- CÁC HÀM XỬ LÝ DẤU (+) CHO DỊCH VỤ ---
     const addServiceRow = () => {
         setFormData(prev => ({
             ...prev,
@@ -141,6 +142,7 @@ const ContractManagement = () => {
         setFormData({ ...formData, selectedServices: newArr });
     };
 
+    // --- GỬI REQUEST TẠO HỢP ĐỒNG ---
     const handleCreateContract = async (e) => {
         e.preventDefault();
 
@@ -149,7 +151,6 @@ const ContractManagement = () => {
         }
 
         setIsSubmitting(true);
-
         const payload = new FormData();
         payload.append("ApartmentId", formData.apartmentId);
         payload.append("ResidentAccountId", formData.residentAccountId);
@@ -159,7 +160,7 @@ const ContractManagement = () => {
         payload.append("Deposit", formData.deposit || 0);
         payload.append("File", formData.file);
 
-        // Nối mảng Cư dân phụ vào FormData
+        // Map mảng cư dân phụ vào FormData
         formData.additionalResidents.forEach((res, index) => {
             if (res.accountId && res.relationshipId) {
                 payload.append(`AdditionalResidents[${index}].AccountId`, res.accountId);
@@ -167,7 +168,7 @@ const ContractManagement = () => {
             }
         });
 
-        // Nối mảng Dịch vụ vào FormData
+        // Map mảng dịch vụ vào FormData
         formData.selectedServices.forEach((srv, index) => {
             if (srv.serviceId) {
                 payload.append(`Services[${index}].ServiceId`, srv.serviceId);
@@ -193,7 +194,7 @@ const ContractManagement = () => {
         }
     };
 
-    // 2. SỬA FUNCTION TERMINATE (Đã Resolve Conflict)
+    // --- XỬ LÝ CHẤM DỨT HỢP ĐỒNG ---
     const handleTerminate = async () => {
         try {
             const res = await api.put(`/contract/${selectedTerminateId}/terminate`, {
@@ -201,7 +202,7 @@ const ContractManagement = () => {
                 additionalCost: Number(additionalCost)
             });
 
-            setTerminateResult(res.data?.data || res.data); // Dùng optional chaining an toàn hơn
+            setTerminateResult(res.data?.data || res.data); 
             fetchData();
         } catch (error) {
             const errorMsg = error.response?.data?.message || "Không thể chấm dứt hợp đồng.";
@@ -209,6 +210,7 @@ const ContractManagement = () => {
         }
     };
 
+    // Lọc data cho Dropdown
     const vacantApartments = apartments.filter(a => a.status === 1);
     const activeResidents = residents.filter(r => r.status === 1 && !r.apartmentCode);
 
@@ -217,11 +219,9 @@ const ContractManagement = () => {
     const currentItems = contracts.slice(indexOfFirstItem, indexOfLastItem);
 
     const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-
     const formatDate = (dateString) => {
         if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleDateString('vi-VN');
+        return new Date(dateString).toLocaleDateString('vi-VN');
     };
 
     return (
@@ -331,7 +331,7 @@ const ContractManagement = () => {
                 </div>
             </div>
 
-            {/* Modal Giao Diện Tạo Hợp Đồng */}
+            {/* --- MODAL TẠO HỢP ĐỒNG --- */}
             <div className="modal fade" id="createContractModal" tabIndex="-1">
                 <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                     <div className="modal-content">
@@ -343,16 +343,16 @@ const ContractManagement = () => {
                         <form onSubmit={handleCreateContract} id="contractForm">
                             <div className="modal-body p-4 bg-light">
                                 <div className="alert alert-info py-2 px-3 mb-4" style={{ backgroundColor: '#e8f4fd', border: 'none', color: '#5b82a1', fontSize: '0.9rem' }}>
-                                    <strong>Lưu ý quan trọng:</strong> Chỉ những Phòng trống và Cư dân chưa có phòng mới được hiển thị ở đây. Khi tạo hợp đồng thành công, Cư dân sẽ tự động được gán vào phòng.
+                                    <strong>Lưu ý:</strong> Chủ hợp đồng mặc định sẽ được gán chức danh "Chủ Hộ". Có thể thêm các thành viên khác và dịch vụ ngay bên dưới.
                                 </div>
 
-                                {/* SECTION 1: Thông tin hợp đồng cơ bản */}
+                                {/* --- SECTION 1: THÔNG TIN CƠ BẢN --- */}
                                 <div className="card shadow-sm border-0 mb-4">
                                     <div className="card-header bg-white fw-bold">1. Thông tin Hợp đồng & Chủ hộ</div>
                                     <div className="card-body">
                                         <div className="row mb-3">
                                             <div className="col-md-6">
-                                                <label className="form-label fw-semibold text-muted small">Cư dân thuê (*)</label>
+                                                <label className="form-label fw-semibold text-muted small">Cư dân (Chủ Hợp Đồng) (*)</label>
                                                 <Select
                                                     placeholder="-- Chọn cư dân --"
                                                     noOptionsMessage={() => "Không có cư dân nào khả dụng"}
@@ -388,7 +388,6 @@ const ContractManagement = () => {
                                                 <label className="form-label fw-semibold text-muted small">Ngày bắt đầu (*)</label>
                                                 <input type="date" className="form-control" name="startDay" value={formData.startDay} onChange={handleInputChange} required />
                                             </div>
-                                            {/* Đã Resolve Conflict: Khôi phục lại input Ngày kết thúc */}
                                             <div className="col-md-3">
                                                 <label className="form-label fw-semibold text-muted small">Ngày kết thúc (*)</label>
                                                 <input type="date" className="form-control" name="endDay" value={formData.endDay} onChange={handleInputChange} required />
@@ -405,15 +404,16 @@ const ContractManagement = () => {
 
                                         <div className="mb-3">
                                             <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
-                                            <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf,.jpg,.png" required />
+                                            {/* Đảm bảo BE check chuẩn file PDF thì FE cũng nên khóa accept=".pdf" */}
+                                            <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf" required />
                                             <div className="form-text mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
-                                                Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Chỉ nhận PDF, JPG, PNG).
+                                                Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Định dạng PDF).
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* SECTION 2: Thêm cư dân phụ */}
+                                {/* --- SECTION 2: THÊM CƯ DÂN PHỤ --- */}
                                 <div className="card shadow-sm border-0 mb-4">
                                     <div className="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
                                         <span>2. Thêm Thành Viên Ở Cùng</span>
@@ -435,6 +435,7 @@ const ContractManagement = () => {
                                                             onChange={(e) => handleAdditionalResidentChange(index, 'accountId', e.target.value)}
                                                         >
                                                             <option value="">-- Chọn --</option>
+                                                            {/* Loại trừ chủ hộ ra khỏi list & dùng Number() ép kiểu */}
                                                             {activeResidents.filter(r => r.accountId !== Number(formData.residentAccountId)).map(r => (
                                                                 <option key={r.accountId} value={r.accountId}>
                                                                     {r.info?.fullName || r.fullName || r.userName || 'Chưa cập nhật tên'} - CCCD: {r.info?.identityCard || r.identityCard || 'N/A'}
@@ -466,7 +467,7 @@ const ContractManagement = () => {
                                     </div>
                                 </div>
 
-                                {/* SECTION 3: Thêm dịch vụ */}
+                                {/* --- SECTION 3: THÊM DỊCH VỤ --- */}
                                 <div className="card shadow-sm border-0">
                                     <div className="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
                                         <span>3. Đăng ký Dịch Vụ Cố Định</span>
@@ -519,8 +520,8 @@ const ContractManagement = () => {
 
                             <div className="modal-footer" style={{ borderTop: 'none', backgroundColor: '#f8f9fa' }}>
                                 <button type="button" className="btn btn-secondary px-4" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" className="btn btn-primary px-4" disabled={isSubmitting} style={{ backgroundColor: '#4a7fb8', border: 'none' }}>
-                                    {isSubmitting ? 'Đang tạo...' : 'Tạo Hợp Đồng'}
+                                <button type="submit" form="contractForm" className="btn btn-primary px-4" disabled={isSubmitting} style={{ backgroundColor: '#4a7fb8', border: 'none' }}>
+                                    {isSubmitting ? 'Đang tạo...' : 'Xác Nhận Tạo Hợp Đồng'}
                                 </button>
                             </div>
                         </form>
@@ -528,7 +529,7 @@ const ContractManagement = () => {
                 </div>
             </div>
 
-            {/* Modal Chấm Dứt Hợp Đồng */}
+            {/* --- MODAL CHẤM DỨT HỢP ĐỒNG --- */}
             <div className="modal fade" id="terminateModal">
                 <div className="modal-dialog">
                     <div className="modal-content">
@@ -555,21 +556,19 @@ const ContractManagement = () => {
 
                             {terminateResult && (
                                 <div className="p-3 bg-light rounded border mt-3">
-                                    <h6 className="fw-bold mb-3 border-bottom pb-2">Kết quả thanh toán:</h6>
-                                    <p className="mb-1"><strong>Tổng:</strong> {formatCurrency(terminateResult.totalInvoice)}</p>
+                                    <h6 className="fw-bold mb-3 border-bottom pb-2">Kết quả đối soát:</h6>
+                                    <p className="mb-1"><strong>Tổng Hóa đơn:</strong> {formatCurrency(terminateResult.totalInvoice)}</p>
                                     <p className="mb-1"><strong>Đã trả:</strong> {formatCurrency(terminateResult.totalPaid)}</p>
+                                    <p className="mb-1"><strong>Phí phát sinh:</strong> {formatCurrency(terminateResult.additionalCost)}</p>
 
-                                    {terminateResult.amountToPay > 0 && (
-                                        <p className="text-danger mb-1 mt-2"><strong>Thiếu:</strong> {formatCurrency(terminateResult.amountToPay)}</p>
+                                    {terminateResult.refundAmount < 0 && (
+                                        <p className="text-danger mb-1 mt-2"><strong>Khách CẦN TRẢ THÊM:</strong> {formatCurrency(Math.abs(terminateResult.refundAmount))}</p>
                                     )}
-
-                                    {terminateResult.amountToReturn > 0 && (
-                                        <p className="text-success mb-1 mt-2"><strong>Dư (cần trả lại):</strong> {formatCurrency(terminateResult.amountToReturn)}</p>
+                                    {terminateResult.refundAmount > 0 && (
+                                        <p className="text-success mb-1 mt-2"><strong>BQL TRẢ LẠI KHÁCH:</strong> {formatCurrency(terminateResult.refundAmount)}</p>
                                     )}
-                                    {terminateResult.amountToPay === 0 && terminateResult.amountToReturn === 0 && (
-                                        <p className="text-primary mt-2">
-                                            <strong>Đã thanh toán đủ</strong>
-                                        </p>
+                                    {terminateResult.refundAmount === 0 && (
+                                        <p className="text-primary mt-2"><strong>Đã thanh toán vừa đủ.</strong></p>
                                     )}
                                 </div>
                             )}
@@ -582,7 +581,7 @@ const ContractManagement = () => {
                                 onClick={handleTerminate}
                                 disabled={!terminationDate}
                             >
-                                Xác nhận chấm dứt
+                                Tính toán & Xác nhận
                             </button>
                         </div>
                     </div>
