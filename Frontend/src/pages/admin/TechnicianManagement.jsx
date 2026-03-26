@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
 import CreateAccountForm from '../../components/common/CreateAccountForm';
+// --- IMPORT UTILS THÔNG BÁO ---
+import { notify, confirmAction, confirmDelete } from '../../utils/notificationAlert';
 
 const TechnicianManagement = () => {
     const [technicians, setTechnicians] = useState([]);
@@ -24,7 +26,7 @@ const TechnicianManagement = () => {
             const dataList = response.data.data ? response.data.data : response.data;
             setTechnicians(Array.isArray(dataList) ? dataList : []);
         } catch (error) {
-            console.error("Lỗi khi tải dữ liệu:", error);
+            notify.error("Lỗi khi tải dữ liệu kỹ thuật viên");
         } finally {
             setLoading(false);
         }
@@ -42,39 +44,18 @@ const TechnicianManagement = () => {
     const handleOpenModal = (tech = null) => {
         if (tech) {
             setEditId(tech.accountId);
-
-            // Lấy birthDay từ các field có thể
             let birthDay = '';
-            if (tech.info?.birthday) {
-                birthDay = tech.info.birthday.split('T')[0];
-            } else if (tech.birthDay) {
-                birthDay = tech.birthDay.split('T')[0];
-            } else if (tech.dayOfBirth) {
-                birthDay = tech.dayOfBirth.split('T')[0];
-            } else if (tech._dayOfBirth) {
-                birthDay = tech._dayOfBirth.split('T')[0];
-            } else if (tech.BirthDay) {
-                birthDay = tech.BirthDay.split('T')[0];
-            }
+            if (tech.info?.birthday) birthDay = tech.info.birthday.split('T')[0];
+            else if (tech.birthDay) birthDay = tech.birthDay.split('T')[0];
+            else if (tech.dayOfBirth) birthDay = tech.dayOfBirth.split('T')[0];
+            else if (tech.BirthDay) birthDay = tech.BirthDay.split('T')[0];
 
-            // Lấy sex từ các field có thể
             let sex = '';
-            if (tech.info?.sex !== null && tech.info?.sex !== undefined) {
-                sex = tech.info.sex.toString();
-            } else if (tech.sex !== null && tech.sex !== undefined) {
-                sex = tech.sex.toString();
-            } else if (tech.Sex !== null && tech.Sex !== undefined) {
-                sex = tech.Sex.toString();
-            } else if (tech.gender !== null && tech.gender !== undefined) {
-                sex = tech.gender.toString();
-            }
+            if (tech.info?.sex !== null && tech.info?.sex !== undefined) sex = tech.info.sex.toString();
+            else if (tech.sex !== null && tech.sex !== undefined) sex = tech.sex.toString();
 
-            // Lấy country
             const country = tech.info?.country || tech.country || tech.Country || '';
-
-            // Lấy city
             const city = tech.info?.city || tech.city || tech.City || '';
-
 
             setFormData({
                 email: tech.email || '',
@@ -112,13 +93,12 @@ const TechnicianManagement = () => {
                     sex: formData.sex !== '' ? Number(formData.sex) : null
                 };
                 const res = await api.put(`/Technicians/UpdateTechnician/${editId}`, updatePayload);
-                alert(res.data?.message || "Cập nhật thành công!");
+                notify.success(res.data?.message || "Cập nhật thành công!");
             }
             fetchTechnicians();
             document.getElementById('closeTechModal').click();
         } catch (error) {
-            const errorMessage = error.response?.data?.message || "Lỗi đầu vào, vui lòng kiểm tra lại thông tin!";
-            alert("LỖI: " + errorMessage);
+            notify.error("LỖI: " + (error.response?.data?.message || "Lỗi đầu vào!"));
         } finally {
             setIsSubmitting(false);
         }
@@ -127,54 +107,72 @@ const TechnicianManagement = () => {
     const handleToggleStatus = async (id) => {
         try {
             const res = await api.put(`/Technicians/toggleStatus/${id}`);
-            alert(res.data?.message || "Đã thay đổi trạng thái hệ thống!");
+            notify.success(res.data?.message || "Đã thay đổi trạng thái!");
             fetchTechnicians();
-        } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể thực hiện.")); }
+        } catch (error) {
+            notify.error("LỖI: " + (error.response?.data?.message || "Không thể thực hiện"));
+        }
     };
 
     const handleToggleAvailability = async (id) => {
         try {
             const res = await api.put(`/Technicians/toggleAvailability/${id}`);
-            alert(res.data?.message || "Đã thay đổi tình trạng công việc!");
+            notify.success(res.data?.message || "Đã thay đổi tình trạng!");
             fetchTechnicians();
-        } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể thực hiện.")); }
+        } catch (error) {
+            notify.error("LỖI: " + (error.response?.data?.message || "Không thể thực hiện"));
+        }
     };
 
     const handleDelete = async (id, name) => {
-        if (window.confirm(`Xác nhận đưa KTV "${name}" vào danh sách đã xóa?`)) {
+        const { isConfirmed } = await confirmDelete.fire({
+            title: 'Xác nhận xóa?',
+            text: `Đưa KTV "${name}" vào danh sách đã xóa?`
+        });
+
+        if (isConfirmed) {
             try {
                 const res = await api.delete(`/Technicians/DeleteTechnician/${id}`);
-                alert(res.data?.message || "Đã xóa thành công.");
+                notify.success(res.data?.message || "Đã xóa thành công.");
                 fetchTechnicians();
-            } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể xóa.")); }
+            } catch (error) {
+                notify.error("LỖI: " + (error.response?.data?.message || "Không thể xóa"));
+            }
         }
     };
 
     const handleRestore = async (id) => {
         try {
             const res = await api.put(`/Technicians/Restore/${id}`);
-            alert(res.data?.message || "Khôi phục thành công!");
+            notify.success(res.data?.message || "Khôi phục thành công!");
             fetchTechnicians();
-        } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể khôi phục.")); }
+        } catch (error) {
+            notify.error("LỖI: " + (error.response?.data?.message || "Không thể khôi phục"));
+        }
     };
 
     const handleHardDelete = async (id, name) => {
-        if (window.confirm(`CẢNH BÁO: Bạn sắp XÓA VĨNH VIỄN KTV "${name}". Hành động này không thể hoàn tác. Xác nhận?`)) {
+        const { isConfirmed } = await confirmDelete.fire({
+            title: 'XÓA VĨNH VIỄN!',
+            text: `Bạn sắp xóa vĩnh viễn KTV "${name}". Hành động này không thể hoàn tác!`
+        });
+
+        if (isConfirmed) {
             try {
                 const res = await api.delete(`/Technicians/HardDelete/${id}`);
-                alert(res.data?.message || "Đã xóa vĩnh viễn.");
+                notify.success(res.data?.message || "Đã xóa vĩnh viễn.");
                 fetchTechnicians();
-            } catch (error) { alert("LỖI: " + (error.response?.data?.message || "Không thể xóa.")); }
+            } catch (error) {
+                notify.error("LỖI: " + (error.response?.data?.message || "Không thể xóa"));
+            }
         }
     };
 
     return (
         <div className="container-fluid p-0">
-            {/* TIÊU ĐỀ & NÚT ĐIỀU HƯỚNG */}
             <div className="d-flex justify-content-between align-items-start mb-4">
                 <div>
                     <h2 className="fw-bold mb-0">{showTrash ? 'Danh sách đã xóa: Kỹ thuật viên' : 'Quản lý Kỹ thuật viên'}</h2>
-                    {showTrash && <div className="text-danger small mt-2">Các tài khoản bị vô hiệu hóa và xóa mềm lưu trữ tại đây</div>}
                 </div>
                 <div className="d-flex align-items-center">
                     {!showTrash && (
@@ -189,7 +187,6 @@ const TechnicianManagement = () => {
                 </div>
             </div>
 
-            {/* BẢNG DỮ LIỆU */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
@@ -229,7 +226,6 @@ const TechnicianManagement = () => {
                                                         className={`badge rounded-pill ${tech.status === 1 ? 'bg-success' : 'bg-secondary'}`}
                                                         style={{ cursor: 'pointer' }}
                                                         onClick={() => handleToggleStatus(tech.accountId)}
-                                                        title="Click để Đóng/Mở khóa"
                                                     >
                                                         {tech.status === 1 ? 'Đang hoạt động' : 'Đã khóa'}
                                                     </span>
@@ -241,7 +237,6 @@ const TechnicianManagement = () => {
                                                         className={`badge ${tech.techAvailability === 1 ? 'bg-info text-dark' : 'bg-warning text-dark'}`}
                                                         style={{ cursor: 'pointer' }}
                                                         onClick={() => handleToggleAvailability(tech.accountId)}
-                                                        title="Click để đổi Rảnh/Bận"
                                                     >
                                                         {tech.techAvailability === 1 ? 'Rảnh rỗi' : 'Đang bận'}
                                                     </span>
@@ -255,12 +250,8 @@ const TechnicianManagement = () => {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(tech)} data-bs-toggle="modal" data-bs-target="#techModal">
-                                                            <i className="bi bi-pencil-square me-1"></i> Cập nhật
-                                                        </button>
-                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(tech.accountId, tech.fullName)}>
-                                                            <i className="bi bi-x-circle me-1"></i> Xóa
-                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenModal(tech)} data-bs-toggle="modal" data-bs-target="#techModal">Sửa</button>
+                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(tech.accountId, tech.fullName)}>Xóa</button>
                                                     </>
                                                 )}
                                             </td>
@@ -273,12 +264,9 @@ const TechnicianManagement = () => {
                 </div>
             </div>
 
-            {/* MODAL THÊM / SỬA */}
             <div className="modal fade" id="techModal" tabIndex="-1" aria-hidden="true">
                 <div className={`modal-dialog ${editId ? 'modal-lg' : 'modal-lg modal-dialog-scrollable'}`}>
                     <div className="modal-content border-0">
-
-                        {/* ── CREATE MODE: dùng CreateAccountForm thông minh ── */}
                         {!editId && (
                             <CreateAccountForm
                                 type="technician"
@@ -289,17 +277,7 @@ const TechnicianManagement = () => {
                                 onCancel={() => document.getElementById('closeTechModal').click()}
                             />
                         )}
-
-                        {/* Nút đóng ẩn dùng để đóng modal từ JS */}
-                        <button
-                            type="button"
-                            id="closeTechModal"
-                            data-bs-dismiss="modal"
-                            style={{ display: 'none' }}
-                            aria-hidden="true"
-                        />
-
-                        {/* ── EDIT MODE: form cập nhật đơn giản ── */}
+                        <button type="button" id="closeTechModal" data-bs-dismiss="modal" style={{ display: 'none' }} aria-hidden="true" />
                         {!!editId && (
                             <>
                                 <div className="modal-header text-white" style={{ backgroundColor: '#122240' }}>
@@ -309,43 +287,31 @@ const TechnicianManagement = () => {
                                 <form onSubmit={handleSubmit}>
                                     <div className="modal-body">
                                         <div className="row g-3">
-                                            <div className="col-12 mt-2"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin cá nhân &amp; Liên hệ</h6></div>
+                                            <div className="col-12 mt-2"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin cá nhân</h6></div>
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Họ và Tên (*)</label>
                                                 <input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required />
                                             </div>
                                             <div className="col-md-6">
-                                                <label className="form-label fw-semibold">Số CCCD (12 số) (*)</label>
-                                                <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} pattern="\d{12}" title="CCCD phải bao gồm đúng 12 chữ số" required />
+                                                <label className="form-label fw-semibold">Số CCCD (*)</label>
+                                                <input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} required />
                                             </div>
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Số điện thoại (*)</label>
-                                                <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} pattern="\d{10}" title="Số điện thoại VN gồm 10 số" required />
+                                                <input type="text" className="form-control" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} required />
                                             </div>
                                             <div className="col-md-6">
-                                                <label className="form-label fw-semibold">Email (@gmail.com) (*)</label>
+                                                <label className="form-label fw-semibold">Email (*)</label>
                                                 <input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required />
                                             </div>
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Ngày sinh</label>
-                                                <input
-                                                    type="date"
-                                                    className="form-control"
-                                                    name="birthDay"
-                                                    value={formData.birthDay}
-                                                    onChange={handleInputChange}
-                                                    max={new Date().toISOString().split('T')[0]}
-                                                />
+                                                <input type="date" className="form-control" name="birthDay" value={formData.birthDay} onChange={handleInputChange} />
                                             </div>
                                             <div className="col-md-6">
                                                 <label className="form-label fw-semibold">Giới tính</label>
-                                                <select
-                                                    className="form-select"
-                                                    name="sex"
-                                                    value={formData.sex}
-                                                    onChange={handleInputChange}
-                                                >
-                                                    <option value="">-- Chọn giới tính --</option>
+                                                <select className="form-select" name="sex" value={formData.sex} onChange={handleInputChange}>
+                                                    <option value="">-- Chọn --</option>
                                                     <option value="0">Nam</option>
                                                     <option value="1">Nữ</option>
                                                     <option value="2">Khác</option>
@@ -356,20 +322,18 @@ const TechnicianManagement = () => {
                                                 <input type="text" className="form-control" name="country" value={formData.country} onChange={handleInputChange} />
                                             </div>
                                             <div className="col-md-4">
-                                                <label className="form-label fw-semibold">Tỉnh/Thành phố</label>
+                                                <label className="form-label fw-semibold">Thành phố</label>
                                                 <input type="text" className="form-control" name="city" value={formData.city} onChange={handleInputChange} />
                                             </div>
                                             <div className="col-md-4">
-                                                <label className="form-label fw-semibold">Địa chỉ chi tiết</label>
+                                                <label className="form-label fw-semibold">Địa chỉ</label>
                                                 <input type="text" className="form-control" name="address" value={formData.address} onChange={handleInputChange} />
                                             </div>
                                         </div>
                                     </div>
                                     <div className="modal-footer bg-light">
                                         <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                            {isSubmitting ? 'Đang xử lý...' : 'Lưu Thay Đổi'}
-                                        </button>
+                                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>Lưu Thay Đổi</button>
                                     </div>
                                 </form>
                             </>

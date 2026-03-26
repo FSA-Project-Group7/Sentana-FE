@@ -3,7 +3,6 @@ import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
 import CreateAccountForm from '../../components/common/CreateAccountForm';
 import Select from 'react-select';
-// --- UTILS ---
 import { notify, confirmAction, confirmDelete } from '../../utils/notificationAlert';
 
 const ResidentManagement = () => {
