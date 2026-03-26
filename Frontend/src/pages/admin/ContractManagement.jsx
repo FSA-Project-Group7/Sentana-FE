@@ -14,7 +14,7 @@ const ContractManagement = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
 
-    // Hardcode danh sách relationship theo database của bạn (1 là Chủ hộ - BE đã fix cứng)
+    // Hardcode danh sách relationship (1 là Chủ hộ - BE đã fix cứng)
     const relationships = [
         { id: 2, name: 'Vợ/Chồng' },
         { id: 3, name: 'Con cái' },
@@ -71,8 +71,8 @@ const ContractManagement = () => {
         }
 
         try {
-            // Đảm bảo endpoint này tồn tại ở BE của bạn
-            const srvRes = await api.get('/Service/GetAllServices');
+            // Đã Resolve Conflict: Giữ lại tính năng lấy Dịch vụ chuẩn xác
+            const srvRes = await api.get('/Service');
             const sList = srvRes.data?.data || srvRes.data;
             setSystemServices(Array.isArray(sList) ? sList : []);
         } catch (error) {
@@ -107,12 +107,14 @@ const ContractManagement = () => {
             additionalResidents: [...prev.additionalResidents, { accountId: '', relationshipId: '' }]
         }));
     };
+    
     const removeResidentRow = (index) => {
         setFormData(prev => ({
             ...prev,
             additionalResidents: prev.additionalResidents.filter((_, i) => i !== index)
         }));
     };
+    
     const handleAdditionalResidentChange = (index, field, value) => {
         const newArr = [...formData.additionalResidents];
         newArr[index][field] = value;
@@ -126,12 +128,14 @@ const ContractManagement = () => {
             selectedServices: [...prev.selectedServices, { serviceId: '', actualPrice: '' }]
         }));
     };
+    
     const removeServiceRow = (index) => {
         setFormData(prev => ({
             ...prev,
             selectedServices: prev.selectedServices.filter((_, i) => i !== index)
         }));
     };
+    
     const handleServiceChange = (index, field, value) => {
         const newArr = [...formData.selectedServices];
         newArr[index][field] = value;
@@ -336,12 +340,13 @@ const ContractManagement = () => {
                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeCreateModal"></button>
                         </div>
 
-                        <div className="modal-body p-4 bg-light">
-                            <form onSubmit={handleCreateContract} id="contractForm">
+                        <form onSubmit={handleCreateContract} id="contractForm">
+                            <div className="modal-body p-4 bg-light">
                                 <div className="alert alert-info py-2 px-3 mb-4" style={{ backgroundColor: '#e8f4fd', border: 'none', color: '#5b82a1', fontSize: '0.9rem' }}>
                                     <strong>Lưu ý:</strong> Chủ hợp đồng mặc định sẽ được gán chức danh "Chủ Hộ". Có thể thêm các thành viên khác và dịch vụ ngay bên dưới.
                                 </div>
 
+                                {/* --- SECTION 1: THÔNG TIN CƠ BẢN --- */}
                                 <div className="card shadow-sm border-0 mb-4">
                                     <div className="card-header bg-white fw-bold">1. Thông tin Hợp đồng & Chủ hộ</div>
                                     <div className="card-body">
@@ -362,7 +367,7 @@ const ContractManagement = () => {
                                                 />
                                             </div>
                                             <div className="col-md-6">
-                                                <label className="form-label fw-semibold text-muted small">Căn hộ (*)</label>
+                                                <label className="form-label fw-semibold text-muted small">Chọn Căn hộ trống (*)</label>
                                                 <Select
                                                     placeholder="-- Chọn Căn hộ trống --"
                                                     noOptionsMessage={() => "Không có phòng trống"}
@@ -397,9 +402,13 @@ const ContractManagement = () => {
                                             </div>
                                         </div>
 
-                                        <div>
+                                        <div className="mb-3">
                                             <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
+                                            {/* Đảm bảo BE check chuẩn file PDF thì FE cũng nên khóa accept=".pdf" */}
                                             <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf" required />
+                                            <div className="form-text mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
+                                                Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Định dạng PDF).
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -426,10 +435,10 @@ const ContractManagement = () => {
                                                             onChange={(e) => handleAdditionalResidentChange(index, 'accountId', e.target.value)}
                                                         >
                                                             <option value="">-- Chọn --</option>
-                                                            {/* Loại trừ chủ hộ ra khỏi list */}
-                                                            {activeResidents.filter(r => r.accountId !== formData.residentAccountId).map(r => (
+                                                            {/* Loại trừ chủ hộ ra khỏi list & dùng Number() ép kiểu */}
+                                                            {activeResidents.filter(r => r.accountId !== Number(formData.residentAccountId)).map(r => (
                                                                 <option key={r.accountId} value={r.accountId}>
-                                                                    {r.fullName || r.userName} - CCCD: {r.identityCard}
+                                                                    {r.info?.fullName || r.fullName || r.userName || 'Chưa cập nhật tên'} - CCCD: {r.info?.identityCard || r.identityCard || 'N/A'}
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -507,15 +516,15 @@ const ContractManagement = () => {
                                         )}
                                     </div>
                                 </div>
-                            </form>
-                        </div>
+                            </div>
 
-                        <div className="modal-footer" style={{ borderTop: 'none', backgroundColor: '#f8f9fa' }}>
-                            <button type="button" className="btn btn-secondary px-4" data-bs-dismiss="modal">Hủy</button>
-                            <button type="submit" form="contractForm" className="btn btn-primary px-4" disabled={isSubmitting} style={{ backgroundColor: '#4a7fb8', border: 'none' }}>
-                                {isSubmitting ? 'Đang tạo...' : 'Xác Nhận Tạo Hợp Đồng'}
-                            </button>
-                        </div>
+                            <div className="modal-footer" style={{ borderTop: 'none', backgroundColor: '#f8f9fa' }}>
+                                <button type="button" className="btn btn-secondary px-4" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" form="contractForm" className="btn btn-primary px-4" disabled={isSubmitting} style={{ backgroundColor: '#4a7fb8', border: 'none' }}>
+                                    {isSubmitting ? 'Đang tạo...' : 'Xác Nhận Tạo Hợp Đồng'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
