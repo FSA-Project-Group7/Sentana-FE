@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
-import { toast } from 'react-toastify';
-import Swal from 'sweetalert2';
-
-const confirmModal = Swal.mixin({
-    showCancelButton: true,
-    confirmButtonColor: '#d33',
-    cancelButtonColor: '#6c757d',
-    cancelButtonText: 'Hủy bỏ',
-    reverseButtons: true
-});
+import { notify, confirmDelete, confirmAction } from '../../utils/notificationAlert';
 
 const ApartmentManagement = () => {
+    // --- STATE QUẢN LÝ DỮ LIỆU CƠ BẢN ---
     const [apartments, setApartments] = useState([]);
     const [buildings, setBuildings] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,21 +12,14 @@ const ApartmentManagement = () => {
     const [editId, setEditId] = useState(null);
     const [showTrash, setShowTrash] = useState(false);
 
-    // === PHÂN TRANG ===
+    // --- STATE PHÂN TRANG & BỘ LỌC ---
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
-
-    // === STATE CHO BỘ LỌC (FILTERS) ===
     const [searchTerm, setSearchTerm] = useState('');
     const [filterBuilding, setFilterBuilding] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
 
-    // Mỗi khi thay đổi bộ lọc, tự động reset về trang 1
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm, filterBuilding, filterStatus]);
-
-    // === STATE CHO QUẢN LÝ DỊCH VỤ ===
+    // --- STATE QUẢN LÝ DỊCH VỤ PHÒNG ---
     const [showServiceModal, setShowServiceModal] = useState(false);
     const [selectedApartment, setSelectedApartment] = useState(null);
     const [allServices, setAllServices] = useState([]);
@@ -42,10 +27,53 @@ const ApartmentManagement = () => {
     const [assignForm, setAssignForm] = useState({ serviceId: '', price: '' });
     const [editingPrices, setEditingPrices] = useState({});
 
-    // === STATE CHO MODAL XEM CHI TIẾT (EYE ICON) ===
+    // --- STATE MODAL CHI TIẾT ---
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [aptDetail, setAptDetail] = useState(null);
 
+    const initialFormState = { buildingId: '', apartmentNumber: '', floorNumber: '', area: '', status: 1 };
+    const [formData, setFormData] = useState(initialFormState);
+
+    // Tự động reset về trang 1 khi thay đổi bộ lọc
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterBuilding, filterStatus]);
+
+    // Lấy dữ liệu danh sách Căn hộ & Tòa nhà
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const aptEndpoint = showTrash ? '/Apartments/deleted' : '/Apartments';
+
+            const [aptRes, bldRes] = await Promise.all([
+                api.get(aptEndpoint),
+                api.get('/Buildings')
+            ]);
+
+            const aptList = aptRes.data?.data || aptRes.data;
+            const bldList = bldRes.data?.data || bldRes.data;
+
+            setApartments(Array.isArray(aptList) ? aptList : []);
+            setBuildings(Array.isArray(bldList) ? bldList : []);
+        } catch (error) {
+            notify.error("Không thể tải dữ liệu hệ thống.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+        // Reset filter khi chuyển tab Danh sách / Thùng rác
+        setSearchTerm('');
+        setFilterBuilding('');
+        setFilterStatus('');
+        setCurrentPage(1);
+    }, [showTrash]);
+
+    // --- UTILITY FUNCTIONS ---
+    const extractApartmentNumber = (code) => code ? code.split('-').pop() : '';
+    const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
     const getRelationshipName = (id, nameObj) => {
         if (nameObj) return nameObj;
         switch (id) {
@@ -58,6 +86,7 @@ const ApartmentManagement = () => {
         }
     };
 
+    // --- XỬ LÝ NGHIỆP VỤ: XEM CHI TIẾT CĂN HỘ ---
     const handleViewDetail = async (apt) => {
         setAptDetail({ ...apt, isLoading: true, residents: [], services: [], contract: null });
         setShowDetailModal(true);
@@ -84,11 +113,12 @@ const ApartmentManagement = () => {
                 contract: activeContract || null
             });
         } catch (error) {
-            toast.error("Không thể tải chi tiết phòng lúc này.");
+            notify.error("Không thể tải chi tiết phòng lúc này.");
             setAptDetail(prev => ({ ...prev, isLoading: false }));
         }
     };
 
+    // --- XỬ LÝ NGHIỆP VỤ: QUẢN LÝ DỊCH VỤ ---
     const fetchServicesForRoom = async (apartmentId) => {
         try {
             const res = await api.get(`/Service/room/${apartmentId}`);
@@ -111,37 +141,37 @@ const ApartmentManagement = () => {
             setAllServices(activeServices);
             await fetchServicesForRoom(apartment.apartmentId);
         } catch (error) {
-            console.error(error);
+            notify.error("Lỗi khi tải danh sách dịch vụ.");
         }
     };
 
     const handleAssignService = async (e) => {
         e.preventDefault();
-        if (!assignForm.serviceId) return toast.warning("Vui lòng chọn dịch vụ!");
+        if (!assignForm.serviceId) return notify.warning("Vui lòng chọn dịch vụ!");
 
         try {
             const payload = { apartmentId: selectedApartment.apartmentId, serviceId: Number(assignForm.serviceId) };
             await api.post('/Service/room', payload);
 
+            // Cập nhật giá tùy chỉnh nếu có
             if (assignForm.price) {
                 await api.put('/Service/room/price', {
-                    apartmentId: selectedApartment.apartmentId,
-                    serviceId: Number(assignForm.serviceId),
+                    ...payload,
                     actualPrice: Number(assignForm.price)
                 });
             }
 
-            toast.success("Gán dịch vụ thành công!");
+            notify.success("Gán dịch vụ thành công!");
             setAssignForm({ serviceId: '', price: '' });
             fetchServicesForRoom(selectedApartment.apartmentId);
         } catch (error) {
-            toast.error("LỖI: " + (error.response?.data?.message || "Không thể gán dịch vụ."));
+            notify.error(error.response?.data?.message || "Không thể gán dịch vụ.");
         }
     };
 
     const handleUpdateServicePrice = async (serviceId) => {
         const newPrice = editingPrices[serviceId];
-        if (newPrice === undefined || newPrice === '') return toast.warning("Vui lòng nhập giá mới!");
+        if (newPrice === undefined || newPrice === '') return notify.warning("Vui lòng nhập giá mới!");
 
         try {
             await api.put('/Service/room/price', {
@@ -149,19 +179,18 @@ const ApartmentManagement = () => {
                 serviceId: serviceId,
                 actualPrice: Number(newPrice)
             });
-            toast.success("Cập nhật giá thành công!");
+            notify.success("Cập nhật giá thành công!");
             fetchServicesForRoom(selectedApartment.apartmentId);
         } catch (error) {
-            toast.error("LỖI: " + (error.response?.data?.message || "Không thể cập nhật giá."));
+            notify.error(error.response?.data?.message || "Không thể cập nhật giá.");
         }
     };
 
     const handleRemoveService = async (serviceId) => {
-        const { isConfirmed } = await confirmModal.fire({
+        const { isConfirmed } = await confirmDelete.fire({
             title: 'Gỡ Dịch Vụ?',
             text: "Bạn có chắc chắn muốn gỡ dịch vụ này khỏi phòng?",
-            icon: 'warning',
-            confirmButtonText: 'Đồng ý gỡ'
+            confirmButtonText: '<i class="bi bi-trash me-1"></i> Đồng ý gỡ'
         });
 
         if (!isConfirmed) return;
@@ -170,52 +199,14 @@ const ApartmentManagement = () => {
             await api.delete('/Service/room', {
                 data: { apartmentId: selectedApartment.apartmentId, serviceId: serviceId }
             });
-            toast.success("Đã gỡ dịch vụ khỏi phòng!");
+            notify.success("Đã gỡ dịch vụ khỏi phòng!");
             fetchServicesForRoom(selectedApartment.apartmentId);
         } catch (error) {
-            toast.error("LỖI: " + (error.response?.data?.message || "Không thể gỡ dịch vụ."));
+            notify.error(error.response?.data?.message || "Không thể gỡ dịch vụ.");
         }
     };
 
-    const initialFormState = { buildingId: '', apartmentNumber: '', floorNumber: '', area: '', status: 1 };
-    const [formData, setFormData] = useState(initialFormState);
-
-    const extractApartmentNumber = (code) => {
-        if (!code) return '';
-        return code.split('-').pop();
-    };
-
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const aptEndpoint = showTrash ? '/Apartments/deleted' : '/Apartments';
-
-            const [aptRes, bldRes] = await Promise.all([
-                api.get(aptEndpoint),
-                api.get('/Buildings')
-            ]);
-
-            const aptList = aptRes.data.data ? aptRes.data.data : aptRes.data;
-            const bldList = bldRes.data.data ? bldRes.data.data : bldRes.data;
-
-            setApartments(Array.isArray(aptList) ? aptList : []);
-            setBuildings(Array.isArray(bldList) ? bldList : []);
-        } catch (error) {
-            toast.error("Không thể tải dữ liệu.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-        // Reset filter khi chuyển đổi giữa tab Danh sách và Thùng rác
-        setSearchTerm('');
-        setFilterBuilding('');
-        setFilterStatus('');
-        setCurrentPage(1);
-    }, [showTrash]);
-
+    // --- XỬ LÝ NGHIỆP VỤ: CRUD CĂN HỘ ---
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -242,116 +233,104 @@ const ApartmentManagement = () => {
         setIsSubmitting(true);
 
         try {
+            const payload = {
+                apartmentNumber: Number(formData.apartmentNumber),
+                area: Number(formData.area),
+                status: Number(formData.status),
+                ...(editId ? {} : { buildingId: Number(formData.buildingId), floorNumber: Number(formData.floorNumber) })
+            };
+
             if (editId) {
-                const updatePayload = {
-                    apartmentNumber: Number(formData.apartmentNumber),
-                    area: Number(formData.area),
-                    status: Number(formData.status)
-                };
-                await api.put(`/Apartments/${editId}`, updatePayload);
-                toast.success("Cập nhật thông tin phòng thành công!");
+                await api.put(`/Apartments/${editId}`, payload);
+                notify.success("Cập nhật thông tin phòng thành công!");
             } else {
-                const createPayload = {
-                    buildingId: Number(formData.buildingId),
-                    floorNumber: Number(formData.floorNumber),
-                    apartmentNumber: Number(formData.apartmentNumber),
-                    area: Number(formData.area),
-                    status: Number(formData.status)
-                };
-                await api.post('/Apartments', createPayload);
-                toast.success("Thêm căn hộ mới thành công!");
+                await api.post('/Apartments', payload);
+                notify.success("Thêm căn hộ mới thành công!");
             }
 
             await fetchData();
             document.getElementById('closeAptModal').click();
         } catch (error) {
-            const errorMessage = error.response?.data?.message || "Thao tác thất bại. Vui lòng kiểm tra lại thông tin nhập.";
-            toast.error("LỖI: " + errorMessage);
+            notify.error(error.response?.data?.message || "Thao tác thất bại. Vui lòng kiểm tra lại dữ liệu.");
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleDelete = async (id, aptCode) => {
-        const { isConfirmed } = await confirmModal.fire({
+        const { isConfirmed } = await confirmDelete.fire({
             title: 'Xóa Căn Hộ?',
-            text: `Bạn có chắc chắn muốn đưa căn hộ ${aptCode} vào danh sách đã xóa?`,
-            icon: 'warning',
-            confirmButtonText: 'Đồng ý xóa'
+            text: `Bạn có chắc chắn muốn đưa căn hộ ${aptCode} vào danh sách đã xóa?`
         });
 
-        if (isConfirmed) {
-            try {
-                await api.delete(`/Apartments/${id}`);
-                await fetchData();
-                toast.success("Đã đưa vào danh sách đã xóa.");
-            } catch (error) {
-                toast.error("LỖI: " + (error.response?.data?.message || "Không thể xóa căn hộ lúc này."));
-            }
-        }
-    };
+        if (!isConfirmed) return;
 
-    const handleRestore = async (id) => {
         try {
-            await api.put(`/Apartments/${id}/restore`);
-            toast.success("Đã khôi phục căn hộ thành công!");
+            await api.delete(`/Apartments/${id}`);
+            notify.success("Đã đưa vào danh sách xóa tạm thời.");
             await fetchData();
         } catch (error) {
-            toast.error("LỖI: " + (error.response?.data?.message || "Không thể khôi phục."));
+            notify.error(error.response?.data?.message || "Không thể xóa căn hộ lúc này.");
         }
     };
 
     const handleHardDelete = async (id, aptCode) => {
-        const { isConfirmed } = await confirmModal.fire({
+        const { isConfirmed } = await confirmDelete.fire({
             title: 'CẢNH BÁO!',
             html: `Bạn sắp <b>XÓA VĨNH VIỄN</b> căn hộ <b class="text-danger">${aptCode}</b>.<br/>Hành động này không thể hoàn tác. Xác nhận?`,
             icon: 'error',
-            confirmButtonText: 'Xóa vĩnh viễn!'
+            confirmButtonText: '<i class="bi bi-trash3 me-1"></i> Xóa vĩnh viễn!'
         });
 
-        if (isConfirmed) {
-            try {
-                await api.delete(`/Apartments/${id}/hard`);
-                toast.success("Đã xóa vĩnh viễn thành công!");
-                await fetchData();
-            } catch (error) {
-                toast.error("LỖI: " + (error.response?.data?.message || "Không thể xóa."));
-            }
+        if (!isConfirmed) return;
+
+        try {
+            await api.delete(`/Apartments/${id}/hard`);
+            notify.success("Đã xóa vĩnh viễn thành công!");
+            await fetchData();
+        } catch (error) {
+            notify.error(error.response?.data?.message || "Không thể xóa vĩnh viễn.");
         }
     };
 
+    const handleRestore = async (id) => {
+        const { isConfirmed } = await confirmAction.fire({
+            title: 'Khôi phục Căn Hộ?',
+            text: 'Căn hộ này sẽ hoạt động trở lại bình thường.',
+            confirmButtonText: '<i class="bi bi-arrow-counterclockwise me-1"></i> Khôi phục'
+        });
+
+        if (!isConfirmed) return;
+
+        try {
+            await api.put(`/Apartments/${id}/restore`);
+            notify.success("Đã khôi phục căn hộ thành công!");
+            await fetchData();
+        } catch (error) {
+            notify.error(error.response?.data?.message || "Không thể khôi phục.");
+        }
+    };
+
+    // --- RENDER LOGIC ---
     const getStatusBadge = (status, hasTenant) => {
         switch (status) {
             case 1: return <span className="badge bg-success">Trống</span>;
             case 2: return <span className="badge bg-warning text-dark">Đang thuê</span>;
             case 3:
-                if (hasTenant) {
-                    return (
-                        <span className="badge bg-secondary d-inline-flex align-items-center">
-                            Bảo trì
-                            <span className="bg-danger rounded-circle ms-2 shadow-sm" style={{ width: '8px', height: '8px' }} title="Phòng đang có người thuê"></span>
-                        </span>
-                    );
-                }
-                return <span className="badge bg-secondary">Bảo trì</span>;
+                return (
+                    <span className="badge bg-secondary d-inline-flex align-items-center">
+                        Bảo trì
+                        {hasTenant && <span className="bg-danger rounded-circle ms-2 shadow-sm" style={{ width: '8px', height: '8px' }} title="Phòng đang có người thuê"></span>}
+                    </span>
+                );
             default: return <span className="badge bg-secondary">Không xác định</span>;
         }
     };
 
-    const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
-
     const filteredApartments = apartments.filter(apt => {
-        const matchBuilding = filterBuilding ? (() => {
-            const selectedBld = buildings.find(b => b.buildingId === Number(filterBuilding));
-            return selectedBld && apt.apartmentCode?.startsWith(selectedBld.buildingCode);
-        })() : true;
-
+        const matchBuilding = filterBuilding ? buildings.find(b => b.buildingId === Number(filterBuilding))?.buildingCode === apt.apartmentCode?.split('-')[0] : true;
         const matchStatus = filterStatus ? apt.status === Number(filterStatus) : true;
-        const matchSearch = searchTerm
-            ? (apt.apartmentCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                apt.apartmentName?.toLowerCase().includes(searchTerm.toLowerCase()))
-            : true;
-
+        const matchSearch = searchTerm ? (apt.apartmentCode?.toLowerCase().includes(searchTerm.toLowerCase()) || apt.apartmentName?.toLowerCase().includes(searchTerm.toLowerCase())) : true;
         return matchBuilding && matchStatus && matchSearch;
     });
 
@@ -382,7 +361,7 @@ const ApartmentManagement = () => {
                 </div>
             </div>
 
-            {/* === THANH CÔNG CỤ BỘ LỌC (MỚI) === */}
+            {/* BỘ LỌC */}
             <div className="card shadow-sm border-0 mb-4 bg-light">
                 <div className="card-body py-3">
                     <div className="row g-3">
@@ -424,7 +403,7 @@ const ApartmentManagement = () => {
                 </div>
             </div>
 
-            {/* Bảng dữ liệu Căn Hộ */}
+            {/* DANH SÁCH DỮ LIỆU */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
@@ -452,15 +431,13 @@ const ApartmentManagement = () => {
                                     </thead>
                                     <tbody>
                                         {currentApartments.map((apt, idx) => {
-                                            const derivedRoomNumber = extractApartmentNumber(apt.apartmentCode);
                                             const stt = indexOfFirstItem + idx + 1;
-
                                             return (
                                                 <tr key={apt.apartmentId}>
                                                     <td>{stt}</td>
                                                     <td className={`fw-bold ${showTrash ? 'text-muted' : 'text-primary'}`}>{apt.apartmentCode}</td>
                                                     <td className={`fw-semibold text-start ${showTrash ? 'text-muted text-decoration-line-through' : ''}`}>{apt.apartmentName}</td>
-                                                    <td className="fw-semibold">{derivedRoomNumber}</td>
+                                                    <td className="fw-semibold">{extractApartmentNumber(apt.apartmentCode)}</td>
                                                     <td>{apt.floorNumber}</td>
                                                     <td>{apt.area} m²</td>
                                                     <td>{getStatusBadge(apt.status, apt.hasTenant)}</td>
@@ -503,7 +480,7 @@ const ApartmentManagement = () => {
                 </div>
             </div>
 
-            {/* MODAL XEM CHI TIẾT CĂN HỘ */}
+            {/* MODAL CHI TIẾT */}
             {showDetailModal && aptDetail && (
                 <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1050 }}>
                     <div className="modal-dialog modal-xl modal-dialog-scrollable">
@@ -520,6 +497,7 @@ const ApartmentManagement = () => {
                                 ) : (
                                     <div className="row g-4">
                                         <div className="col-lg-5">
+                                            {/* Thông tin cơ bản */}
                                             <div className="card shadow-sm border-0 mb-4">
                                                 <div className="card-header bg-white fw-bold text-primary border-bottom-0 pt-3 pb-0">
                                                     <i className="bi bi-info-circle me-2"></i>Thông tin cơ bản
@@ -542,6 +520,7 @@ const ApartmentManagement = () => {
                                                 </div>
                                             </div>
 
+                                            {/* Hợp đồng hiện tại */}
                                             <div className="card shadow-sm border-0 border-top border-warning border-3">
                                                 <div className="card-header bg-white fw-bold text-warning border-bottom-0 pt-3 pb-0">
                                                     <i className="bi bi-file-earmark-text me-2"></i>Hợp đồng hiện tại
@@ -564,6 +543,21 @@ const ApartmentManagement = () => {
                                                             <li className="list-group-item px-0 d-flex justify-content-between">
                                                                 <span className="text-muted">Tiền cọc:</span> <span className="fw-semibold">{formatMoney(aptDetail.contract.deposit)}</span>
                                                             </li>
+                                                            <li className="list-group-item px-0 d-flex justify-content-between align-items-center mt-2 border-top-0">
+                                                                <span className="text-muted">File Đính Kèm:</span>
+                                                                {aptDetail.contract.file || aptDetail.contract.File ? (
+                                                                    <a
+                                                                        href={aptDetail.contract.file || aptDetail.contract.File}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="btn btn-sm btn-primary py-1 px-3 fw-semibold shadow-sm"
+                                                                    >
+                                                                        <i className="bi bi-cloud-arrow-down-fill me-1"></i> Xem File
+                                                                    </a>
+                                                                ) : (
+                                                                    <span className="text-muted fst-italic">Không có file</span>
+                                                                )}
+                                                            </li>
                                                         </ul>
                                                     ) : (
                                                         <div className="text-center py-3 text-muted fst-italic">
@@ -576,6 +570,7 @@ const ApartmentManagement = () => {
                                         </div>
 
                                         <div className="col-lg-7">
+                                            {/* Cư dân đang ở */}
                                             <div className="card shadow-sm border-0 mb-4 border-top border-success border-3">
                                                 <div className="card-header bg-white fw-bold text-success border-bottom-0 pt-3 pb-0">
                                                     <i className="bi bi-people me-2"></i>Cư dân đang ở ({aptDetail.residents.length})
@@ -614,6 +609,7 @@ const ApartmentManagement = () => {
                                                 </div>
                                             </div>
 
+                                            {/* Dịch vụ đăng ký */}
                                             <div className="card shadow-sm border-0 border-top border-info border-3">
                                                 <div className="card-header bg-white fw-bold text-info border-bottom-0 pt-3 pb-0">
                                                     <i className="bi bi-box-seam me-2"></i>Dịch vụ đăng ký ({aptDetail.services.length})
@@ -622,10 +618,10 @@ const ApartmentManagement = () => {
                                                     {aptDetail.services.length > 0 ? (
                                                         <div className="d-flex flex-wrap gap-2">
                                                             {aptDetail.services.map(s => (
-                                                                <span key={s.serviceId} className="badge bg-light text-dark border border-secondary p-2">
+                                                                <span key={s.serviceId} className="badge bg-light text-dark border border-secondary p-2 shadow-sm">
                                                                     <i className="bi bi-check-circle-fill text-success me-1"></i>
                                                                     {s.serviceName}
-                                                                    <span className="text-danger ms-1">({formatMoney(s.actualPrice ?? s.defaultPrice)})</span>
+                                                                    <span className="text-danger ms-1 fw-bold">({formatMoney(s.actualPrice ?? s.serviceFee)})</span>
                                                                 </span>
                                                             ))}
                                                         </div>
@@ -646,7 +642,7 @@ const ApartmentManagement = () => {
                 </div>
             )}
 
-            {/* Modal Thêm/Sửa Căn hộ */}
+            {/* MODAL THÊM / SỬA CĂN HỘ */}
             <div className="modal fade" id="apartmentModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-lg">
                     <div className="modal-content">
@@ -689,11 +685,22 @@ const ApartmentManagement = () => {
 
                                     <div className={!editId ? "col-md-4" : "col-md-12"}>
                                         <label className="form-label fw-semibold">Trạng thái</label>
-                                        <select className="form-select" name="status" value={formData.status} onChange={handleInputChange}>
+                                        <select
+                                            className={`form-select ${editId ? 'bg-light text-muted' : ''}`}
+                                            name="status"
+                                            value={formData.status}
+                                            onChange={handleInputChange}
+                                            disabled={!!editId}
+                                        >
                                             <option value={1}>Trống</option>
                                             <option value={2}>Đang thuê</option>
                                             <option value={3}>Bảo trì</option>
                                         </select>
+                                        {editId && (
+                                            <small className="text-danger fst-italic mt-1 d-block">
+                                                <i className="bi bi-lock-fill me-1"></i> Trạng thái được hệ thống cập nhật tự động theo Hợp đồng.
+                                            </small>
+                                        )}
                                     </div>
                                     {!editId && (
                                         <div className="col-12 mt-3">
@@ -711,7 +718,7 @@ const ApartmentManagement = () => {
                 </div>
             </div>
 
-            {/* Modal Quản lý Dịch vụ Phòng */}
+            {/* MODAL QUẢN LÝ DỊCH VỤ PHÒNG */}
             {showServiceModal && selectedApartment && (
                 <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
                     <div className="modal-dialog modal-lg modal-dialog-scrollable">
