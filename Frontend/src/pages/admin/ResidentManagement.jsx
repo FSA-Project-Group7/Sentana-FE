@@ -3,7 +3,7 @@ import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
 import CreateAccountForm from '../../components/common/CreateAccountForm';
 import Select from 'react-select';
-
+import { notify, confirmAction, confirmDelete } from '../../utils/notificationAlert';
 
 const ResidentManagement = () => {
     // --- STATES CƠ BẢN ---
@@ -17,7 +17,7 @@ const ResidentManagement = () => {
 
     const [editId, setEditId] = useState(null);
     const initialFormState = {
-        email: '', userName: '', password: '', fullName: '',
+        email: '', userName: '', fullName: '',
         phoneNumber: '', identityCard: '', country: '', city: '', address: '',
         birthDay: '', sex: ''
     };
@@ -47,7 +47,7 @@ const ResidentManagement = () => {
             setApartments(Array.isArray(aList) ? aList : []);
             setCurrentPage(1);
         } catch (error) {
-            console.error("Lỗi khi tải dữ liệu:", error);
+            notify.error("Không thể tải danh sách cư dân.");
             setResidents([]);
         } finally {
             setLoading(false);
@@ -61,7 +61,7 @@ const ResidentManagement = () => {
             const list = res.data?.data || res.data;
             setDeletedResidents(Array.isArray(list) ? list : []);
         } catch (error) {
-            console.error("Lỗi tải danh sách đã xóa:", error);
+            notify.error("Lỗi tải danh sách đã xóa.");
             setDeletedResidents([]);
         } finally {
             setLoading(false);
@@ -72,54 +72,78 @@ const ResidentManagement = () => {
         fetchData();
     }, []);
 
-    // --- CÁC HÀM XỬ LÝ XÓA / KHÔI PHỤC (Đã cập nhật đón lỗi từ BE) ---
+    // --- UTILS BẮT LỖI TỪ BACKEND ---
+    const extractErrorMessage = (error, defaultMsg) => {
+        if (error.response?.data?.errors) {
+            const firstErrorKey = Object.keys(error.response.data.errors)[0];
+            return error.response.data.errors[firstErrorKey][0];
+        }
+        return error.response?.data?.message || error.response?.data || defaultMsg;
+    };
+
+    // --- CÁC HÀM XỬ LÝ XÓA / KHÔI PHỤC ---
     const handleSoftDelete = async (id) => {
-        if (window.confirm("Bạn có chắc chắn muốn chuyển cư dân này vào danh sách đã xóa?")) {
-            try {
-                const res = await api.delete(`/Residents/DeleteResident/${id}`);
-                alert(res.data?.message || "Đã chuyển vào Danh sách đã xóa!");
-                fetchData();
-            } catch (error) {
-                // Đón đúng câu thông báo lỗi cực chuẩn từ Backend
-                const errorMsg = error.response?.data?.message || error.response?.data || "Không thể xóa. Cư dân có thể đang ở trong phòng.";
-                alert("LỖI: " + errorMsg);
-            }
+        const { isConfirmed } = await confirmDelete.fire({
+            title: 'Chuyển vào Thùng rác?',
+            text: "Bạn có chắc chắn muốn chuyển cư dân này vào danh sách đã xóa?"
+        });
+
+        if (!isConfirmed) return;
+
+        try {
+            const res = await api.delete(`/Residents/DeleteResident/${id}`);
+            notify.success(res.data?.message || "Đã chuyển vào Danh sách đã xóa!");
+            fetchData();
+        } catch (error) {
+            notify.error(extractErrorMessage(error, "Không thể xóa. Cư dân có thể đang ở trong phòng."));
         }
     };
 
     const handleRestore = async (id) => {
+        const { isConfirmed } = await confirmAction.fire({
+            title: 'Khôi phục tài khoản?',
+            text: 'Tài khoản này sẽ hoạt động trở lại.',
+            confirmButtonText: '<i class="bi bi-arrow-counterclockwise me-1"></i> Khôi phục'
+        });
+
+        if (!isConfirmed) return;
+
         try {
             const res = await api.put(`/Residents/Restore/${id}`);
-            alert(res.data?.message || "Đã khôi phục tài khoản thành công!");
+            notify.success(res.data?.message || "Đã khôi phục tài khoản thành công!");
             fetchDeletedData();
             fetchData();
         } catch (error) {
-            const errorMsg = error.response?.data?.message || error.response?.data || "Không thể khôi phục.";
-            alert("LỖI: " + errorMsg);
+            notify.error(extractErrorMessage(error, "Không thể khôi phục."));
         }
     };
 
     const handleHardDelete = async (id) => {
-        if (window.confirm("CẢNH BÁO ĐỎ: Hành động này sẽ xóa vĩnh viễn cư dân khỏi hệ thống và không thể khôi phục! Bạn chắc chắn chứ?")) {
-            try {
-                const res = await api.delete(`/Residents/HardDelete/${id}`);
-                alert(res.data?.message || "Đã xóa vĩnh viễn thành công!");
-                fetchDeletedData();
-            } catch (error) {
-                const errorMsg = error.response?.data?.message || error.response?.data || "Không thể xóa vĩnh viễn.";
-                alert("LỖI: " + errorMsg);
-            }
+        const { isConfirmed } = await confirmDelete.fire({
+            title: 'CẢNH BÁO ĐỎ!',
+            html: `Hành động này sẽ <b>xóa vĩnh viễn</b> cư dân khỏi hệ thống và không thể khôi phục!<br/>Bạn chắc chắn chứ?`,
+            icon: 'error',
+            confirmButtonText: '<i class="bi bi-trash3 me-1"></i> Xóa vĩnh viễn'
+        });
+
+        if (!isConfirmed) return;
+
+        try {
+            const res = await api.delete(`/Residents/HardDelete/${id}`);
+            notify.success(res.data?.message || "Đã xóa vĩnh viễn thành công!");
+            fetchDeletedData();
+        } catch (error) {
+            notify.error(extractErrorMessage(error, "Không thể xóa vĩnh viễn."));
         }
     };
 
     const handleToggleStatus = async (id) => {
         try {
             const res = await api.put(`/Residents/toggleStatus/${id}`);
-            alert(res.data?.message || "Đã thay đổi trạng thái!");
+            notify.success(res.data?.message || "Đã thay đổi trạng thái!");
             fetchData();
         } catch (error) {
-            const errorMsg = error.response?.data?.message || error.response?.data || "Không thể đổi trạng thái.";
-            alert("LỖI: " + errorMsg);
+            notify.error(extractErrorMessage(error, "Không thể đổi trạng thái."));
         }
     };
 
@@ -145,7 +169,7 @@ const ResidentManagement = () => {
             const city = resident.info?.city || resident.city || resident.City || '';
 
             setFormData({
-                email: resident.email || '', userName: resident.userName || '', password: '',
+                email: resident.email || '', userName: resident.userName || '',
                 fullName: resident.fullName || '', phoneNumber: resident.phoneNumber || '',
                 identityCard: resident.identityCard || '', country, city, address: resident.address || '',
                 birthDay, sex
@@ -169,20 +193,15 @@ const ResidentManagement = () => {
                     sex: formData.sex !== '' ? Number(formData.sex) : null
                 };
                 const res = await api.put(`/Residents/UpdateResident/${editId}`, updatePayload);
-                alert(res.data?.message || "Cập nhật thành công!");
+                notify.success(res.data?.message || "Cập nhật thành công!");
             } else {
                 const res = await api.post('/Residents/CreateResident', formData);
-                alert(res.data?.message || "Thêm Cư dân thành công!");
+                notify.success(res.data?.message || "Thêm Cư dân thành công!");
             }
             fetchData();
             document.getElementById('closeResModal').click();
         } catch (error) {
-            let errorMessage = "Lỗi đầu vào, vui lòng kiểm tra lại!";
-            if (error.response?.data?.errors) {
-                const firstErrorKey = Object.keys(error.response.data.errors)[0];
-                errorMessage = error.response.data.errors[firstErrorKey][0];
-            } else if (error.response?.data?.message) errorMessage = error.response.data.message;
-            alert("LỖI: " + errorMessage);
+            notify.error(extractErrorMessage(error, "Lỗi đầu vào, vui lòng kiểm tra lại!"));
         } finally {
             setIsSubmitting(false);
         }
@@ -195,16 +214,16 @@ const ResidentManagement = () => {
     };
 
     const handleAssignRoom = async () => {
-        if (!selectedApartmentId) return alert("Vui lòng chọn một căn hộ!");
+        if (!selectedApartmentId) return notify.warning("Vui lòng chọn một căn hộ!");
         setIsSubmitting(true);
         try {
             const payload = { accountId: selectedResident.accountId, apartmentId: Number(selectedApartmentId), relationshipId: null };
             const res = await api.post('/Residents/assign', payload);
-            alert(res.data?.message || "Đã gán phòng thành công!");
+            notify.success(res.data?.message || "Đã gán phòng thành công!");
             document.getElementById('closeAssignModal').click();
             fetchData();
         } catch (error) {
-            alert("LỖI: " + (error.response?.data?.message || "Không thể gán phòng."));
+            notify.error(extractErrorMessage(error, "Không thể gán phòng."));
         } finally {
             setIsSubmitting(false);
         }
@@ -212,20 +231,26 @@ const ResidentManagement = () => {
 
     const handleRemoveRoom = async () => {
         const targetAptId = selectedResident?.apartmentId;
-        if (!targetAptId) return alert("Cư dân này hiện chưa có phòng!");
-        if (window.confirm(`CẢNH BÁO: Gỡ cư dân sẽ làm vô hiệu hóa Hợp đồng, chuyển phòng thành Trống và khóa tài khoản Cư dân. Bạn có chắc chắn?`)) {
-            setIsSubmitting(true);
-            try {
-                const payload = { accountId: selectedResident.accountId, apartmentId: Number(targetAptId), relationshipId: null };
-                const res = await api.post('/Residents/remove', payload);
-                alert(res.data?.message || "Đã gỡ cư dân khỏi phòng!");
-                document.getElementById('closeAssignModal').click();
-                fetchData();
-            } catch (error) {
-                alert("LỖI: " + (error.response?.data?.message || "Không thể gỡ."));
-            } finally {
-                setIsSubmitting(false);
-            }
+        if (!targetAptId) return notify.warning("Cư dân này hiện chưa có phòng!");
+
+        const { isConfirmed } = await confirmDelete.fire({
+            title: 'Gỡ khỏi Căn hộ?',
+            text: 'Hành động này sẽ làm vô hiệu hóa Hợp đồng, chuyển phòng thành Trống và khóa tài khoản Cư dân. Bạn có chắc chắn?'
+        });
+
+        if (!isConfirmed) return;
+
+        setIsSubmitting(true);
+        try {
+            const payload = { accountId: selectedResident.accountId, apartmentId: Number(targetAptId), relationshipId: null };
+            const res = await api.post('/Residents/remove', payload);
+            notify.success(res.data?.message || "Đã gỡ cư dân khỏi phòng!");
+            document.getElementById('closeAssignModal').click();
+            fetchData();
+        } catch (error) {
+            notify.error(extractErrorMessage(error, "Không thể gỡ."));
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -237,17 +262,19 @@ const ResidentManagement = () => {
 
     const handleImportExcel = async (e) => {
         e.preventDefault();
-        if (!importFile) return alert("Vui lòng chọn file Excel!");
+        if (!importFile) return notify.warning("Vui lòng chọn file Excel!");
+
         setIsSubmitting(true);
         const formPayload = new FormData();
         formPayload.append('File', importFile);
+
         try {
             const res = await api.post('/Residents/import', formPayload, { headers: { 'Content-Type': 'multipart/form-data' } });
             setImportResult(res.data.data);
-            alert(res.data?.message || "Import hoàn tất!");
+            notify.success(res.data?.message || "Import hoàn tất!");
             fetchData();
         } catch (error) {
-            alert("LỖI IMPORT: " + (error.response?.data?.message || "Có lỗi xảy ra khi đọc file."));
+            notify.error(extractErrorMessage(error, "Có lỗi xảy ra khi đọc file."));
         } finally {
             setIsSubmitting(false);
         }
@@ -357,7 +384,7 @@ const ResidentManagement = () => {
                                                             </button>
                                                         )}
                                                     </td>
-                                                    
+
                                                     <td>
                                                         {!isTrashMode ? (
                                                             <div className="d-flex justify-content-center gap-2">

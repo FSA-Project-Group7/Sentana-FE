@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
+import { notify, confirmAction } from '../../utils/notificationAlert';
 
 const AccountManagement = () => {
     const [activeTab, setActiveTab] = useState('technician');
@@ -13,21 +14,16 @@ const AccountManagement = () => {
     const fetchAccounts = async () => {
         try {
             setLoading(true);
-            let response;
-
-            if (activeTab === 'technician') {
-                response = await api.get('/Technicians');
-            } else {
-                response = await api.get('/Residents/GetAllResidents');
-            }
-
-            const remoteData = response.data?.data ? response.data.data : response.data;
+            // Chuẩn hóa Endpoint dựa trên Tab hiện tại
+            const endpoint = activeTab === 'technician' ? '/Technicians' : '/Residents/GetAllResidents';
+            const response = await api.get(endpoint);
+            const remoteData = response.data?.data || response.data;
             setAccounts(Array.isArray(remoteData) ? remoteData : []);
 
-            // Reset về trang 1 mỗi khi đổi Tab
+            // Reset pagination khi đổi tab
             setCurrentPage(1);
         } catch (error) {
-            console.error("Lỗi tải danh sách tài khoản:", error);
+            notify.error("Không thể tải danh sách tài khoản.");
         } finally {
             setLoading(false);
         }
@@ -37,22 +33,32 @@ const AccountManagement = () => {
         fetchAccounts();
     }, [activeTab]);
 
-    const handleToggleStatus = async (id) => {
+    const handleToggleStatus = async (acc) => {
+        const actionText = acc.status === 1 ? 'khóa' : 'mở khóa';
+
+        // --- XÁC NHẬN THAO TÁC (Dùng SweetAlert2) ---
+        const { isConfirmed } = await confirmAction.fire({
+            title: `Xác nhận ${actionText}?`,
+            text: `Bạn có chắc chắn muốn ${actionText} tài khoản của "${acc.userName}"?`
+        });
+
+        if (!isConfirmed) return;
+
         try {
             const endpoint = activeTab === 'technician'
-                ? `/Technicians/toggleStatus/${id}`
-                : `/Residents/toggleStatus/${id}`;
+                ? `/Technicians/toggleStatus/${acc.accountId}`
+                : `/Residents/toggleStatus/${acc.accountId}`;
 
             const res = await api.put(endpoint);
 
-            alert(res.data?.message || "Cập nhật trạng thái thành công!");
-
+            notify.success(res.data?.message || `Đã ${actionText} tài khoản thành công!`);
             await fetchAccounts();
         } catch (error) {
-            alert("LỖI: " + (error.response?.data?.message || "Thao tác thất bại."));
+            notify.error(error.response?.data?.message || "Thao tác thất bại.");
         }
     };
 
+    // --- PAGINATION LOGIC ---
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentAccounts = accounts.slice(indexOfFirstItem, indexOfLastItem);
@@ -100,7 +106,7 @@ const AccountManagement = () => {
                         </div>
                     ) : (
                         <>
-                            {/* BẢNG DỮ LIỆU DÙNG CHUNG CHO CẢ 2 TAB */}
+                            {/* DATA TABLE */}
                             <div className="table-responsive">
                                 <table className="table table-hover mb-0 align-middle text-center">
                                     <thead className="table-light text-muted small text-uppercase">
@@ -129,7 +135,7 @@ const AccountManagement = () => {
                                                         <button
                                                             type="button"
                                                             className={`btn btn-sm rounded-pill fw-bold text-white ${acc.status === 1 ? 'btn-success' : 'btn-danger'}`}
-                                                            onClick={() => handleToggleStatus(acc.accountId)}
+                                                            onClick={() => handleToggleStatus(acc)}
                                                             title="Nhấn để Khóa/Mở khóa tài khoản"
                                                             style={{ minWidth: '110px' }}
                                                         >
@@ -143,7 +149,6 @@ const AccountManagement = () => {
                                 </table>
                             </div>
 
-                            {/* COMPONENT PHÂN TRANG */}
                             <Pagination
                                 totalItems={accounts.length}
                                 itemsPerPage={itemsPerPage}
