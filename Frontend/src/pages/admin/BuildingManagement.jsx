@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
+import { notify, confirmDelete, confirmAction } from '../../utils/notificationAlert';
 
 const BuildingManagement = () => {
+    // --- STATE QUẢN LÝ TÒA NHÀ ---
     const [buildings, setBuildings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showTrash, setShowTrash] = useState(false);
 
+    // --- STATE FORM THÊM/SỬA ---
     const [formData, setFormData] = useState({
         buildingCode: '', buildingName: '', address: '', city: 'Hà Nội', floorNumber: 0, apartmentNumber: 0, status: 1
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editId, setEditId] = useState(null);
 
+    // Thuật toán sinh mã Tòa nhà tự động (Gợi ý chữ cái A-Z chưa dùng)
     const suggestBuildingInfo = () => {
         const existingCodes = buildings.map(b => b.buildingCode);
         let nextChar = 'A';
@@ -28,26 +32,20 @@ const BuildingManagement = () => {
         };
     };
 
-const fetchBuildings = async () => {
-    try {
-        setLoading(true);
-        const endpoint = showTrash ? '/Buildings/deleted' : '/Buildings';
-        const response = await api.get(endpoint);
-        const actualData = response.data?.data || response.data;
-        if (Array.isArray(actualData)) {
-            setBuildings(actualData);
-        } else {
-            console.error("Dữ liệu trả về không phải là mảng:", actualData);
+    const fetchBuildings = async () => {
+        try {
+            setLoading(true);
+            const endpoint = showTrash ? '/Buildings/deleted' : '/Buildings';
+            const response = await api.get(endpoint);
+            const actualData = response.data?.data || response.data;
+            setBuildings(Array.isArray(actualData) ? actualData : []);
+        } catch (error) {
+            notify.error("Không thể tải danh sách tòa nhà.");
             setBuildings([]);
+        } finally {
+            setLoading(false);
         }
-    } catch (error) {
-        console.error("Lỗi khi tải danh sách:", error);
-        setBuildings([]);
-    } finally {
-        setLoading(false);
-    }
     };
-
 
     useEffect(() => {
         fetchBuildings();
@@ -89,6 +87,7 @@ const fetchBuildings = async () => {
         });
     };
 
+    // --- XỬ LÝ NGHIỆP VỤ: LƯU, XÓA, KHÔI PHỤC ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -96,62 +95,81 @@ const fetchBuildings = async () => {
             if (editId) {
                 const updatePayload = { ...formData, apartmentNumber: formData.floorNumber * 10 };
                 await api.put(`/Buildings/${editId}`, updatePayload);
-                alert("Cập nhật thông tin thành công!");
+                notify.success("Cập nhật thông tin thành công!");
             } else {
                 const createPayload = {
                     BuildingCode: formData.buildingCode,
                     BuildingName: formData.buildingName,
-                    ApartmentNumber: 1,
+                    ApartmentNumber: 1, // Fix tạm cứng, BE nên lo việc đếm số phòng
                     FloorNumber: formData.floorNumber,
                     City: formData.city,
                     Address: formData.address
                 };
-                const response = await api.post('/Buildings', createPayload);
-                if (response.data?.success) {
-                alert("Thêm tòa nhà thành công!");
-                }
+                await api.post('/Buildings', createPayload);
+                notify.success("Thêm tòa nhà thành công!");
             }
             fetchBuildings();
             document.getElementById('closeModal').click();
         } catch (error) {
-            alert("LỖI: " + (error.response?.data?.message || "Có lỗi xảy ra, vui lòng thử lại!"));
+            notify.error(error.response?.data?.message || "Có lỗi xảy ra, vui lòng thử lại!");
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleDelete = async (id, name) => {
-        if (window.confirm(`Xác nhận đưa tòa nhà "${name}" vào thùng rác?`)) {
+        const { isConfirmed } = await confirmDelete.fire({
+            title: 'Tạm xóa Tòa nhà?',
+            text: `Xác nhận đưa tòa nhà "${name}" vào thùng rác?`,
+        });
+
+        if (isConfirmed) {
             try {
                 await api.delete(`/Buildings/${id}`);
-                alert("Đã đưa vào thùng rác.");
+                notify.success("Đã đưa vào thùng rác.");
                 fetchBuildings();
-            } catch (error) { alert("LỖI: " + error.response?.data?.message); }
+            } catch (error) { notify.error(error.response?.data?.message || "Xóa thất bại!"); }
         }
     };
 
     const handleRestore = async (id) => {
-        try {
-            await api.put(`/Buildings/${id}/restore`);
-            alert("Đã khôi phục tòa nhà thành công!");
-            fetchBuildings();
-        } catch (error) { alert("LỖI: " + error.response?.data?.message); }
+        const { isConfirmed } = await confirmAction.fire({
+            title: 'Khôi phục Tòa nhà?',
+            text: 'Tòa nhà này sẽ được kích hoạt trở lại.',
+            confirmButtonText: '<i class="bi bi-arrow-counterclockwise me-1"></i> Khôi phục'
+        });
+
+        if (isConfirmed) {
+            try {
+                await api.put(`/Buildings/${id}/restore`);
+                notify.success("Đã khôi phục tòa nhà thành công!");
+                fetchBuildings();
+            } catch (error) { notify.error(error.response?.data?.message || "Khôi phục thất bại."); }
+        }
     };
 
     const handleHardDelete = async (id, name) => {
-        if (window.confirm(`CẢNH BÁO: Bạn sắp XÓA VĨNH VIỄN tòa nhà "${name}". Hành động này không thể hoàn tác. Xác nhận?`)) {
+        const { isConfirmed } = await confirmDelete.fire({
+            title: 'CẢNH BÁO!',
+            html: `Bạn sắp <b>XÓA VĨNH VIỄN</b> tòa nhà <b>"${name}"</b>.<br/>Hành động này không thể hoàn tác. Xác nhận?`,
+            icon: 'error',
+            confirmButtonText: '<i class="bi bi-trash3 me-1"></i> Xóa vĩnh viễn!'
+        });
+
+        if (isConfirmed) {
             try {
                 await api.delete(`/Buildings/${id}/hard`);
-                alert("Đã xóa vĩnh viễn thành công!");
+                notify.success("Đã xóa vĩnh viễn thành công!");
                 fetchBuildings();
             } catch (error) {
-                alert("LỖI: " + (error.response?.data?.message || "Không thể xóa."));
+                notify.error(error.response?.data?.message || "Không thể xóa vĩnh viễn.");
             }
         }
     };
 
     return (
         <div className="container-fluid p-0">
+            {/* --- HEADER --- */}
             <div className="d-flex justify-content-between align-items-start mb-4">
                 <div>
                     <h2 className="fw-bold mb-0">{showTrash ? 'Danh sách đã xóa: Tòa nhà' : 'Quản lý Tòa nhà'}</h2>
@@ -172,6 +190,7 @@ const fetchBuildings = async () => {
                 </div>
             </div>
 
+            {/* --- DANH SÁCH TÒA NHÀ --- */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
@@ -221,7 +240,6 @@ const fetchBuildings = async () => {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        {/* ĐÃ ĐỔI TÊN THÀNH CẬP NHẬT Ở ĐÂY */}
                                                         <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleOpenEdit(building)} data-bs-toggle="modal" data-bs-target="#buildingModal">
                                                             <i className="bi bi-pencil-square me-1"></i> Cập nhật
                                                         </button>
@@ -240,6 +258,7 @@ const fetchBuildings = async () => {
                 </div>
             </div>
 
+            {/* --- MODAL THÊM / CẬP NHẬT --- */}
             <div className="modal fade" id="buildingModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-lg">
                     <div className="modal-content">

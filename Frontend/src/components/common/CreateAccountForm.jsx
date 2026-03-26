@@ -9,7 +9,6 @@ const REGEX = {
   email: /^[a-zA-Z0-9._%+-]+@gmail\.com$/,
   phone: /^(0|84|\+84)[35789][0-9]{8}$/,
   cccd: /^[0-9]{12}$/,
-  password: /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/,
   fullName: /^[a-zA-ZÀ-ỹà-ỹ\s]+$/,
 };
 
@@ -17,7 +16,6 @@ const ERROR_MESSAGES = {
   email: 'Email phải có đuôi @gmail.com',
   phone: 'Số điện thoại không hợp lệ (VD: 0912345678)',
   cccd: 'CCCD phải gồm đúng 12 số',
-  password: 'Mật khẩu tối thiểu 8 ký tự, gồm chữ, số và ký tự đặc biệt',
   fullName: 'Họ tên chỉ được chứa chữ cái và khoảng trắng',
   required: 'Trường này là bắt buộc',
 };
@@ -87,9 +85,9 @@ const FieldError = ({ error }) =>
 /**
  * CreateAccountForm
  * Props:
- *   - type: 'resident' | 'technician'
- *   - onSuccess: () => void   – called after successful creation
- *   - onCancel: () => void    – called when user clicks "Hủy"
+ * - type: 'resident' | 'technician'
+ * - onSuccess: () => void   – called after successful creation
+ * - onCancel: () => void    – called when user clicks "Hủy"
  */
 const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
   const isResident = type === 'resident';
@@ -103,7 +101,8 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
     // Account fields (always editable)
     email: '',
     userName: '',
-    password: '',
+    // Password đã được BE lo liệu (Tự động sinh và gửi qua mail)
+
     // Info fields (locked when CCCD found in system)
     fullName: '',
     phoneNumber: '',
@@ -121,7 +120,6 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
   const [isCccdChecking, setIsCccdChecking] = useState(false);
   const [cccdStatus, setCccdStatus] = useState(null); // 'found' | 'not_found' | null
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   const cccdDebounceRef = useRef(null);
   const { toasts, addToast, removeToast } = useToast();
@@ -134,11 +132,10 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
       return ERROR_MESSAGES.required;
     }
     switch (name) {
-      case 'email':       return REGEX.email.test(value) ? '' : ERROR_MESSAGES.email;
+      case 'email': return REGEX.email.test(value) ? '' : ERROR_MESSAGES.email;
       case 'phoneNumber': return REGEX.phone.test(value) ? '' : ERROR_MESSAGES.phone;
-      case 'identityCard':return REGEX.cccd.test(value) ? '' : ERROR_MESSAGES.cccd;
-      case 'password':    return REGEX.password.test(value) ? '' : ERROR_MESSAGES.password;
-      case 'fullName':    return REGEX.fullName.test(value) ? '' : ERROR_MESSAGES.fullName;
+      case 'identityCard': return REGEX.cccd.test(value) ? '' : ERROR_MESSAGES.cccd;
+      case 'fullName': return REGEX.fullName.test(value) ? '' : ERROR_MESSAGES.fullName;
       case 'birthDay': {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -151,7 +148,8 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
 
   // ── Full form validation ──────────────────────
   const validateAll = () => {
-    const requiredFields = ['email', 'userName', 'password', 'fullName', 'phoneNumber', 'identityCard'];
+    // ĐÃ XÓA PASSWORD khỏi mảng bắt buộc
+    const requiredFields = ['email', 'userName', 'fullName', 'phoneNumber', 'identityCard'];
     const newErrors = {};
     requiredFields.forEach(field => {
       const err = validateField(field, formData[field]);
@@ -166,21 +164,18 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
     setCccdStatus(null);
     try {
       const res = await api.get(`/InFos/check-cccd/${cccd}`);
-      // Lấy data từ res.data.data
       const apiMessage = res.data?.message;
       const data = res.data?.data;
       if (data) {
         setFormData(prev => ({
           ...prev,
-          fullName:    data.fullName    || '',
+          fullName: data.fullName || '',
           phoneNumber: data.phoneNumber || '',
-          country:     data.country     || '',
-          city:        data.city        || '',
-          address:     data.address     || '',
-          // Cắt chuỗi lấy ngày theo đúng format data.birthday.split('T')[0]
-          birthDay:    data.birthday ? data.birthday.split('T')[0] : '',
-          // Chuyển sang chuỗi để dropdown nhận giá trị
-          sex:         (data.sex !== null && data.sex !== undefined) ? data.sex.toString() : ''
+          country: data.country || '',
+          city: data.city || '',
+          address: data.address || '',
+          birthDay: data.birthday ? data.birthday.split('T')[0] : '',
+          sex: (data.sex !== null && data.sex !== undefined) ? data.sex.toString() : ''
         }));
         setIsExistingInfo(true);
         setCccdStatus('found');
@@ -210,7 +205,6 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
-    // Validate on change if field was previously touched/erred
     if (errors[name] !== undefined) {
       setErrors(prev => ({ ...prev, [name]: validateField(name, value) }));
     }
@@ -221,12 +215,10 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
-    // Validate on change if field was previously touched/erred
     if (errors[name] !== undefined) {
       setErrors(prev => ({ ...prev, [name]: validateField(name, value) }));
     }
 
-    // Clear info khi người dùng sửa lại CCCD đã auto-fill trước đó
     if (isExistingInfo) {
       setIsExistingInfo(false);
       setCccdStatus(null);
@@ -245,7 +237,6 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
 
     if (cccdDebounceRef.current) clearTimeout(cccdDebounceRef.current);
 
-    // Chỉ gọi check CCCD khi đúng 12 số
     if (value.length === 12 && REGEX.cccd.test(value)) {
       cccdDebounceRef.current = setTimeout(() => {
         checkCccd(value);
@@ -272,25 +263,24 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
       return;
     }
 
-    // Prepare payload
+    // Prepare payload (ĐÃ XÓA PASSWORD)
     const payload = {
-      email:        formData.email.trim(),
-      userName:     formData.userName.trim(),
-      password:     formData.password,
-      fullName:     formData.fullName.trim(),
-      phoneNumber:  formData.phoneNumber.trim(),
+      email: formData.email.trim(),
+      userName: formData.userName.trim(),
+      fullName: formData.fullName.trim(),
+      phoneNumber: formData.phoneNumber.trim(),
       identityCard: formData.identityCard.trim(),
-      country:      formData.country.trim(),
-      city:         formData.city.trim(),
-      address:      formData.address.trim(),
-      birthDay:     formData.birthDay ? formData.birthDay : null,
-      sex:          formData.sex !== '' ? Number(formData.sex) : null,
+      country: formData.country.trim(),
+      city: formData.city.trim(),
+      address: formData.address.trim(),
+      birthDay: formData.birthDay ? formData.birthDay : null,
+      sex: formData.sex !== '' ? Number(formData.sex) : null,
     };
 
     setIsSubmitting(true);
     try {
       const res = await api.post(apiEndpoint, payload);
-      const successMsg = res.data?.message || res.data?.data?.message || (isResident ? 'Tạo Cư Dân thành công!' : 'Tạo Kỹ Thuật Viên thành công!');
+      const successMsg = res.data?.message || res.data?.data?.message || (isResident ? 'Tạo Cư Dân thành công! Mật khẩu đã được gửi qua email.' : 'Tạo Kỹ Thuật Viên thành công! Mật khẩu đã được gửi qua email.');
       addToast(successMsg, 'success');
       setTimeout(() => {
         if (onSuccess) onSuccess();
@@ -299,10 +289,9 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
       let errorMessage = 'Đã xảy ra lỗi. Vui lòng thử lại.';
       const backendErrors = err.response?.data?.errors;
       if (backendErrors) {
-        // Map backend field errors to local state
         const mapped = {};
         if (backendErrors.BirthDay) mapped.birthDay = backendErrors.BirthDay[0];
-        if (backendErrors.Sex)      mapped.sex      = backendErrors.Sex[0];
+        if (backendErrors.Sex) mapped.sex = backendErrors.Sex[0];
         if (Object.keys(mapped).length > 0) setErrors(prev => ({ ...prev, ...mapped }));
         const firstKey = Object.keys(backendErrors)[0];
         errorMessage = backendErrors[firstKey][0];
@@ -330,14 +319,12 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
     if (onCancel) onCancel();
   };
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (cccdDebounceRef.current) clearTimeout(cccdDebounceRef.current);
     };
   }, []);
 
-  // ── Determine input class ─────────────────────
   const inputClass = (name) => {
     let cls = 'form-control caf-input';
     if (errors[name]) cls += ' is-invalid';
@@ -348,17 +335,15 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
   // ─────────────────────────────────────────────
   return (
     <>
-      {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
       <div className="caf-wrapper">
-        {/* Header */}
         <div className="caf-header">
           <div className="caf-header__icon">
             {isResident ? (
-              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"/></svg>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9" /></svg>
             ) : (
-              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             )}
           </div>
           <h5 className="caf-header__title">{title}</h5>
@@ -387,7 +372,7 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
 
             <div className="row g-3">
               {/* Email */}
-              <div className="col-md-12">
+              <div className="col-md-6">
                 <label className="form-label caf-label" htmlFor="caf-email">
                   Email <span className="caf-required">*</span>
                 </label>
@@ -424,38 +409,11 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                 <FieldError error={errors.userName} />
               </div>
 
-              {/* Password */}
-              <div className="col-md-6">
-                <label className="form-label caf-label" htmlFor="caf-password">
-                  Mật khẩu <span className="caf-required">*</span>
-                </label>
-                <div className="caf-password-wrapper">
-                  <input
-                    id="caf-password"
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    className={inputClass('password')}
-                    value={formData.password}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Tối thiểu 8 ký tự, gồm số & ký tự đặc biệt"
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    className="caf-password-toggle"
-                    onClick={() => setShowPassword(v => !v)}
-                    tabIndex={-1}
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                  >
-                    {showPassword ? (
-                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-                    ) : (
-                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    )}
-                  </button>
+              <div className="col-12 mt-2">
+                <div className="alert alert-info py-2 small mb-0">
+                  <i className="bi bi-shield-lock-fill me-2"></i>
+                  <strong>Bảo mật:</strong> Mật khẩu sẽ được hệ thống tự động khởi tạo ngẫu nhiên và gửi trực tiếp vào hòm thư Email của người dùng này.
                 </div>
-                <FieldError error={errors.password} />
               </div>
             </div>
           </div>
@@ -467,14 +425,14 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
               Thông tin cá nhân
               {isExistingInfo && (
                 <span className="caf-badge-locked ms-2">
-                  <svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                  <svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
                   Hồ sơ có sẵn – đã khóa
                 </span>
               )}
             </div>
 
             <div className="row g-3">
-              {/* CCCD – Always editable, drives the lookup */}
+              {/* CCCD */}
               <div className="col-md-6">
                 <label className="form-label caf-label" htmlFor="caf-identityCard">
                   Số CCCD <span className="caf-required">*</span>
@@ -493,17 +451,14 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                     maxLength={12}
                     inputMode="numeric"
                   />
-                  {/* Loading spinner */}
                   {isCccdChecking && (
                     <div className="caf-cccd-spinner" aria-label="Đang tra cứu CCCD">
                       <div className="caf-spinner" />
                     </div>
                   )}
-                  {/* Found badge */}
                   {!isCccdChecking && cccdStatus === 'found' && (
                     <div className="caf-cccd-status caf-cccd-status--found" title="Tìm thấy hồ sơ">✓</div>
                   )}
-                  {/* Not found badge */}
                   {!isCccdChecking && cccdStatus === 'not_found' && (
                     <div className="caf-cccd-status caf-cccd-status--notfound" title="Không tìm thấy">?</div>
                   )}
@@ -525,6 +480,7 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Nguyễn Văn A"
+                  readOnly={isExistingInfo}
                 />
                 <FieldError error={errors.fullName} />
               </div>
@@ -543,6 +499,7 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="0912345678"
+                  readOnly={isExistingInfo}
                 />
                 <FieldError error={errors.phoneNumber} />
               </div>
@@ -562,11 +519,12 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   max={new Date().toISOString().split('T')[0]}
+                  readOnly={isExistingInfo}
                 />
                 <FieldError error={errors.birthDay} />
               </div>
 
-              {/* Sex – select dropdown */}
+              {/* Sex */}
               <div className="col-md-6">
                 <label className="form-label caf-label" htmlFor="caf-sex">Giới tính</label>
                 <select
@@ -576,6 +534,7 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                   value={formData.sex}
                   onChange={handleChange}
                   onBlur={handleBlur}
+                  disabled={isExistingInfo}
                 >
                   <option value="">-- Chọn giới tính --</option>
                   <option value="0">Nam</option>
@@ -597,6 +556,7 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Việt Nam"
+                  readOnly={isExistingInfo}
                 />
               </div>
 
@@ -612,6 +572,7 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Hà Nội"
+                  readOnly={isExistingInfo}
                 />
               </div>
 
@@ -627,6 +588,7 @@ const CreateAccountForm = ({ type = 'resident', onSuccess, onCancel }) => {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Số nhà, ngõ, phường..."
+                  readOnly={isExistingInfo}
                 />
               </div>
             </div>
