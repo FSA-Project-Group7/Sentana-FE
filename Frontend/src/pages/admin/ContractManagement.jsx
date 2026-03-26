@@ -7,11 +7,20 @@ const ContractManagement = () => {
     const [contracts, setContracts] = useState([]);
     const [apartments, setApartments] = useState([]);
     const [residents, setResidents] = useState([]);
+    const [systemServices, setSystemServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
+
+    const relationships = [
+        { id: 2, name: 'Vợ/Chồng' },
+        { id: 3, name: 'Con cái' },
+        { id: 4, name: 'Anh/Chị/Em' },
+        { id: 5, name: 'Bạn cùng phòng' },
+        { id: 6, name: 'Khác' }
+    ];
 
     const initialFormState = {
         apartmentId: '',
@@ -20,13 +29,13 @@ const ContractManagement = () => {
         endDay: '',
         monthlyRent: '',
         deposit: '',
-        file: null
+        file: null,
+        additionalResidents: [],
+        selectedServices: []
     };
 
     const [formData, setFormData] = useState(initialFormState);
-    const [selectedContract, setSelectedContract] = useState(null);
 
-    // 1. THÊM STATE CHẤM DỨT HỢP ĐỒNG
     const [terminationDate, setTerminationDate] = useState('');
     const [additionalCost, setAdditionalCost] = useState(0);
     const [terminateResult, setTerminateResult] = useState(null);
@@ -37,7 +46,7 @@ const ContractManagement = () => {
 
         try {
             const contractRes = await api.get('/contract/view-all-contract');
-            const cList = contractRes.data?.data || contractRes.data;
+            const cList = contractRes.data?.data || contractRes.data?.Data || contractRes.data;
             setContracts(Array.isArray(cList) ? cList : []);
         } catch (error) {
             setContracts([]);
@@ -45,7 +54,7 @@ const ContractManagement = () => {
 
         try {
             const aptRes = await api.get('/Apartments');
-            const aList = aptRes.data?.data || aptRes.data;
+            const aList = aptRes.data?.data || aptRes.data?.Data || aptRes.data;
             setApartments(Array.isArray(aList) ? aList : []);
         } catch (error) {
             setApartments([]);
@@ -53,10 +62,19 @@ const ContractManagement = () => {
 
         try {
             const resData = await api.get('/Residents/GetAllResidents');
-            const rList = resData.data?.data || resData.data;
-            setResidents(Array.isArray(rList) ? rList : []);
+            const rList = resData.data?.data || resData.data?.Data || resData.data;
+            const validResidents = Array.isArray(rList) ? rList : [];
+            setResidents(validResidents);
         } catch (error) {
             setResidents([]);
+        }
+
+        try {
+            const srvRes = await api.get('/Service');
+            const sList = srvRes.data?.data || srvRes.data?.Data || srvRes.data;
+            setSystemServices(Array.isArray(sList) ? sList : []);
+        } catch (error) {
+            setSystemServices([]);
         }
 
         setLoading(false);
@@ -80,6 +98,46 @@ const ContractManagement = () => {
         setFormData(initialFormState);
     };
 
+    const addResidentRow = () => {
+        setFormData(prev => ({
+            ...prev,
+            additionalResidents: [...prev.additionalResidents, { accountId: '', relationshipId: '' }]
+        }));
+    };
+
+    const removeResidentRow = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            additionalResidents: prev.additionalResidents.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleAdditionalResidentChange = (index, field, value) => {
+        const newArr = [...formData.additionalResidents];
+        newArr[index][field] = value;
+        setFormData({ ...formData, additionalResidents: newArr });
+    };
+
+    const addServiceRow = () => {
+        setFormData(prev => ({
+            ...prev,
+            selectedServices: [...prev.selectedServices, { serviceId: '', actualPrice: '' }]
+        }));
+    };
+
+    const removeServiceRow = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            selectedServices: prev.selectedServices.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleServiceChange = (index, field, value) => {
+        const newArr = [...formData.selectedServices];
+        newArr[index][field] = value;
+        setFormData({ ...formData, selectedServices: newArr });
+    };
+
     const handleCreateContract = async (e) => {
         e.preventDefault();
 
@@ -88,7 +146,6 @@ const ContractManagement = () => {
         }
 
         setIsSubmitting(true);
-
         const payload = new FormData();
         payload.append("ApartmentId", formData.apartmentId);
         payload.append("ResidentAccountId", formData.residentAccountId);
@@ -97,6 +154,22 @@ const ContractManagement = () => {
         payload.append("MonthlyRent", formData.monthlyRent || 0);
         payload.append("Deposit", formData.deposit || 0);
         payload.append("File", formData.file);
+
+        formData.additionalResidents.forEach((res, index) => {
+            if (res.accountId && res.relationshipId) {
+                payload.append(`AdditionalResidents[${index}].AccountId`, res.accountId);
+                payload.append(`AdditionalResidents[${index}].RelationshipId`, res.relationshipId);
+            }
+        });
+
+        formData.selectedServices.forEach((srv, index) => {
+            if (srv.serviceId) {
+                payload.append(`Services[${index}].ServiceId`, srv.serviceId);
+                if (srv.actualPrice) {
+                    payload.append(`Services[${index}].ActualPrice`, srv.actualPrice);
+                }
+            }
+        });
 
         try {
             const res = await api.post('/contract/create-contract', payload, {
@@ -114,7 +187,6 @@ const ContractManagement = () => {
         }
     };
 
-    // 2. SỬA FUNCTION TERMINATE
     const handleTerminate = async () => {
         try {
             const res = await api.put(`/contract/${selectedTerminateId}/terminate`, {
@@ -122,7 +194,7 @@ const ContractManagement = () => {
                 additionalCost: Number(additionalCost)
             });
 
-            setTerminateResult(res.data.data || res.data); // Đề phòng cấu trúc response linh hoạt
+            setTerminateResult(res.data?.data || res.data?.Data || res.data);
             fetchData();
         } catch (error) {
             const errorMsg = error.response?.data?.message || "Không thể chấm dứt hợp đồng.";
@@ -130,19 +202,24 @@ const ContractManagement = () => {
         }
     };
 
-    const vacantApartments = apartments.filter(a => a.status === 1);
-    const activeResidents = residents.filter(r => r.status === 1 && !r.apartmentCode);
+    const vacantApartments = apartments.filter(a => {
+        const st = a.status ?? a.Status;
+        return st === 1 || String(st).toLowerCase() === 'vacant';
+    });
+
+    const activeResidents = residents.filter(r => {
+        const aptId = r.apartmentId ?? r.ApartmentId;
+        return !aptId; 
+    });
 
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = contracts.slice(indexOfFirstItem, indexOfLastItem);
 
     const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-
     const formatDate = (dateString) => {
         if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleDateString('vi-VN');
+        return new Date(dateString).toLocaleDateString('vi-VN');
     };
 
     return (
@@ -219,7 +296,6 @@ const ContractManagement = () => {
                                                     )}
                                                 </td>
                                                 <td>
-                                                    {/* 3. SỬA NÚT CHẤM DỨT */}
                                                     {contract.status === 1 && (
                                                         <button
                                                             className="btn btn-sm btn-outline-danger"
@@ -253,97 +329,209 @@ const ContractManagement = () => {
                 </div>
             </div>
 
-            {/* Modal Giao Diện Tạo Hợp Đồng */}
+            {/* --- MODAL TẠO HỢP ĐỒNG --- */}
             <div className="modal fade" id="createContractModal" tabIndex="-1">
-                <div className="modal-dialog modal-lg modal-dialog-centered">
-                    <div className="modal-content">
+                <div className="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    
+                    {/* THAY ĐỔI Ở ĐÂY: Dùng form làm class modal-content luôn để giữ đúng cấu trúc Flexbox */}
+                    <form className="modal-content" onSubmit={handleCreateContract} id="contractForm">
                         <div className="modal-header text-white" style={{ backgroundColor: '#1b2a47' }}>
                             <h5 className="modal-title fw-bold">Tạo Hợp Đồng Thuê</h5>
                             <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeCreateModal"></button>
                         </div>
 
-                        <form onSubmit={handleCreateContract}>
-                            <div className="modal-body p-4">
-                                <div className="alert alert-info py-2 px-3 mb-4" style={{ backgroundColor: '#e8f4fd', border: 'none', color: '#5b82a1', fontSize: '0.9rem' }}>
-                                    <strong>Lưu ý quan trọng:</strong> Chỉ những Phòng trống và Cư dân chưa có phòng mới được hiển thị ở đây. Khi tạo hợp đồng thành công, Cư dân sẽ tự động được gán vào phòng và phòng sẽ chuyển sang trạng thái "Đang thuê".
-                                </div>
+                        <div className="modal-body p-4 bg-light">
+                            <div className="alert alert-info py-2 px-3 mb-4" style={{ backgroundColor: '#e8f4fd', border: 'none', color: '#5b82a1', fontSize: '0.9rem' }}>
+                                <strong>Lưu ý:</strong> Chủ hợp đồng mặc định sẽ được gán chức danh "Chủ Hộ". Có thể thêm các thành viên khác và dịch vụ ngay bên dưới.
+                            </div>
 
-                                <div className="row mb-3">
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Cư dân thuê (*)</label>
-                                        <Select
-                                            placeholder="-- Chọn cư dân --"
-                                            noOptionsMessage={() => "Không có cư dân nào khả dụng"}
-                                            isClearable
-                                            isSearchable
-                                            options={activeResidents.map(r => ({
-                                                value: r.accountId,
-                                                label: `${r.fullName || r.userName} - CCCD: ${r.identityCard || 'N/A'}`
-                                            }))}
-                                            onChange={(opt) => setFormData(prev => ({ ...prev, residentAccountId: opt ? opt.value : '' }))}
-                                            value={activeResidents.find(r => r.accountId === formData.residentAccountId) ? { label: `${activeResidents.find(r => r.accountId === formData.residentAccountId).fullName || activeResidents.find(r => r.accountId === formData.residentAccountId).userName} - CCCD: ${activeResidents.find(r => r.accountId === formData.residentAccountId).identityCard || 'N/A'}`, value: formData.residentAccountId } : null}
-                                        />
+                            {/* --- SECTION 1: THÔNG TIN CƠ BẢN --- */}
+                            <div className="card shadow-sm border-0 mb-4">
+                                <div className="card-header bg-white fw-bold">1. Thông tin Hợp đồng & Chủ hộ</div>
+                                <div className="card-body">
+                                    <div className="row mb-3">
+                                        <div className="col-md-6">
+                                            <label className="form-label fw-semibold text-muted small">Cư dân (Chủ Hợp Đồng) (*)</label>
+                                            <Select
+                                                placeholder="-- Chọn cư dân --"
+                                                noOptionsMessage={() => "Không có cư dân nào khả dụng"}
+                                                isClearable
+                                                isSearchable
+                                                options={activeResidents.map(r => ({
+                                                    value: r.accountId ?? r.AccountId,
+                                                    label: `${r.fullName || r.FullName || r.userName || r.UserName} - CCCD: ${r.identityCard || r.IdentityCard || 'N/A'}`
+                                                }))}
+                                                onChange={(opt) => setFormData(prev => ({ ...prev, residentAccountId: opt ? opt.value : '' }))}
+                                                value={activeResidents.find(r => Number(r.accountId ?? r.AccountId) === Number(formData.residentAccountId)) ? { 
+                                                    label: `${activeResidents.find(r => Number(r.accountId ?? r.AccountId) === Number(formData.residentAccountId)).fullName || activeResidents.find(r => Number(r.accountId ?? r.AccountId) === Number(formData.residentAccountId)).FullName || 'N/A'} - CCCD: ${activeResidents.find(r => Number(r.accountId ?? r.AccountId) === Number(formData.residentAccountId)).identityCard || activeResidents.find(r => Number(r.accountId ?? r.AccountId) === Number(formData.residentAccountId)).IdentityCard || 'N/A'}`, 
+                                                    value: formData.residentAccountId 
+                                                } : null}
+                                            />
+                                        </div>
+                                        <div className="col-md-6">
+                                            <label className="form-label fw-semibold text-muted small">Chọn Căn hộ trống (*)</label>
+                                            <Select
+                                                placeholder="-- Chọn Căn hộ trống --"
+                                                noOptionsMessage={() => "Không có phòng trống"}
+                                                isClearable
+                                                isSearchable
+                                                options={vacantApartments.map(a => ({
+                                                    value: a.apartmentId ?? a.ApartmentId,
+                                                    label: `${a.apartmentCode ?? a.ApartmentCode} - Tòa ${a.apartmentName || a.ApartmentName || 'B'}`
+                                                }))}
+                                                onChange={(opt) => setFormData(prev => ({ ...prev, apartmentId: opt ? opt.value : '' }))}
+                                                value={vacantApartments.find(a => Number(a.apartmentId ?? a.ApartmentId) === Number(formData.apartmentId)) ? { 
+                                                    label: `${vacantApartments.find(a => Number(a.apartmentId ?? a.ApartmentId) === Number(formData.apartmentId)).apartmentCode || vacantApartments.find(a => Number(a.apartmentId ?? a.ApartmentId) === Number(formData.apartmentId)).ApartmentCode} - Tòa B`, 
+                                                    value: formData.apartmentId 
+                                                } : null}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Chọn Căn hộ trống (*)</label>
-                                        <Select
-                                            placeholder="-- Chọn Căn hộ trống --"
-                                            noOptionsMessage={() => "Không có phòng trống"}
-                                            isClearable
-                                            isSearchable
-                                            options={vacantApartments.map(a => ({
-                                                value: a.apartmentId,
-                                                label: `${a.apartmentCode} - Phòng ${a.apartmentCode.replace(/[^0-9]/g, '')} Tòa ${a.apartmentName || 'B'}`
-                                            }))}
-                                            onChange={(opt) => setFormData(prev => ({ ...prev, apartmentId: opt ? opt.value : '' }))}
-                                            value={vacantApartments.find(a => a.apartmentId === formData.apartmentId) ? { label: `${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentCode} - ${vacantApartments.find(a => a.apartmentId === formData.apartmentId).apartmentName}`, value: formData.apartmentId } : null}
-                                        />
-                                    </div>
-                                </div>
 
-                                <div className="row mb-3">
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Ngày bắt đầu (*)</label>
-                                        <input type="date" className="form-control" name="startDay" value={formData.startDay} onChange={handleInputChange} />
+                                    <div className="row mb-3">
+                                        <div className="col-md-3">
+                                            <label className="form-label fw-semibold text-muted small">Ngày bắt đầu (*)</label>
+                                            <input type="date" className="form-control" name="startDay" value={formData.startDay} onChange={handleInputChange} required />
+                                        </div>
+                                        <div className="col-md-3">
+                                            <label className="form-label fw-semibold text-muted small">Ngày kết thúc (*)</label>
+                                            <input type="date" className="form-control" name="endDay" value={formData.endDay} onChange={handleInputChange} required />
+                                        </div>
+                                        <div className="col-md-3">
+                                            <label className="form-label fw-semibold text-muted small">Giá thuê (VNĐ)</label>
+                                            <input type="number" className="form-control" name="monthlyRent" value={formData.monthlyRent} onChange={handleInputChange} />
+                                        </div>
+                                        <div className="col-md-3">
+                                            <label className="form-label fw-semibold text-muted small">Tiền cọc (VNĐ)</label>
+                                            <input type="number" className="form-control" name="deposit" value={formData.deposit} onChange={handleInputChange} />
+                                        </div>
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Ngày kết thúc (*)</label>
-                                        <input type="date" className="form-control" name="endDay" value={formData.endDay} onChange={handleInputChange} />
-                                    </div>
-                                </div>
 
-                                <div className="row mb-3">
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Giá thuê hàng tháng (VNĐ)</label>
-                                        <input type="number" className="form-control" name="monthlyRent" value={formData.monthlyRent} onChange={handleInputChange} />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label fw-semibold text-muted small">Tiền cọc (VNĐ)</label>
-                                        <input type="number" className="form-control" name="deposit" value={formData.deposit} onChange={handleInputChange} />
-                                    </div>
-                                </div>
-
-                                <div className="mb-3">
-                                    <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
-                                    <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf,.jpg,.png" />
-                                    <div className="form-text mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
-                                        Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Chỉ nhận PDF, JPG, PNG).
+                                    <div className="mb-3">
+                                        <label className="form-label fw-semibold text-danger small">File Hợp đồng (Bản scan/PDF) (*)</label>
+                                        <input type="file" className="form-control" onChange={handleFileChange} accept=".pdf" required />
+                                        <div className="form-text mt-1 text-muted" style={{ fontSize: '0.8rem' }}>
+                                            Vui lòng đính kèm bản mềm của hợp đồng để lưu trữ (Định dạng PDF).
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="modal-footer" style={{ borderTop: 'none', backgroundColor: '#f8f9fa' }}>
-                                <button type="button" className="btn btn-secondary px-4" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" className="btn btn-primary px-4" disabled={isSubmitting} style={{ backgroundColor: '#4a7fb8', border: 'none' }}>
-                                    {isSubmitting ? 'Đang tạo...' : 'Tạo Hợp Đồng'}
-                                </button>
+                            {/* --- SECTION 2: THÊM CƯ DÂN PHỤ --- */}
+                            <div className="card shadow-sm border-0 mb-4">
+                                <div className="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                                    <span>2. Thêm Thành Viên Ở Cùng</span>
+                                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={addResidentRow}>
+                                        <i className="bi bi-person-plus-fill"></i> Thêm người
+                                    </button>
+                                </div>
+                                <div className="card-body">
+                                    {formData.additionalResidents.length === 0 ? (
+                                        <div className="text-muted small fst-italic">Không có thành viên phụ.</div>
+                                    ) : (
+                                        formData.additionalResidents.map((res, index) => (
+                                            <div className="row mb-2 align-items-end" key={index}>
+                                                <div className="col-md-6">
+                                                    <label className="form-label small">Chọn Cư dân phụ</label>
+                                                    <select
+                                                        className="form-select"
+                                                        value={res.accountId}
+                                                        onChange={(e) => handleAdditionalResidentChange(index, 'accountId', e.target.value)}
+                                                    >
+                                                        <option value="">-- Chọn --</option>
+                                                        {activeResidents.filter(r => Number(r.accountId || r.AccountId) !== Number(formData.residentAccountId)).map(r => (
+                                                            <option key={r.accountId || r.AccountId} value={r.accountId || r.AccountId}>
+                                                                {r.fullName || r.FullName || r.userName || r.UserName || 'Chưa cập nhật tên'} - CCCD: {r.identityCard || r.IdentityCard || 'N/A'}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <label className="form-label small">Mối quan hệ</label>
+                                                    <select
+                                                        className="form-select"
+                                                        value={res.relationshipId}
+                                                        onChange={(e) => handleAdditionalResidentChange(index, 'relationshipId', e.target.value)}
+                                                    >
+                                                        <option value="">-- Chọn --</option>
+                                                        {relationships.map(rel => (
+                                                            <option key={rel.id} value={rel.id}>{rel.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="col-md-2">
+                                                    <button type="button" className="btn btn-outline-danger w-100" onClick={() => removeResidentRow(index)}>
+                                                        <i className="bi bi-trash"></i> Xóa
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
-                        </form>
-                    </div>
+
+                            {/* --- SECTION 3: THÊM DỊCH VỤ --- */}
+                            <div className="card shadow-sm border-0">
+                                <div className="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                                    <span>3. Đăng ký Dịch Vụ Cố Định</span>
+                                    <button type="button" className="btn btn-sm btn-outline-success" onClick={addServiceRow}>
+                                        <i className="bi bi-plus-circle"></i> Thêm dịch vụ
+                                    </button>
+                                </div>
+                                <div className="card-body">
+                                    {formData.selectedServices.length === 0 ? (
+                                        <div className="text-muted small fst-italic">Phòng chưa đăng ký dịch vụ cố định nào.</div>
+                                    ) : (
+                                        formData.selectedServices.map((srv, index) => (
+                                            <div className="row mb-2 align-items-end" key={index}>
+                                                <div className="col-md-6">
+                                                    <label className="form-label small">Dịch vụ</label>
+                                                    <select
+                                                        className="form-select"
+                                                        value={srv.serviceId}
+                                                        onChange={(e) => handleServiceChange(index, 'serviceId', e.target.value)}
+                                                    >
+                                                        <option value="">-- Chọn dịch vụ --</option>
+                                                        {systemServices.map(s => (
+                                                            <option key={s.serviceId ?? s.ServiceId} value={s.serviceId ?? s.ServiceId}>
+                                                                {s.serviceName ?? s.ServiceName} - {formatCurrency(s.serviceFee ?? s.ServiceFee)}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="col-md-4">
+                                                    <label className="form-label small">Giá tùy chỉnh (Tùy chọn)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control"
+                                                        placeholder="Để trống lấy giá gốc"
+                                                        value={srv.actualPrice}
+                                                        onChange={(e) => handleServiceChange(index, 'actualPrice', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="col-md-2">
+                                                    <button type="button" className="btn btn-outline-danger w-100" onClick={() => removeServiceRow(index)}>
+                                                        <i className="bi bi-trash"></i> Xóa
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="modal-footer" style={{ borderTop: 'none', backgroundColor: '#f8f9fa' }}>
+                            <button type="button" className="btn btn-secondary px-4" data-bs-dismiss="modal">Hủy</button>
+                            <button type="submit" className="btn btn-primary px-4" disabled={isSubmitting} style={{ backgroundColor: '#4a7fb8', border: 'none' }}>
+                                {isSubmitting ? 'Đang tạo...' : 'Xác Nhận Tạo Hợp Đồng'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
-            {/* 4. THÊM MODAL CHẤM DỨT */}
+            {/* --- MODAL CHẤM DỨT HỢP ĐỒNG --- */}
             <div className="modal fade" id="terminateModal">
                 <div className="modal-dialog">
                     <div className="modal-content">
@@ -370,21 +558,19 @@ const ContractManagement = () => {
 
                             {terminateResult && (
                                 <div className="p-3 bg-light rounded border mt-3">
-                                    <h6 className="fw-bold mb-3 border-bottom pb-2">Kết quả thanh toán:</h6>
-                                    <p className="mb-1"><strong>Tổng:</strong> {formatCurrency(terminateResult.totalInvoice)}</p>
+                                    <h6 className="fw-bold mb-3 border-bottom pb-2">Kết quả đối soát:</h6>
+                                    <p className="mb-1"><strong>Tổng Hóa đơn:</strong> {formatCurrency(terminateResult.totalInvoice)}</p>
                                     <p className="mb-1"><strong>Đã trả:</strong> {formatCurrency(terminateResult.totalPaid)}</p>
+                                    <p className="mb-1"><strong>Phí phát sinh:</strong> {formatCurrency(terminateResult.additionalCost)}</p>
 
-                                    {terminateResult.amountToPay > 0 && (
-                                        <p className="text-danger mb-1 mt-2"><strong>Thiếu:</strong> {formatCurrency(terminateResult.amountToPay)}</p>
+                                    {terminateResult.refundAmount < 0 && (
+                                        <p className="text-danger mb-1 mt-2"><strong>Khách CẦN TRẢ THÊM:</strong> {formatCurrency(Math.abs(terminateResult.refundAmount))}</p>
                                     )}
-
-                                    {terminateResult.amountToReturn > 0 && (
-                                        <p className="text-success mb-1 mt-2"><strong>Dư (cần trả lại):</strong> {formatCurrency(terminateResult.amountToReturn)}</p>
+                                    {terminateResult.refundAmount > 0 && (
+                                        <p className="text-success mb-1 mt-2"><strong>BQL TRẢ LẠI KHÁCH:</strong> {formatCurrency(terminateResult.refundAmount)}</p>
                                     )}
-                                    {terminateResult.amountToPay === 0 && terminateResult.amountToReturn === 0 && (
-                                        <p className="text-primary mt-2">
-                                            <strong>Đã thanh toán đủ</strong>
-                                        </p>
+                                    {terminateResult.refundAmount === 0 && (
+                                        <p className="text-primary mt-2"><strong>Đã thanh toán vừa đủ.</strong></p>
                                     )}
                                 </div>
                             )}
@@ -397,7 +583,7 @@ const ContractManagement = () => {
                                 onClick={handleTerminate}
                                 disabled={!terminationDate}
                             >
-                                Xác nhận chấm dứt
+                                Tính toán & Xác nhận
                             </button>
                         </div>
                     </div>

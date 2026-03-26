@@ -24,9 +24,10 @@ const Login = () => {
       });
       console.log("Dữ liệu BE trả về:", response.data);
 
-      const { token, role } = response.data.data;
+      const { token, refreshToken, role } = response.data.data;
 
       localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('role', role);
 
       if (role === 'Manager') {
