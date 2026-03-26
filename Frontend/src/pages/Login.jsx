@@ -25,8 +25,10 @@ const Login = () => {
       console.log("Dữ liệu BE trả về:", response.data);
 
       const { token, role, requiresPasswordChange } = response.data.data;
+      // const { token, refreshToken, role } = response.data.data;
 
       localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('role', role);
       localStorage.setItem('requiresPasswordChange', requiresPasswordChange ? 'true' : 'false');
 
