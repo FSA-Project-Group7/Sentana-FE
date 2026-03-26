@@ -24,15 +24,24 @@ const Login = () => {
       });
       console.log("Dữ liệu BE trả về:", response.data);
 
-      const { token, role } = response.data.data;
+      const { token, role, requiresPasswordChange } = response.data.data;
 
       localStorage.setItem('token', token);
       localStorage.setItem('role', role);
+      localStorage.setItem('requiresPasswordChange', requiresPasswordChange ? 'true' : 'false');
+
+      // Redirect first-login users before anyone else
+      if (requiresPasswordChange) {
+        navigate('/first-login-setup');
+        return;
+      }
 
       if (role === 'Manager') {
         navigate('/admin');
       } else if (role === 'Resident') {
         navigate('/resident');
+      } else if (role === 'Technician') {
+        navigate('/technician');
       } else {
         navigate('/');
       }
