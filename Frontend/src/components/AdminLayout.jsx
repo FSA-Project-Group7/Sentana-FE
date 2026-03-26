@@ -31,7 +31,7 @@ const AdminLayout = () => {
     const navItems = [
         { path: '/admin', label: 'Trang chủ', icon: 'bi-speedometer2 me-2' },
         { path: '/admin/buildings', label: 'Tòa nhà', icon: 'bi-building me-2' },
-        { path: '/admin/apartments', label: 'Danh sách phòng', icon: 'bi-door-open me-2' },
+        { path: '/admin/apartments', label: 'Quản lý Căn hộ', icon: 'bi-door-open me-2' },
         { path: '/admin/residents', label: 'Quản lý Cư dân', icon: 'bi-people-fill me-2' },
         { path: '/admin/technicians', label: 'Kỹ thuật viên', icon: 'bi-person-gear me-2' },
         { path: '/admin/accounts', label: 'Tài khoản hệ thống', icon: 'bi-person-lock me-2' },
