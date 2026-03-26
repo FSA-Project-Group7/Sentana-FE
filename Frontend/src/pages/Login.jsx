@@ -24,8 +24,7 @@ const Login = () => {
       });
       console.log("Dữ liệu BE trả về:", response.data);
 
-      const { token, role, requiresPasswordChange } = response.data.data;
-      // const { token, refreshToken, role } = response.data.data;
+      const { token, role, refreshToken, requiresPasswordChange } = response.data.data;
 
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);
