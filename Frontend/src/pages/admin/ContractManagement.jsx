@@ -19,6 +19,10 @@ const ContractManagement = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
 
+    // STATE CHO BỘ LỌC (FILTER & SEARCH)
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterStatus, setFilterStatus] = useState('all');
+
     const relationships = [
         { id: 2, name: 'Vợ/Chồng' },
         { id: 3, name: 'Con cái' },
@@ -95,6 +99,11 @@ const ContractManagement = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // ĐƯA TRANG VỀ 1 MỖI KHI THAY ĐỔI BỘ LỌC ĐỂ KHÔNG BỊ LỖI HIỂN THỊ
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterStatus]);
 
     const fetchDeletedContracts = async () => {
         setLoadingDeleted(true);
@@ -344,7 +353,6 @@ const ContractManagement = () => {
         }
     };
 
-    // LỌC CĂN HỘ: Chỉ hiện phòng Trống (Vacant) hoặc phòng đang được Edit
     const availableApartments = apartments.filter(a => {
         const st = a.status ?? a.Status;
         const isVacant = st === 1 || String(st).toLowerCase() === 'vacant';
@@ -352,7 +360,6 @@ const ContractManagement = () => {
         return isVacant || isCurrentEdit;
     });
 
-    // LỌC CƯ DÂN: Bỏ giới hạn có phòng, cho phép tất cả cư dân Active tạo hợp đồng (Giải pháp 1)
     const availableResidents = residents.filter(r => {
         const st = r.status ?? r.Status;
         if (st !== undefined && st !== null) {
@@ -369,9 +376,23 @@ const ContractManagement = () => {
     const selectedResident = availableResidents.find(r => Number(r.accountId ?? r.AccountId) === Number(formData.residentAccountId));
     const selectedApartment = availableApartments.find(a => Number(a.apartmentId ?? a.ApartmentId) === Number(formData.apartmentId));
 
+    // LOGIC LỌC DỮ LIỆU CHÍNH
+    const filteredContracts = contracts.filter(contract => {
+        const keyword = searchTerm.toLowerCase();
+        const codeMatch = (contract.contractCode || '').toLowerCase().includes(keyword);
+        const nameMatch = (contract.account?.info?.fullName || contract.account?.fullName || contract.account?.userName || '').toLowerCase().includes(keyword);
+        const aptMatch = (contract.apartment?.apartmentCode || '').toLowerCase().includes(keyword);
+        
+        const matchSearch = codeMatch || nameMatch || aptMatch;
+        const matchStatus = filterStatus === 'all' ? true : contract.status === Number(filterStatus);
+
+        return matchSearch && matchStatus;
+    });
+
+    // Đã thay 'contracts' bằng 'filteredContracts' cho phần phân trang
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = contracts.slice(indexOfFirstItem, indexOfLastItem);
+    const currentItems = filteredContracts.slice(indexOfFirstItem, indexOfLastItem);
 
     const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
     const formatDate = (dateString) => {
@@ -399,12 +420,56 @@ const ContractManagement = () => {
                 </div>
             </div>
 
+            {/* --- THANH TÌM KIẾM VÀ BỘ LỌC (FILTER BAR) --- */}
+            <div className="card shadow-sm border-0 mb-4">
+                <div className="card-body bg-light rounded d-flex flex-wrap gap-3 align-items-center">
+                    <div className="flex-grow-1" style={{ minWidth: '250px' }}>
+                        <div className="input-group">
+                            <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
+                            <input 
+                                type="text" 
+                                className="form-control border-start-0 ps-0" 
+                                placeholder="Tìm theo Mã HĐ, Tên cư dân, Mã phòng..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div style={{ minWidth: '200px' }}>
+                        <select 
+                            className="form-select" 
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                        >
+                            <option value="all">Tất cả trạng thái</option>
+                            <option value="1">Có hiệu lực</option>
+                            <option value="0">Đã chấm dứt</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button 
+                            className="btn btn-outline-secondary"
+                            onClick={() => {
+                                setSearchTerm('');
+                                setFilterStatus('all');
+                            }}
+                            title="Xóa bộ lọc"
+                        >
+                            <i className="bi bi-arrow-clockwise"></i> Lọc Lại
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
                         <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
-                    ) : contracts.length === 0 ? (
-                        <div className="text-center p-5 text-muted">Chưa có dữ liệu Hợp đồng nào.</div>
+                    ) : filteredContracts.length === 0 ? (
+                        <div className="text-center p-5 text-muted">
+                            <i className="bi bi-inbox fs-1 d-block mb-3"></i>
+                            {contracts.length === 0 ? "Chưa có dữ liệu Hợp đồng nào." : "Không tìm thấy hợp đồng phù hợp với bộ lọc."}
+                        </div>
                     ) : (
                         <>
                             <div className="table-responsive">
@@ -506,7 +571,7 @@ const ContractManagement = () => {
                             </div>
 
                             <Pagination
-                                totalItems={contracts.length}
+                                totalItems={filteredContracts.length} // Fix count cho Pagination dựa trên danh sách đã lọc
                                 itemsPerPage={itemsPerPage}
                                 currentPage={currentPage}
                                 onPageChange={setCurrentPage}
