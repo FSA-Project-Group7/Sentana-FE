@@ -3,10 +3,12 @@
     justify-content: center;
     align-items: center;
     height: 100vh;
+    /* Đường dẫn ảnh nền của bạn */
     background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('../assets/banner.jpg');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    position: relative;
 }
 
 .login-form-card {
@@ -27,6 +29,7 @@
     font-weight: 800;
 }
 
+/* Khung hiện lỗi màu đỏ khi sai mật khẩu */
 .login-error {
     color: #dc3545;
     text-align: center;
@@ -35,6 +38,7 @@
     background-color: rgba(220, 53, 69, 0.1);
     padding: 8px;
     border-radius: 4px;
+    font-weight: 600;
 }
 
 .login-form {
@@ -93,35 +97,38 @@
     background-color: #999;
     cursor: not-allowed;
 }
-/* Styling cho nút Back */
+
+/* Styling cho nút Back về trang chủ ở góc trái */
 .back-home-btn {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  background: none;
-  border: none;
-  color: #adb5bd; /* Màu xám nhạt */
-  display: flex;
-  align-items: center;
-  font-size: 0.9rem;
-  padding: 0;
-  transition: color 0.2s ease-in-out;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: none;
+    border: none;
+    color: #adb5bd; /* Màu xám nhạt */
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    padding: 0;
+    transition: color 0.2s ease-in-out;
+    z-index: 10;
 }
 
 .back-home-btn:hover {
-  color: #ffffff; /* Sáng lên khi hover */
-  text-decoration: none;
+    color: #ffffff; /* Sáng lên khi hover */
+    text-decoration: none;
 }
 
 /* Styling cho link Quên mật khẩu */
 .forgot-password-link {
-  font-size: 0.85rem;
-  color: #0dcaf0; /* Màu cyan nổi bật trên nền tối */
-  text-decoration: none;
-  transition: color 0.2s;
+    font-size: 0.85rem;
+    color: #007BFF; /* Đổi màu xanh cho hợp tone với nút Đăng nhập */
+    text-decoration: none;
+    transition: color 0.2s;
+    font-weight: 600;
 }
-
+npm run :-moz-drag-over
 .forgot-password-link:hover {
-  color: #fff;
-  text-decoration: underline;
+    color: #0056b3;
+    text-decoration: underline;
 }

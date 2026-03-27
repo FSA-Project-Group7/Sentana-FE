@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import logoImg from '../assets/logo.png';
 
+// ✅ ĐÃ SỬA LẠI ĐƯỜNG DẪN IMPORT (Cùng cấp thư mục)
+import NotificationDropdown from './NotificationDropdown'; 
+
 // Nhận prop isResident (mặc định là false)
 const Navbar = ({ isResident = false }) => {
     const navigate = useNavigate();
@@ -99,7 +102,8 @@ const Navbar = ({ isResident = false }) => {
                                     <Link className={`nav-link ${isActive('/resident/dashboard')}`} to="/resident/dashboard">Hóa đơn</Link>
                                 </li>
                                 <li className="nav-item">
-                                    <Link className="nav-link" to="#!">Báo cáo sự cố</Link>
+                                    {/* ✅ US17: ĐÃ GẮN LINK SANG MÀN BÁO CÁO SỰ CỐ */}
+                                    <Link className={`nav-link ${isActive('/resident/maintenance')}`} to="/resident/maintenance">Báo cáo sự cố</Link>
                                 </li>
                             </>
                         ) : (
@@ -112,12 +116,15 @@ const Navbar = ({ isResident = false }) => {
                             </>
                         )}
                     </ul>
-
-                    <div className="d-flex gap-2">
+                    <div className="d-flex gap-3 align-items-center">
                         {isResident ? (
-                            <button onClick={handleLogout} className="btn btn-outline-light btn-sm fw-normal">
-                                Đăng xuất
-                            </button>
+                            <>
+                                <NotificationDropdown />
+
+                                <button onClick={handleLogout} className="btn btn-outline-light btn-sm fw-normal">
+                                    Đăng xuất
+                                </button>
+                            </>
                         ) : isLoggedIn ? (
                             <Link to="/login" 
                                 className="nav-link d-flex align-items-center gap-1 text-decoration-none px-3 py-1 rounded" 
