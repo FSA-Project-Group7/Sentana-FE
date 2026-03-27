@@ -7,23 +7,18 @@ const AdminLayout = () => {
     const location = useLocation();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-
     const handleLogout = async () => {
         if (isLoggingOut) return;
         setIsLoggingOut(true);
 
         try {
-
             await api.post('/Auth/Logout');
             console.log("Đã hủy Token Admin ở Backend thành công!");
         } catch (error) {
             console.error("Lỗi khi gọi API Đăng xuất:", error);
         } finally {
-
             localStorage.removeItem('token');
             localStorage.removeItem('role');
-
-
             window.location.href = '/login';
         }
     };
@@ -42,24 +37,30 @@ const AdminLayout = () => {
         { path: '/admin/payments', label: 'Xét duyệt Thanh toán', icon: 'bi-wallet2 text-info me-2' },
     ];
 
+    // Cố định kích thước sidebar để dễ kiểm soát layout
+    const sidebarWidth = '260px';
+
     return (
-        <div className={styles.adminContainer}>
-            {/* Sidebar nhất quán màu Sentana */}
-            <aside className={styles.sidebar}>
+        <div className={`${styles.adminContainer} d-flex`}>
+            {/* Sidebar nhất quán màu Sentana - Đã được ghim cố định (Fixed) */}
+            <aside
+                className={`${styles.sidebar} position-fixed top-0 start-0 bottom-0 d-flex flex-column shadow`}
+                style={{ width: sidebarWidth, zIndex: 1040 }}
+            >
                 <div className={styles.sidebarHeader}>
                     <h4 className={styles.logoText}>SENTANA</h4>
                     <small style={{ color: '#00c292', fontSize: '10px' }}>MANAGEMENT SYSTEM</small>
                 </div>
 
-                <div className={styles.sidebarMenu}>
+                {/* Khu vực menu có thể cuộn nếu nội dung quá dài */}
+                <div className={`${styles.sidebarMenu} flex-grow-1 overflow-y-auto overflow-x-hidden`} style={{ scrollbarWidth: 'thin' }}>
                     <div className={styles.menuLabel}>Chức năng chính</div>
                     <nav>
                         {navItems.map((item) => (
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                className={`${styles.navLink} ${location.pathname === item.path ? styles.activeLink : ''
-                                    }`}
+                                className={`${styles.navLink} ${location.pathname === item.path ? styles.activeLink : ''}`}
                             >
                                 <i className={`bi ${item.icon}`}></i>
                                 <span>{item.label}</span>
@@ -68,13 +69,14 @@ const AdminLayout = () => {
                     </nav>
                 </div>
 
-                {/* Gắn sự kiện và hiệu ứng loading cho nút Đăng xuất */}
+                {/* Gắn sự kiện và hiệu ứng loading cho nút Đăng xuất (Luôn nằm dưới cùng nhờ flex-column và mt-auto) */}
                 <div
-                    className={styles.logoutBtn}
+                    className={`${styles.logoutBtn} mt-auto`}
                     onClick={handleLogout}
                     style={{
                         cursor: isLoggingOut ? 'not-allowed' : 'pointer',
-                        opacity: isLoggingOut ? 0.6 : 1
+                        opacity: isLoggingOut ? 0.6 : 1,
+                        borderTop: '1px solid rgba(255,255,255,0.1)'
                     }}
                 >
                     <i className="bi bi-box-arrow-left me-3"></i>
@@ -82,10 +84,13 @@ const AdminLayout = () => {
                 </div>
             </aside>
 
-            {/* Main Content Area */}
-            <div className={styles.mainContent}>
+            {/* Main Content Area - Đẩy lùi sang phải bằng đúng độ rộng của Sidebar */}
+            <div
+                className={styles.mainContent}
+                style={{ marginLeft: sidebarWidth, width: `calc(100% - ${sidebarWidth})`, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
+            >
                 {/* Topbar trắng sạch sẽ */}
-                <header className={styles.topbar}>
+                <header className={`${styles.topbar} sticky-top shadow-sm`} style={{ zIndex: 1030 }}>
                     <div className="d-flex align-items-center">
                         <button className="btn btn-sm text-secondary border-0 me-3">
                             <i className="bi bi-list fs-4"></i>
@@ -114,7 +119,7 @@ const AdminLayout = () => {
                 </header>
 
                 {/* Content Render Area */}
-                <main className={styles.contentBody}>
+                <main className={`${styles.contentBody} flex-grow-1`}>
                     <div className="fade-in-animation">
                         <Outlet />
                     </div>
