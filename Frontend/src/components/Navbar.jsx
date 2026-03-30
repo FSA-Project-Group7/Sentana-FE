@@ -2,14 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import logoImg from '../assets/logo.png';
 
-// ✅ ĐÃ SỬA LẠI ĐƯỜNG DẪN IMPORT (Cùng cấp thư mục)
-import NotificationDropdown from './NotificationDropdown'; 
-
 // Nhận prop isResident (mặc định là false)
 const Navbar = ({ isResident = false }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    
+
     const [isVisible, setIsVisible] = useState(true);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [fullName, setFullName] = useState('');
@@ -31,12 +28,12 @@ const Navbar = ({ isResident = false }) => {
             try {
                 const base64Url = token.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+                const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
                     return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
                 }).join(''));
-                
+
                 const payload = JSON.parse(jsonPayload);
-                
+
                 const nameFromToken = payload.unique_name || payload.name || payload.sub || 'bạn';
                 setFullName(nameFromToken);
 
@@ -75,7 +72,7 @@ const Navbar = ({ isResident = false }) => {
                     <img
                         src={logoImg}
                         alt="Sentana Logo"
-                        width="38" 
+                        width="38"
                         height="38"
                         className="d-inline-block align-text-top rounded-circle bg-white p-1"
                         style={{ objectFit: 'contain' }}
@@ -102,8 +99,7 @@ const Navbar = ({ isResident = false }) => {
                                     <Link className={`nav-link ${isActive('/resident/dashboard')}`} to="/resident/dashboard">Hóa đơn</Link>
                                 </li>
                                 <li className="nav-item">
-                                    {/* ✅ US17: ĐÃ GẮN LINK SANG MÀN BÁO CÁO SỰ CỐ */}
-                                    <Link className={`nav-link ${isActive('/resident/maintenance')}`} to="/resident/maintenance">Báo cáo sự cố</Link>
+                                    <Link className="nav-link" to="#!">Báo cáo sự cố</Link>
                                 </li>
                             </>
                         ) : (
@@ -116,22 +112,19 @@ const Navbar = ({ isResident = false }) => {
                             </>
                         )}
                     </ul>
-                    <div className="d-flex gap-3 align-items-center">
-                        {isResident ? (
-                            <>
-                                <NotificationDropdown />
 
-                                <button onClick={handleLogout} className="btn btn-outline-light btn-sm fw-normal">
-                                    Đăng xuất
-                                </button>
-                            </>
+                    <div className="d-flex gap-2">
+                        {isResident ? (
+                            <button onClick={handleLogout} className="btn btn-outline-light btn-sm fw-normal">
+                                Đăng xuất
+                            </button>
                         ) : isLoggedIn ? (
-                            <Link to="/login" 
-                                className="nav-link d-flex align-items-center gap-1 text-decoration-none px-3 py-1 rounded" 
+                            <Link to="/login"
+                                className="nav-link d-flex align-items-center gap-1 text-decoration-none px-3 py-1 rounded"
                                 style={{
                                     fontSize: '0.95rem',
                                     fontWeight: 400,
-                                    color: 'rgba(255, 255, 255, 0.85)', 
+                                    color: 'rgba(255, 255, 255, 0.85)',
                                     backgroundColor: 'transparent',
                                     transition: 'all 0.2s ease-out',
                                 }}
@@ -144,12 +137,12 @@ const Navbar = ({ isResident = false }) => {
                                     e.target.style.backgroundColor = 'transparent';
                                 }}
                             >
-                                <span style={{opacity: '0.6'}}>Xin chào,</span> 
+                                <span style={{ opacity: '0.6' }}>Xin chào,</span>
                                 <span className="fw-medium text-white">{fullName}</span>
-                                <i className="bi bi-chevron-right ms-1 small" style={{opacity: '0.4'}}></i>
+                                <i className="bi bi-chevron-right ms-1 small" style={{ opacity: '0.4' }}></i>
                             </Link>
                         ) : (
-                            <Link to="/login" className="btn btn-outline-light btn-sm fw-normal px-3 rounded-pill">
+                            <Link to="/login" className="btn btn-outline-light btn-sm fw-normal px-3 rounded-2">
                                 Đăng nhập
                             </Link>
                         )}
