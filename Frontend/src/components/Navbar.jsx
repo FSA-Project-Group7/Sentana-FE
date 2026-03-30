@@ -99,8 +99,7 @@ const Navbar = ({ isResident = false }) => {
                                     <Link className={`nav-link ${isActive('/resident/dashboard')}`} to="/resident/dashboard">Hóa đơn</Link>
                                 </li>
                                 <li className="nav-item">
-                                    <Link className="nav-link" to="#!">Báo cáo sự cố</Link>
-                                </li>
+                                    <Link className={`nav-link ${isActive('/resident/maintenance')}`} to="/resident/maintenance">Báo cáo sự cố</Link>                                </li>
                             </>
                         ) : (
                             <>
