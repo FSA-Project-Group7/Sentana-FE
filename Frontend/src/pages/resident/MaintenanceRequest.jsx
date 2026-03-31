@@ -171,7 +171,6 @@ const MaintenanceRequest = () => {
                         </form>
                     </div>
                 </div>
-
                 <div className="col-lg-8">
                     <div className="modern-card p-4">
                         <h5 className="fw-bold mb-4"><i className="bi bi-clock-history text-primary me-2"></i>Lịch sử yêu cầu</h5>
