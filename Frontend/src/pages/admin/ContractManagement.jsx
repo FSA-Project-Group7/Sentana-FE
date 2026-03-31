@@ -5,7 +5,7 @@ import Select from 'react-select';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 // ✅ Import file CSS đã tách
-import './ContractManagement.css'; 
+import './ContractManagement.css';
 
 const ContractManagement = () => {
     // ==========================================
@@ -16,7 +16,7 @@ const ContractManagement = () => {
     const [residents, setResidents] = useState([]);
     const [systemServices, setSystemServices] = useState([]);
     const [loading, setLoading] = useState(true);
-    
+
     const [deletedContracts, setDeletedContracts] = useState([]);
     const [loadingDeleted, setLoadingDeleted] = useState(false);
 
@@ -39,13 +39,13 @@ const ContractManagement = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [extendContractId, setExtendContractId] = useState(null);
-    const [extendNewEndDate, setExtendNewEndDate] = useState(''); 
-    const [extendOldEndDate, setExtendOldEndDate] = useState(''); 
+    const [extendNewEndDate, setExtendNewEndDate] = useState('');
+    const [extendOldEndDate, setExtendOldEndDate] = useState('');
     const [isExtending, setIsExtending] = useState(false);
 
     const [selectedTerminateId, setSelectedTerminateId] = useState(null);
-    const [actionDate, setActionDate] = useState(''); 
-    const [additionalCost, setAdditionalCost] = useState(''); 
+    const [actionDate, setActionDate] = useState('');
+    const [additionalCost, setAdditionalCost] = useState('');
     const [terminateResult, setTerminateResult] = useState(null);
     const [isTerminating, setIsTerminating] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -59,11 +59,11 @@ const ContractManagement = () => {
     // --- BỘ NÃO STATE MACHINE ---
     const analyzeStateMachine = (contract) => {
         if (!contract) return { type: 'UNKNOWN', label: 'Lỗi', bg: 'secondary', permissions: {} };
-        
-        const dbStatus = contract.status ?? contract.Status; 
-        if (dbStatus === 2) return { type: 'DRAFT', label: 'Bản Nháp', bg: 'secondary', permissions: { canEditCore: true, canEditAddons: true, canSubmit: true, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: true }};
-        if (dbStatus === -1) return { type: 'CANCELLED', label: 'Đã Hủy', bg: 'secondary', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: true }};
-        if (dbStatus === 0) return { type: 'TERMINATED', label: 'Đã Thanh Lý', bg: 'dark', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: false, reasonNoDelete: "Chứa công nợ lịch sử" }};
+
+        const dbStatus = contract.status ?? contract.Status;
+        if (dbStatus === 2) return { type: 'DRAFT', label: 'Bản Nháp', bg: 'secondary', permissions: { canEditCore: true, canEditAddons: true, canSubmit: true, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: true } };
+        if (dbStatus === -1) return { type: 'CANCELLED', label: 'Đã Hủy', bg: 'secondary', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: true } };
+        if (dbStatus === 0) return { type: 'TERMINATED', label: 'Đã Thanh Lý', bg: 'dark', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: false, reasonNoDelete: "Chứa công nợ lịch sử" } };
 
         const startDay = contract.startDay ?? contract.StartDay;
         const endDay = contract.endDay ?? contract.EndDay;
@@ -74,11 +74,11 @@ const ContractManagement = () => {
         const end = new Date(endDay); end.setHours(0, 0, 0, 0);
         const diffDays = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
 
-        if (today < start) return { type: 'PENDING', label: 'Chờ Hiệu Lực', bg: 'info', permissions: { canEditCore: true, canEditAddons: true, canSubmit: false, canCancel: true, canTerminate: false, canExtend: false, canSoftDelete: false, reasonNoDelete: "Dùng chức năng Hủy" }};
-        if (today > end) return { type: 'OVERDUE', label: 'Quá Hạn', bg: 'danger', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: true, canExtend: true, requiresExtendNote: true, canSoftDelete: false, reasonNoDelete: "Cần xử lý vi phạm" }};
-        if (diffDays <= 30) return { type: 'EXPIRING_SOON', label: 'Sắp Hết Hạn', bg: 'warning', permissions: { canEditCore: false, canEditAddons: true, canSubmit: false, canCancel: false, canTerminate: true, canExtend: true, canSoftDelete: false, reasonNoDelete: "Hợp đồng đang chạy" }};
+        if (today < start) return { type: 'PENDING', label: 'Chờ Hiệu Lực', bg: 'info', permissions: { canEditCore: true, canEditAddons: true, canSubmit: false, canCancel: true, canTerminate: false, canExtend: false, canSoftDelete: false, reasonNoDelete: "Dùng chức năng Hủy" } };
+        if (today > end) return { type: 'OVERDUE', label: 'Quá Hạn', bg: 'danger', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: true, canExtend: true, requiresExtendNote: true, canSoftDelete: false, reasonNoDelete: "Cần xử lý vi phạm" } };
+        if (diffDays <= 30) return { type: 'EXPIRING_SOON', label: 'Sắp Hết Hạn', bg: 'warning', permissions: { canEditCore: false, canEditAddons: true, canSubmit: false, canCancel: false, canTerminate: true, canExtend: true, canSoftDelete: false, reasonNoDelete: "Hợp đồng đang chạy" } };
 
-        return { type: 'ACTIVE', label: 'Đang Hiệu Lực', bg: 'success', permissions: { canEditCore: false, canEditAddons: true, canSubmit: false, canCancel: false, canTerminate: true, canExtend: true, canSoftDelete: false, reasonNoDelete: "Hợp đồng đang chạy" }};
+        return { type: 'ACTIVE', label: 'Đang Hiệu Lực', bg: 'success', permissions: { canEditCore: false, canEditAddons: true, canSubmit: false, canCancel: false, canTerminate: true, canExtend: true, canSoftDelete: false, reasonNoDelete: "Hợp đồng đang chạy" } };
     };
 
     // --- API FETCHING ---
@@ -107,7 +107,7 @@ const ContractManagement = () => {
         try {
             const res = await api.get('/contract/deleted-contracts');
             setDeletedContracts(res.data?.data || res.data?.Data || res.data || []);
-        } catch (error) { toast.error("Lỗi lấy lịch sử!"); } 
+        } catch (error) { toast.error("Lỗi lấy lịch sử!"); }
         finally { setLoadingDeleted(false); }
     };
 
@@ -115,7 +115,7 @@ const ContractManagement = () => {
     const handleActionClick = async (actionType, contract) => {
         const state = analyzeStateMachine(contract);
         setSelectedContract(contract);
-        
+
         setActionDate(''); setAdditionalCost(''); setTerminateResult(null);
         setExtendNewEndDate(''); setExtendOldEndDate('');
 
@@ -135,15 +135,15 @@ const ContractManagement = () => {
             try {
                 const res = await api.get(`/contract/view-contract/${currentId}`);
                 const detail = res?.data?.data || res?.data?.Data || res?.data || {};
-                setFormData(prev => ({ 
-                    ...prev, 
-                    additionalResidents: (detail?.additionalResidents || []).map(r => ({ accountId: String(r?.accountId), relationshipId: String(r?.relationshipId) })), 
-                    selectedServices: (detail?.selectedServices || []).map(s => ({ serviceId: String(s?.serviceId), actualPrice: String(s?.actualPrice) })) 
+                setFormData(prev => ({
+                    ...prev,
+                    additionalResidents: (detail?.additionalResidents || []).map(r => ({ accountId: String(r?.accountId), relationshipId: String(r?.relationshipId) })),
+                    selectedServices: (detail?.selectedServices || []).map(s => ({ serviceId: String(s?.serviceId), actualPrice: String(s?.actualPrice) }))
                 }));
             } catch (error) { toast.error("Không thể tải chi tiết!"); return; }
             setIsEditMode(true);
             setActiveDrawer('FORM');
-        } 
+        }
         else if (actionType === 'EXTEND') {
             setExtendContractId(contract.contractId || contract.ContractId);
             setExtendOldEndDate(contract.endDay ? String(contract.endDay).substring(0, 10) : '');
@@ -151,13 +151,13 @@ const ContractManagement = () => {
         }
         else if (actionType === 'TERMINATE' || actionType === 'CANCEL') {
             setSelectedTerminateId(contract.contractId || contract.ContractId);
-            setActionDate(new Date().toISOString().substring(0, 10)); 
+            setActionDate(new Date().toISOString().substring(0, 10));
             setActiveDrawer(actionType);
         }
         else if (actionType === 'DELETE') {
             if (!state.permissions.canSoftDelete) return toast.warning(`BẢO VỆ: ${state.permissions.reasonNoDelete}`);
-            if(window.confirm("Đưa hợp đồng này vào thùng rác?")) {
-                try { await api.delete(`/contract/${contract.contractId || contract.ContractId}/soft-delete`); toast.success("Đã xóa mềm!"); fetchData(); } 
+            if (window.confirm("Đưa hợp đồng này vào thùng rác?")) {
+                try { await api.delete(`/contract/${contract.contractId || contract.ContractId}/soft-delete`); toast.success("Đã xóa mềm!"); fetchData(); }
                 catch (error) { toast.error("Lỗi xóa!"); }
             }
         }
@@ -191,11 +191,11 @@ const ContractManagement = () => {
         payload.append("ApartmentId", formData.apartmentId); payload.append("ResidentAccountId", formData.residentAccountId);
         payload.append("StartDay", formData.startDay); payload.append("EndDay", formData.endDay);
         payload.append("MonthlyRent", formData.monthlyRent || 0); payload.append("Deposit", formData.deposit || 0);
-        payload.append("Status", isDraftSubmit ? 2 : 1); 
+        payload.append("Status", isDraftSubmit ? 2 : 1);
         if (formData.file) payload.append("File", formData.file);
 
-        formData.additionalResidents.forEach((r, i) => { if (r.accountId && r.relationshipId) { payload.append(`AdditionalResidents[${i}].AccountId`, r.accountId); payload.append(`AdditionalResidents[${i}].RelationshipId`, r.relationshipId); }});
-        formData.selectedServices.forEach((s, i) => { if (s.serviceId) { payload.append(`Services[${i}].ServiceId`, s.serviceId); if (s.actualPrice) payload.append(`Services[${i}].ActualPrice`, s.actualPrice); }});
+        formData.additionalResidents.forEach((r, i) => { if (r.accountId && r.relationshipId) { payload.append(`AdditionalResidents[${i}].AccountId`, r.accountId); payload.append(`AdditionalResidents[${i}].RelationshipId`, r.relationshipId); } });
+        formData.selectedServices.forEach((s, i) => { if (s.serviceId) { payload.append(`Services[${i}].ServiceId`, s.serviceId); if (s.actualPrice) payload.append(`Services[${i}].ActualPrice`, s.actualPrice); } });
 
         try {
             const url = isEditMode ? `/contract/${editContractId}/update-contract` : '/contract/create-contract';
@@ -203,14 +203,14 @@ const ContractManagement = () => {
             await api[method](url, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
             toast.success(isDraftSubmit ? "Đã lưu nháp!" : "Phát hành hợp đồng thành công!");
             closeDrawer(); fetchData();
-        } catch (error) { toast.error("Backend từ chối thao tác."); } 
+        } catch (error) { toast.error("Backend từ chối thao tác."); }
         finally { setIsSubmitting(false); }
     };
 
     const handleExecuteExtend = async (e) => {
         e.preventDefault();
         if (new Date(extendNewEndDate) <= new Date(extendOldEndDate)) return toast.error("Ngày gia hạn phải lớn hơn ngày cũ!");
-        
+
         setIsExtending(true);
         try {
             await api.put(`/contract/${extendContractId}/extend`, { newEndDate: extendNewEndDate });
@@ -220,32 +220,32 @@ const ContractManagement = () => {
 
     const handleExecuteTerminate = async (e) => {
         e.preventDefault();
-        if (additionalCost < 0) return toast.warning("Phí phát sinh không được là số âm!"); 
-        
+        if (additionalCost < 0) return toast.warning("Phí phát sinh không được là số âm!");
+
         setIsTerminating(true);
         try {
             const res = await api.put(`/contract/${selectedTerminateId}/terminate`, { terminationDate: actionDate, additionalCost: Number(additionalCost || 0) });
             setTerminateResult(res?.data?.data || res?.data?.Data || res?.data);
-            toast.success("Đã chốt thanh lý!"); fetchData(); 
+            toast.success("Đã chốt thanh lý!"); fetchData();
         } catch (error) { toast.error("Thanh lý thất bại."); } finally { setIsTerminating(false); }
     };
 
     const handleExecuteCancel = async () => {
-        if(!window.confirm("Hủy hợp đồng chưa hiệu lực?")) return;
+        if (!window.confirm("Hủy hợp đồng chưa hiệu lực?")) return;
         try {
-            await api.delete(`/contract/${selectedTerminateId}/soft-delete`); 
+            await api.delete(`/contract/${selectedTerminateId}/soft-delete`);
             toast.success("Đã Hủy hợp đồng!"); closeDrawer(); fetchData();
         } catch (error) { toast.error("Lỗi khi hủy."); }
     };
 
     const handleRestoreContract = async (id) => {
-        try { await api.put(`/contract/${id}/restore`); toast.success("Đã khôi phục!"); fetchDeletedContracts(); fetchData(); } 
+        try { await api.put(`/contract/${id}/restore`); toast.success("Đã khôi phục!"); fetchDeletedContracts(); fetchData(); }
         catch (error) { toast.error("Lỗi khôi phục!"); }
     };
 
     const handleHardDeleteContract = async (id) => {
         if (deleteConfirmText !== "XAC NHAN") return toast.warning("Vui lòng gõ XAC NHAN để xóa vĩnh viễn!");
-        try { await api.delete(`/contract/${id}/hard-delete`); toast.success("Đã xóa cứng!"); setDeleteConfirmText(''); fetchDeletedContracts(); } 
+        try { await api.delete(`/contract/${id}/hard-delete`); toast.success("Đã xóa cứng!"); setDeleteConfirmText(''); fetchDeletedContracts(); }
         catch (error) { toast.error("Lỗi xóa vĩnh viễn!"); }
     };
 
@@ -280,9 +280,9 @@ const ContractManagement = () => {
 
     const filteredContracts = contracts.filter(Boolean).filter(c => {
         const searchStr = searchTerm.toLowerCase();
-        const matchSearch = (c.contractCode || '').toLowerCase().includes(searchStr) || 
-                            (c.account?.info?.fullName || c.account?.fullName || '').toLowerCase().includes(searchStr) || 
-                            (c.apartment?.apartmentCode || '').toLowerCase().includes(searchStr);
+        const matchSearch = (c.contractCode || '').toLowerCase().includes(searchStr) ||
+            (c.account?.info?.fullName || c.account?.fullName || '').toLowerCase().includes(searchStr) ||
+            (c.apartment?.apartmentCode || '').toLowerCase().includes(searchStr);
         let matchStatus = true;
         if (filterStatus !== 'all') {
             const type = analyzeStateMachine(c).type;
@@ -302,8 +302,8 @@ const ContractManagement = () => {
         const start = new Date(contract.startDay); const end = new Date(contract.endDay); const today = new Date();
         const total = end - start; const passed = today - start;
         let progress = total > 0 ? (passed / total) * 100 : 0;
-        progress = Math.max(0, Math.min(100, progress)); 
-        
+        progress = Math.max(0, Math.min(100, progress));
+
         return (
             <div className="timeline-container shadow-sm">
                 <h6 className="fw-bold mb-3 text-dark d-flex justify-content-between"><span>Tiến độ Hợp Đồng</span> <span className={`badge bg-${stateMachine.bg} px-3 py-2 rounded-pill`}>{stateMachine.label}</span></h6>
@@ -324,15 +324,15 @@ const ContractManagement = () => {
 
             <div className="px-5 pt-4">
                 <div className="page-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                    <div style={{zIndex: 2}}>
+                    <div style={{ zIndex: 2 }}>
                         <h2 className="fw-bolder mb-1"><i className="bi bi-shield-check me-2 text-info"></i>Contract Center</h2>
                         <p className="mb-0 text-white-50 fw-medium" style={{ fontSize: '0.95rem' }}>Hệ thống quản trị vòng đời và giám sát tài chính</p>
                     </div>
-                    <div className="d-flex gap-3" style={{zIndex: 2}}>
+                    <div className="d-flex gap-3" style={{ zIndex: 2 }}>
                         <button className="btn btn-light fw-bold text-dark rounded-pill px-4 py-2 shadow-sm" onClick={fetchDeletedContracts} data-bs-toggle="modal" data-bs-target="#trashModal">
                             <i className="bi bi-archive-fill me-2 text-danger"></i>Lịch sử & Thùng rác
                         </button>
-                        <button className="btn btn-gradient-warning rounded-pill px-4 py-2 shadow" onClick={() => { setIsEditMode(false); setFormData(initialFormState); setActiveDrawer('FORM'); document.getElementById('file').value=''; }}>
+                        <button className="btn btn-gradient-warning rounded-pill px-4 py-2 shadow" onClick={() => { setIsEditMode(false); setFormData(initialFormState); setActiveDrawer('FORM'); document.getElementById('file').value = ''; }}>
                             <i className="bi bi-pen-fill me-2"></i>Ký Hợp Đồng
                         </button>
                     </div>
@@ -344,7 +344,7 @@ const ContractManagement = () => {
                             <div className={`modern-card h-100 border-start border-${s.color} border-4`}>
                                 <div className="card-body p-4 d-flex justify-content-between align-items-center">
                                     <div>
-                                        <h6 className="text-muted fw-bold mb-2 text-uppercase" style={{fontSize: '0.75rem', letterSpacing:'0.5px'}}>{s.title}</h6>
+                                        <h6 className="text-muted fw-bold mb-2 text-uppercase" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>{s.title}</h6>
                                         <h2 className={`fw-bold mb-0 text-${s.color}`}>{s.val}</h2>
                                         {s.alert && <small className={`text-${s.color} fw-bold mt-2 d-block`}><i className="bi bi-bell-fill me-1"></i>{s.alert}</small>}
                                     </div>
@@ -363,7 +363,7 @@ const ContractManagement = () => {
                         </div>
                     </div>
                     <div style={{ minWidth: '220px' }}>
-                        <select className="form-control-icon form-select bg-light border-0 fw-semibold text-secondary shadow-none w-100" style={{paddingLeft: '16px !important'}} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                        <select className="form-control-icon form-select bg-light border-0 fw-semibold text-secondary shadow-none w-100" style={{ paddingLeft: '16px !important' }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                             <option value="all">Hiển thị: Tất cả</option>
                             <option value="draft">🔘 Bản nháp (Draft)</option>
                             <option value="1">🟢 Đang hiệu lực / Chờ</option>
@@ -383,7 +383,7 @@ const ContractManagement = () => {
                             <button className="btn btn-gradient-primary rounded-pill px-4 py-2" onClick={() => { setIsEditMode(false); setFormData(initialFormState); setActiveDrawer('FORM'); }}><i className="bi bi-plus-lg me-2"></i>Tạo Hợp Đồng Đầu Tiên</button>
                         </div>
                     ) : (
-                        <div className="table-responsive" style={{overflowX: 'visible'}}>
+                        <div className="table-responsive" style={{ overflowX: 'visible' }}>
                             <table className="table table-custom w-100">
                                 <thead>
                                     <tr><th className="ps-4">Hợp Đồng</th><th>Chủ Hộ</th><th>Thời hạn & Tài chính</th><th>Trạng Thái</th><th className="text-end pe-4">Thao tác</th></tr>
@@ -407,11 +407,11 @@ const ContractManagement = () => {
                                                     {state.alert && <div className={`small fw-bold mt-2 text-${state.bg}`}><i className="bi bi-info-circle-fill me-1"></i>{state.alert}</div>}
                                                 </td>
                                                 <td><div className={`status-badge bg-${state.bg} bg-opacity-10 text-${state.bg} border border-${state.bg}`}><i className={`bi ${state.icon}`}></i> {state.label}</div></td>
-                                                
+
                                                 <td className="text-end pe-4 action-dropdown">
                                                     <div className="dropdown d-inline-block">
                                                         <button className={`btn btn-sm ${state.type === 'OVERDUE' ? 'btn-danger btn-suggest-terminate' : state.type === 'EXPIRING_SOON' ? 'btn-warning btn-suggest-extend' : 'btn-light border'} rounded-pill px-4 py-2 shadow-sm`} data-bs-toggle="dropdown">Hành động <i className="bi bi-chevron-down ms-1"></i></button>
-                                                        <ul className="dropdown-menu dropdown-menu-end mt-2" style={{minWidth: '240px'}}>
+                                                        <ul className="dropdown-menu dropdown-menu-end mt-2" style={{ minWidth: '240px' }}>
                                                             <li><button className="dropdown-item d-flex align-items-center fw-bold text-dark" onClick={() => handleActionClick('VIEW', contract)}>
                                                                 <i className="bi bi-eye-fill me-3 fs-5 text-secondary"></i> Xem chi tiết HĐ
                                                             </button></li>
@@ -449,7 +449,7 @@ const ContractManagement = () => {
 
             <div className={`drawer-backdrop ${activeDrawer ? 'open' : ''}`} onClick={closeDrawer}></div>
 
-            <div className={`custom-drawer ${activeDrawer === 'VIEW' ? 'open' : ''}`} style={{width: '600px'}}>
+            <div className={`custom-drawer ${activeDrawer === 'VIEW' ? 'open' : ''}`} style={{ width: '600px' }}>
                 <div className="drawer-header bg-dark text-white"><h4 className="fw-bold mb-0">Chi Tiết Hợp Đồng</h4><button className="btn-close btn-close-white" onClick={closeDrawer}></button></div>
                 <div className="drawer-body bg-light">
                     {selectedContract && (() => {
@@ -562,7 +562,7 @@ const ContractManagement = () => {
                                             <option key={r.accountId || r.AccountId} value={r.accountId || r.AccountId}>{r.fullName || r.userName}</option>
                                         ))}
                                     </select>
-                                    <select className="form-select border-0 shadow-none bg-transparent text-muted py-2" style={{width: '180px'}} value={res.relationshipId} onChange={(e) => handleListChange('additionalResidents', index, 'relationshipId', e.target.value)}><option value="">-- Quan hệ --</option>{relationships.map(rel => <option key={rel.id} value={rel.id}>{rel.name}</option>)}</select>
+                                    <select className="form-select border-0 shadow-none bg-transparent text-muted py-2" style={{ width: '180px' }} value={res.relationshipId} onChange={(e) => handleListChange('additionalResidents', index, 'relationshipId', e.target.value)}><option value="">-- Quan hệ --</option>{relationships.map(rel => <option key={rel.id} value={rel.id}>{rel.name}</option>)}</select>
                                     <button type="button" className="btn btn-white text-danger shadow-none" onClick={() => removeResidentRow(index)}><i className="bi bi-trash fs-5"></i></button>
                                 </div>
                             ))}
@@ -578,7 +578,7 @@ const ContractManagement = () => {
                                             <option key={s.serviceId || s.ServiceId} value={s.serviceId || s.ServiceId}>{s.serviceName || s.ServiceName}</option>
                                         ))}
                                     </select>
-                                    <div className="input-icon-wrapper" style={{width: '200px'}}><span className="input-icon fw-bold small">₫</span><input type="number" min="0" onKeyDown={preventInvalidNumber} className="form-control form-control-icon border-0 shadow-none bg-transparent py-2" placeholder="Tùy chỉnh giá" value={srv.actualPrice} onChange={(e) => handleListChange('selectedServices', index, 'actualPrice', e.target.value)} /></div>
+                                    <div className="input-icon-wrapper" style={{ width: '200px' }}><span className="input-icon fw-bold small">₫</span><input type="number" min="0" onKeyDown={preventInvalidNumber} className="form-control form-control-icon border-0 shadow-none bg-transparent py-2" placeholder="Tùy chỉnh giá" value={srv.actualPrice} onChange={(e) => handleListChange('selectedServices', index, 'actualPrice', e.target.value)} /></div>
                                     <button type="button" className="btn btn-white text-danger shadow-none" onClick={() => removeServiceRow(index)}><i className="bi bi-trash fs-5"></i></button>
                                 </div>
                             ))}
@@ -592,7 +592,7 @@ const ContractManagement = () => {
                 </div>
             </div>
 
-            <div className={`custom-drawer ${activeDrawer === 'EXTEND' ? 'open' : ''}`} style={{width: '450px'}}>
+            <div className={`custom-drawer ${activeDrawer === 'EXTEND' ? 'open' : ''}`} style={{ width: '450px' }}>
                 <div className="drawer-header bg-warning text-dark"><h5 className="fw-bold mb-0">Gia Hạn Hợp Đồng</h5><button className="btn-close" onClick={closeDrawer}></button></div>
                 <div className="drawer-body bg-light">
                     <div className="form-section">
@@ -605,7 +605,7 @@ const ContractManagement = () => {
                 <div className="drawer-footer"><button className="btn btn-light border rounded-pill px-4 fw-bold" onClick={closeDrawer}>Hủy</button><button className="btn btn-gradient-warning text-white fw-bold px-5 rounded-pill shadow" onClick={handleExecuteExtend} disabled={isSubmitting || !extendNewEndDate}>{isSubmitting ? <span className="spinner-border spinner-border-sm"></span> : "Xác nhận Gia Hạn"}</button></div>
             </div>
 
-            <div className={`custom-drawer ${activeDrawer === 'TERMINATE' || activeDrawer === 'CANCEL' ? 'open' : ''}`} style={{width: '500px'}}>
+            <div className={`custom-drawer ${activeDrawer === 'TERMINATE' || activeDrawer === 'CANCEL' ? 'open' : ''}`} style={{ width: '500px' }}>
                 <div className={`drawer-header text-white ${activeDrawer === 'CANCEL' ? 'bg-warning text-dark' : 'bg-danger'}`}><h5 className="fw-bold mb-0">{activeDrawer === 'CANCEL' ? 'Hủy Giao Kèo' : 'Thanh Lý Hợp Đồng'}</h5><button className={`btn-close ${activeDrawer === 'TERMINATE' ? 'btn-close-white' : ''}`} onClick={closeDrawer}></button></div>
                 <div className="drawer-body bg-light">
                     {activeDrawer === 'CANCEL' ? (
@@ -614,7 +614,7 @@ const ContractManagement = () => {
                         <div className="form-section">
                             <label className="fw-bold mb-2 small text-muted">Ngày bàn giao thực tế <span className="text-danger">*</span></label>
                             <input type="date" className="form-control form-control-lg mb-4 py-3 shadow-none border-danger border-opacity-50" value={actionDate} onChange={e => setActionDate(e.target.value)} />
-                            
+
                             <label className="fw-bold mb-2 small text-muted">Phạt / Hư hỏng tài sản (VNĐ)</label>
                             <div className="input-icon-wrapper mb-4">
                                 <span className="input-icon fw-bold">₫</span>
@@ -622,10 +622,10 @@ const ContractManagement = () => {
                             </div>
 
                             <div className="bg-white p-4 rounded-4 border border-dark shadow-sm">
-                                <h6 className="fw-bold mb-3 text-primary text-uppercase" style={{letterSpacing:'0.5px'}}>Bản Tính Nháp Trước Khi Chốt</h6>
+                                <h6 className="fw-bold mb-3 text-primary text-uppercase" style={{ letterSpacing: '0.5px' }}>Bản Tính Nháp Trước Khi Chốt</h6>
                                 <div className="d-flex justify-content-between mb-2"><span className="text-muted">Tiền Cọc (Deposit):</span> <strong className="fs-6 text-dark">{formatCurrency(selectedContract?.deposit || 0)}</strong></div>
                                 <div className="d-flex justify-content-between mb-3"><span className="text-muted">Phí phát sinh (Additional):</span> <strong className="text-danger fs-6">- {formatCurrency(additionalCost || 0)}</strong></div>
-                                <hr className="my-2"/>
+                                <hr className="my-2" />
                                 {((selectedContract?.deposit || 0) - Number(additionalCost || 0)) < 0 ? (
                                     <div className="text-danger fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3"><span>Khách BÙ THÊM:</span> <span>{formatCurrency(Math.abs((selectedContract?.deposit || 0) - Number(additionalCost || 0)))}</span></div>
                                 ) : (
@@ -663,7 +663,7 @@ const ContractManagement = () => {
                                                     <button className="btn btn-sm btn-light text-success rounded-pill px-3 border me-2 shadow-sm fw-bold" onClick={() => handleRestoreContract(c?.contractId || c?.ContractId)}><i className="bi bi-arrow-counterclockwise me-1"></i> Khôi phục</button>
                                                     <div className="dropdown d-inline-block">
                                                         <button className="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="dropdown"><i className="bi bi-fire me-1"></i> Tiêu hủy</button>
-                                                        <div className="dropdown-menu p-3 shadow-lg border-0 rounded-4" style={{width: '280px'}}>
+                                                        <div className="dropdown-menu p-3 shadow-lg border-0 rounded-4" style={{ width: '280px' }}>
                                                             <label className="form-label text-danger fw-bold small mb-2">Gõ XAC NHAN để xóa vĩnh viễn:</label>
                                                             <input type="text" className="form-control form-control-sm mb-3 shadow-none bg-light" placeholder="XAC NHAN" onChange={(e) => setDeleteConfirmText(e.target.value)} />
                                                             <button className="btn btn-sm btn-danger w-100 fw-bold rounded-pill" onClick={() => handleHardDeleteContract(c?.contractId || c?.ContractId)} disabled={deleteConfirmText !== "XAC NHAN"}>Xóa Dữ Liệu Thực Sự</button>

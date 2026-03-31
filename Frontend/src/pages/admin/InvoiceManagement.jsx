@@ -169,7 +169,6 @@ const InvoiceManagement = () => {
     const getStatusBadge = (statusName) => {
         if (statusName === 'Paid') return <span className="badge bg-success">Đã thanh toán</span>;
         if (statusName === 'Unpaid') return <span className="badge bg-danger">Chưa thanh toán</span>;
-        if (statusName === 'PendingVerification') return <span className="badge bg-warning text-dark">Chờ xác nhận</span>;
         return <span className="badge bg-secondary">{statusName || 'Không rõ'}</span>;
     };
 
@@ -210,9 +209,8 @@ const InvoiceManagement = () => {
                             <label className="form-label small fw-bold text-muted mb-1">Trạng thái</label>
                             <select className="form-select form-select-sm" name="status" value={filters.status} onChange={handleFilterChange}>
                                 <option value="">Tất cả</option>
-                                <option value="1">Chưa thanh toán (Unpaid)</option>
-                                <option value="2">Chờ xác nhận (Pending)</option>
-                                <option value="3">Đã thanh toán (Paid)</option>
+                                <option value="0">Chưa thanh toán (Unpaid)</option>
+                                <option value="1">Đã thanh toán (Paid)</option>
                             </select>
                         </div>
                     </div>
@@ -484,14 +482,14 @@ const InvoiceManagement = () => {
                                         <div className="row mt-3 text-center">
                                             <div className="col-6">
                                                 <div className="p-2 border rounded border-success">
-                                                    <span className="text-muted d-block small">Đã nộp</span> 
-                                                    <strong className="text-success">{(detailData.pay || 0).toLocaleString()} đ</strong>
+                                                    <span className="text-muted d-block small">Đã nộp</span>
+                                                    <strong className="text-success">{detailData.pay?.toLocaleString()} đ</strong>
                                                 </div>
                                             </div>
                                             <div className="col-6">
                                                 <div className="p-2 border rounded border-danger">
-                                                    <span className="text-muted d-block small">Còn nợ</span> 
-                                                    <strong className="text-danger">{(detailData.debt || 0).toLocaleString()} đ</strong>
+                                                    <span className="text-muted d-block small">Còn nợ</span>
+                                                    <strong className="text-danger">{detailData.debt?.toLocaleString()} đ</strong>
                                                 </div>
                                             </div>
                                         </div>

@@ -43,20 +43,11 @@ const Login = () => {
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('role', role);
-      localStorage.setItem('requiresPasswordChange', requiresPasswordChange ? 'true' : 'false');
-
-      // Redirect first-login users before anyone else
-      if (requiresPasswordChange) {
-        navigate('/first-login-setup');
-        return;
-      }
 
       if (role === 'Manager') {
         navigate('/admin');
       } else if (role === 'Resident') {
         navigate('/resident');
-      } else if (role === 'Technician') {
-        navigate('/technician');
       } else {
         navigate('/');
       }
