@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
-import { notify } from '../../utils/notificationAlert'; // Tích hợp thông báo xịn xò
+import { notify } from '../../utils/notificationAlert'; 
 
 const ResidentProfile = () => {
     const [userInfo, setUserInfo] = useState(null);
@@ -20,7 +20,6 @@ const ResidentProfile = () => {
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordForm, setPasswordForm] = useState({
         otpCode: '',
-        oldPassword: '',
         newPassword: '',
         confirmNewPassword: ''
     });
@@ -28,9 +27,11 @@ const ResidentProfile = () => {
     const [isChangingPassword, setIsChangingPassword] = useState(false);
 
     // Bật tắt hiển thị mật khẩu
-    const [showOldPassword, setShowOldPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // BỘ ĐẾM NGƯỢC 60 GIÂY
+    const [countdown, setCountdown] = useState(0);
 
     const fetchProfile = async () => {
         setLoading(true);
@@ -56,6 +57,17 @@ const ResidentProfile = () => {
     useEffect(() => {
         fetchProfile();
     }, []);
+
+    // Hiệu ứng chạy bộ đếm ngược
+    useEffect(() => {
+        let timer;
+        if (countdown > 0) {
+            timer = setInterval(() => {
+                setCountdown((prev) => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [countdown]);
 
     const formatDateForInput = (dateString) => {
         if (!dateString) return '';
@@ -115,16 +127,30 @@ const ResidentProfile = () => {
     const handleRequestOtp = async () => {
         setIsRequestingOtp(true);
         try {
-            const res = await api.post('/Auth/request-change-password-otp');
+            // Truyền thêm object rỗng {} để triệt tiêu hoàn toàn lỗi 415 Unsupported Media Type nếu có
+            const res = await api.post('/Auth/request-change-password-otp', {});
             notify.success(res.data?.message || "Đã gửi mã OTP về email của bạn. Vui lòng kiểm tra hộp thư!");
             
-            setPasswordForm({ otpCode: '', oldPassword: '', newPassword: '', confirmNewPassword: '' });
-            setShowOldPassword(false);
+            // Bắt đầu đếm ngược 60 giây
+            setCountdown(60);
+
+            setPasswordForm({ otpCode: '', newPassword: '', confirmNewPassword: '' });
             setShowNewPassword(false);
             setShowConfirmPassword(false);
             setShowPasswordModal(true);
         } catch (error) {
-            notify.error(error.response?.data?.message || "Không thể yêu cầu mã OTP lúc này.");
+            // Đã nâng cấp hàm bắt lỗi để lấy chính xác thông báo chặn spam từ Backend
+            let errorMessage = "Không thể yêu cầu mã OTP lúc này.";
+            if (error.response?.data?.errors) {
+                const validationErrors = error.response.data.errors;
+                const firstErrorKey = Object.keys(validationErrors)[0];
+                errorMessage = validationErrors[firstErrorKey][0];
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (typeof error.response?.data === 'string') {
+                errorMessage = error.response.data;
+            }
+            notify.error(errorMessage);
         } finally {
             setIsRequestingOtp(false);
         }
@@ -142,7 +168,6 @@ const ResidentProfile = () => {
         try {
             const payload = {
                 OtpCode: passwordForm.otpCode,
-                OldPassword: passwordForm.oldPassword,
                 NewPassword: passwordForm.newPassword,
                 ConfirmNewPassword: passwordForm.confirmNewPassword
             };
@@ -151,11 +176,13 @@ const ResidentProfile = () => {
             notify.success(res.data?.message || "Đổi mật khẩu thành công!");
             setShowPasswordModal(false);
         } catch (error) {
-            let errorMessage = error.response?.data?.message || "Lỗi khi đổi mật khẩu. Mã OTP có thể đã hết hạn.";
+            let errorMessage = "Lỗi khi đổi mật khẩu. Mã OTP có thể đã hết hạn.";
             if (error.response?.data?.errors) {
                 const validationErrors = error.response.data.errors;
                 const firstErrorKey = Object.keys(validationErrors)[0];
                 errorMessage = validationErrors[firstErrorKey][0];
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
             }
             notify.error(errorMessage);
         } finally {
@@ -202,13 +229,20 @@ const ResidentProfile = () => {
                                         <button onClick={handleOpenModal} className="btn btn-sm btn-outline-primary fw-semibold">
                                             <i className="bi bi-pencil-square me-1"></i> Cập nhật
                                         </button>
-                                        <button onClick={handleRequestOtp} disabled={isRequestingOtp} className="btn btn-sm btn-outline-primary fw-semibold ms-2">
+                                        <button 
+                                            onClick={handleRequestOtp} 
+                                            disabled={isRequestingOtp || countdown > 0} 
+                                            className={`btn btn-sm fw-semibold ms-2 ${countdown > 0 ? 'btn-secondary' : 'btn-outline-primary'}`}
+                                            style={{ transition: 'all 0.3s' }}
+                                        >
                                             {isRequestingOtp ? (
                                                 <span className="spinner-border spinner-border-sm me-1"></span>
+                                            ) : countdown > 0 ? (
+                                                <i className="bi bi-hourglass-split me-1"></i>
                                             ) : (
                                                 <i className="bi bi-key me-1"></i>
                                             )} 
-                                            Đổi mật khẩu
+                                            {countdown > 0 ? `Thử lại sau (${countdown}s)` : 'Đổi mật khẩu'}
                                         </button>
                                     </div>
                                 </div>
@@ -324,7 +358,7 @@ const ResidentProfile = () => {
                 </div>
             )}
 
-            {/* MODAL ĐỔI MẬT KHẨU (Giao diện đồng bộ + Toggle Password) */}
+            {/* MODAL ĐỔI MẬT KHẨU */}
             {showPasswordModal && (
                 <div className="modal fade show d-block" tabIndex="-1">
                     <div className="modal-dialog modal-dialog-centered">
@@ -349,22 +383,6 @@ const ResidentProfile = () => {
                                             onChange={(e) => setPasswordForm({ ...passwordForm, otpCode: e.target.value })}
                                             required
                                         />
-                                    </div>
-                                    <div className="mb-3">
-                                        <label className="form-label fw-semibold">Mật khẩu hiện tại (*)</label>
-                                        <div className="input-group">
-                                            <input
-                                                type={showOldPassword ? "text" : "password"}
-                                                className="form-control"
-                                                placeholder="Nhập mật khẩu đang sử dụng"
-                                                value={passwordForm.oldPassword}
-                                                onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
-                                                required
-                                            />
-                                            <button className="btn btn-outline-secondary" type="button" onClick={() => setShowOldPassword(!showOldPassword)}>
-                                                <i className={`bi ${showOldPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
-                                            </button>
-                                        </div>
                                     </div>
                                     <div className="mb-3">
                                         <label className="form-label fw-semibold">Mật khẩu mới (*)</label>
