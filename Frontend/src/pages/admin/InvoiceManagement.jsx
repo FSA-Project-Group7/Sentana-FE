@@ -244,7 +244,9 @@ const InvoiceManagement = () => {
                                         {invoices.map((inv) => (
                                             <tr key={inv.invoiceId}>
                                                 <td className="fw-bold text-primary">{inv.apartmentCode}</td>
-                                                <td className="fw-semibold">Tháng {inv.billingMonth}/{inv.billingYear}</td>
+                                                <td className="fw-semibold text-primary">
+                                                    {inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}
+                                                </td>
                                                 <td className="small text-muted">{inv.createdAt}</td>
                                                 <td className="fw-bold text-success">{inv.totalMoney?.toLocaleString()} đ</td>
                                                 <td className="fw-bold text-danger">{inv.debt?.toLocaleString()} đ</td>
@@ -385,10 +387,24 @@ const InvoiceManagement = () => {
                                 ) : (
                                     <div>
                                         <div className="row mb-3 bg-light p-3 rounded">
-                                            <div className="col-md-6"><p className="mb-1 text-muted">Mã Phòng:</p> <h6 className="fw-bold">{detailData.apartmentCode}</h6></div>
-                                            <div className="col-md-6"><p className="mb-1 text-muted">Kỳ thanh toán:</p> <h6 className="fw-bold">Tháng {detailData.billingMonth}/{detailData.billingYear}</h6></div>
-                                            <div className="col-md-6 mt-2"><p className="mb-1 text-muted">Trạng thái:</p> <h6>{getStatusBadge(detailData.statusName)}</h6></div>
-                                            <div className="col-md-6 mt-2"><p className="mb-1 text-muted">Ngày lập:</p> <h6>{detailData.dayCreat}</h6></div>
+                                            <div className="col-md-6">
+                                                <p className="mb-1 text-muted">Mã Phòng:</p> 
+                                                <h6 className="fw-bold">{detailData.apartmentCode}</h6>
+                                            </div>
+                                            <div className="col-md-6">
+                                                <p className="mb-1 text-muted">Kỳ thanh toán:</p> 
+                                                <h6 className="fw-bold text-primary">
+                                                    {detailData.billingPeriod || `Tháng ${detailData.billingMonth}/${detailData.billingYear}`}
+                                                </h6>
+                                            </div>
+                                            <div className="col-md-6 mt-2">
+                                                <p className="mb-1 text-muted">Trạng thái:</p> 
+                                                <h6>{getStatusBadge(detailData.statusName)}</h6>
+                                            </div>
+                                            <div className="col-md-6 mt-2">
+                                                <p className="mb-1 text-muted">Ngày lập:</p> 
+                                                <h6>{detailData.dayCreat || "Đang cập nhật"}</h6>
+                                            </div>
                                         </div>
 
                                         {detailData.utilityHistory && (
