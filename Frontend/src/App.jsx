@@ -24,7 +24,6 @@ import PaymentManagement from './pages/admin/PaymentManagement';
 import ResidentDashboard from './pages/resident/ResidentDashboard';
 import ResidentLayout from './components/ResidentLayout';
 import ResidentProfile from './pages/resident/ResidentProfile';
-
 import FirstLoginSetup from './pages/FirstLoginSetup';
 import MaintenanceRequest from './pages/resident/MaintenanceRequest';
 
