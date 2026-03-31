@@ -4,22 +4,20 @@ import Pagination from '../../components/common/Pagination';
 import { notify, confirmAction } from '../../utils/notificationAlert';
 
 const InvoiceManagement = () => {
-    // --- STATE DỮ LIỆU ---
     const [invoices, setInvoices] = useState([]);
     const [apartments, setApartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // --- STATE BỘ LỌC & PHÂN TRANG ---
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     const availableYears = Array.from(new Array(6), (_, index) => currentYear - 3 + index);
 
-    const [filters, setFilters] = useState({ month: currentMonth, year: currentYear, status: '' });
+    // Mặc định rỗng để hiển thị toàn bộ (Clear default filter)
+    const [filters, setFilters] = useState({ month: '', year: '', status: '' });
     const [pagination, setPagination] = useState({ pageNumber: 1, pageSize: 10, totalCount: 0 });
 
-    // --- STATE QUẢN LÝ MODAL ---
-    const [activeModal, setActiveModal] = useState(null); // 'generate', 'edit', 'detail'
+    const [activeModal, setActiveModal] = useState(null); 
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [detailData, setDetailData] = useState(null);
 
@@ -28,7 +26,6 @@ const InvoiceManagement = () => {
         additionalFee: 0, note: ''
     });
 
-    // --- FETCH DATA ---
     const fetchInvoices = async (page = pagination.pageNumber) => {
         setLoading(true);
         try {
@@ -70,12 +67,10 @@ const InvoiceManagement = () => {
         fetchApartments();
     }, []);
 
-    // Tự động load lại từ trang 1 khi thay đổi bộ lọc
     useEffect(() => {
         fetchInvoices(1);
     }, [filters.month, filters.year, filters.status]);
 
-    // --- XỬ LÝ FORM & BỘ LỌC ---
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         setFilters(prev => ({ ...prev, [name]: value }));
@@ -86,7 +81,6 @@ const InvoiceManagement = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- QUẢN LÝ ĐÓNG/MỞ MODAL ---
     const openModal = async (type, invoice = null) => {
         setActiveModal(type);
         setSelectedInvoice(invoice);
@@ -97,7 +91,6 @@ const InvoiceManagement = () => {
             setFormData(prev => ({ ...prev, additionalFee: 0, note: '' }));
         } else if (type === 'detail') {
             try {
-                // Gọi API lấy chi tiết bảng kê theo Tháng/Năm
                 const res = await api.get(`/Invoice/apartment/${invoice.apartmentId}?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
                 const dataList = res.data?.data;
                 if (dataList && dataList.length > 0) {
@@ -115,7 +108,6 @@ const InvoiceManagement = () => {
         setDetailData(null);
     };
 
-    // --- XỬ LÝ NGHIỆP VỤ ---
     const handleGenerate = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -174,7 +166,6 @@ const InvoiceManagement = () => {
         }
     };
 
-    // --- RENDER HELPERS ---
     const getStatusBadge = (statusName) => {
         if (statusName === 'Paid') return <span className="badge bg-success">Đã thanh toán</span>;
         if (statusName === 'Unpaid') return <span className="badge bg-danger">Chưa thanh toán</span>;
@@ -183,7 +174,6 @@ const InvoiceManagement = () => {
 
     return (
         <div className="container-fluid p-0">
-            {/* --- HEADER --- */}
             <div className="d-flex justify-content-between align-items-start mb-4">
                 <div>
                     <h2 className="fw-bold mb-0">Quản lý Hóa Đơn</h2>
@@ -194,7 +184,6 @@ const InvoiceManagement = () => {
                 </button>
             </div>
 
-            {/* --- BỘ LỌC --- */}
             <div className="card shadow-sm border-0 mb-4 bg-light">
                 <div className="card-body py-3">
                     <div className="row g-3 align-items-end">
@@ -228,13 +217,12 @@ const InvoiceManagement = () => {
                 </div>
             </div>
 
-            {/* --- BẢNG DỮ LIỆU --- */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
                         <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
                     ) : invoices.length === 0 ? (
-                        <div className="text-center p-5 text-muted">Chưa có dữ liệu hóa đơn nào trong kỳ này.</div>
+                        <div className="text-center p-5 text-muted">Chưa có dữ liệu hóa đơn nào trong hệ thống.</div>
                     ) : (
                         <>
                             <div className="table-responsive">
@@ -254,7 +242,9 @@ const InvoiceManagement = () => {
                                         {invoices.map((inv) => (
                                             <tr key={inv.invoiceId}>
                                                 <td className="fw-bold text-primary">{inv.apartmentCode}</td>
-                                                <td className="fw-semibold">Tháng {inv.billingMonth}/{inv.billingYear}</td>
+                                                <td className="fw-semibold text-primary">
+                                                    {inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}
+                                                </td>
                                                 <td className="small text-muted">{inv.createdAt}</td>
                                                 <td className="fw-bold text-success">{inv.totalMoney?.toLocaleString()} đ</td>
                                                 <td className="fw-bold text-danger">{inv.debt?.toLocaleString()} đ</td>
@@ -287,7 +277,6 @@ const InvoiceManagement = () => {
                 </div>
             </div>
 
-            {/* MÀN MỜ CHUNG CHO CÁC MODAL */}
             {activeModal && <div className="modal-backdrop fade show"></div>}
 
             {/* --- MODAL 1: SINH HÓA ĐƠN --- */}
@@ -308,11 +297,21 @@ const InvoiceManagement = () => {
                                     <div className="row g-3">
                                         <div className="col-6">
                                             <label className="form-label fw-semibold">Tháng (*)</label>
-                                            <input type="number" min="1" max="12" className="form-control" name="genMonth" value={formData.genMonth} onChange={handleInputChange} required />
+                                            {/* Áp dụng Dropdown List (Danh sách thả xuống) cho Tháng */}
+                                            <select className="form-select" name="genMonth" value={formData.genMonth} onChange={handleInputChange} required>
+                                                {[...Array(12).keys()].map(m => (
+                                                    <option key={m + 1} value={m + 1}>Tháng {m + 1}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div className="col-6">
                                             <label className="form-label fw-semibold">Năm (*)</label>
-                                            <input type="number" min="2000" className="form-control" name="genYear" value={formData.genYear} onChange={handleInputChange} required />
+                                            {/* Áp dụng Dropdown List (Danh sách thả xuống) cho Năm */}
+                                            <select className="form-select" name="genYear" value={formData.genYear} onChange={handleInputChange} required>
+                                                {availableYears.map(y => (
+                                                    <option key={y} value={y}>Năm {y}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div className="col-12">
                                             <label className="form-label fw-semibold">Áp dụng cho phòng</label>
@@ -386,10 +385,24 @@ const InvoiceManagement = () => {
                                 ) : (
                                     <div>
                                         <div className="row mb-3 bg-light p-3 rounded">
-                                            <div className="col-md-6"><p className="mb-1 text-muted">Mã Phòng:</p> <h6 className="fw-bold">{detailData.apartmentCode}</h6></div>
-                                            <div className="col-md-6"><p className="mb-1 text-muted">Kỳ thanh toán:</p> <h6 className="fw-bold">Tháng {detailData.billingMonth}/{detailData.billingYear}</h6></div>
-                                            <div className="col-md-6 mt-2"><p className="mb-1 text-muted">Trạng thái:</p> <h6>{getStatusBadge(detailData.statusName)}</h6></div>
-                                            <div className="col-md-6 mt-2"><p className="mb-1 text-muted">Ngày lập:</p> <h6>{detailData.dayCreat}</h6></div>
+                                            <div className="col-md-6">
+                                                <p className="mb-1 text-muted">Mã Phòng:</p> 
+                                                <h6 className="fw-bold">{detailData.apartmentCode}</h6>
+                                            </div>
+                                            <div className="col-md-6">
+                                                <p className="mb-1 text-muted">Kỳ thanh toán:</p> 
+                                                <h6 className="fw-bold text-primary">
+                                                    {detailData.billingPeriod || `Tháng ${detailData.billingMonth}/${detailData.billingYear}`}
+                                                </h6>
+                                            </div>
+                                            <div className="col-md-6 mt-2">
+                                                <p className="mb-1 text-muted">Trạng thái:</p> 
+                                                <h6>{getStatusBadge(detailData.statusName)}</h6>
+                                            </div>
+                                            <div className="col-md-6 mt-2">
+                                                <p className="mb-1 text-muted">Ngày lập:</p> 
+                                                <h6>{detailData.dayCreat || "Đang cập nhật"}</h6>
+                                            </div>
                                         </div>
 
                                         {detailData.utilityHistory && (

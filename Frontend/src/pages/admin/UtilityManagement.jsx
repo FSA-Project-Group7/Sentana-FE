@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
 // --- UTILS ---
-import { notify } from '../../utils/notificationAlert';
+import { notify, confirmAction } from '../../utils/notificationAlert';
 
 const UtilityManagement = () => {
     const [apartments, setApartments] = useState([]);
@@ -67,7 +67,7 @@ const UtilityManagement = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- XỬ LÝ LƯU CHỈ SỐ ---
+    // --- XỬ LÝ LƯU CHỈ SỐ (KÈM LOGIC GỘP KỲ - MERGE BILLING LOGIC) ---
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -81,41 +81,61 @@ const UtilityManagement = () => {
         let successCount = 0;
         let errors = [];
 
-        // 1. Ghi chỉ số Điện
+        // Hàm xử lý chung cho Điện và Nước (Reusable Utility Processor)
+        const processUtility = async (type, value, endpoint) => {
+            let payload = {
+                apartmentId: Number(selectedApartmentId),
+                registrationDate: formattedDate,
+                newIndex: Number(value),
+                isMerge: false // Mặc định không gộp (Default false)
+            };
+
+            try {
+                await api.post(endpoint, payload);
+                successCount++;
+                setFormData(prev => ({ ...prev, [type === 'Điện' ? 'electricIndex' : 'waterIndex']: '' }));
+            } catch (error) {
+                const errorMsg = error.response?.data?.message || `Lỗi lưu số ${type.toLowerCase()}`;
+                
+                // Kiểm tra cờ yêu cầu gộp từ Backend (Check for Merge Flag)
+                if (errorMsg.startsWith("REQUIRE_MERGE|")) {
+                    const confirmText = errorMsg.split("|")[1];
+                    const { isConfirmed } = await confirmAction.fire({
+                        title: 'Xác nhận gộp kỳ thanh toán',
+                        text: confirmText,
+                        confirmButtonText: '<i class="bi bi-check-circle me-1"></i> Đồng ý gộp'
+                    });
+
+                    // Nếu đồng ý, đính kèm cờ và thử lại (Retry with Merge Flag)
+                    if (isConfirmed) {
+                        payload.isMerge = true;
+                        try {
+                            await api.post(endpoint, payload);
+                            successCount++;
+                            setFormData(prev => ({ ...prev, [type === 'Điện' ? 'electricIndex' : 'waterIndex']: '' }));
+                        } catch (retryError) {
+                            errors.push(`${type}: ${retryError.response?.data?.message || "Lỗi xử lý gộp kỳ."}`);
+                        }
+                    } else {
+                        errors.push(`${type}: Đã hủy thao tác gộp kỳ.`);
+                    }
+                } else {
+                    errors.push(`${type}: ${errorMsg}`);
+                }
+            }
+        };
+
         if (formData.electricIndex) {
-            try {
-                await api.post('/Utility/electric/input', {
-                    apartmentId: Number(selectedApartmentId),
-                    registrationDate: formattedDate,
-                    newIndex: Number(formData.electricIndex)
-                });
-                successCount++;
-                setFormData(prev => ({ ...prev, electricIndex: '' }));
-            } catch (error) {
-                errors.push(`Điện: ${error.response?.data?.message || "Lỗi lưu số điện"}`);
-            }
+            await processUtility('Điện', formData.electricIndex, '/Utility/electric/input');
         }
 
-        // 2. Ghi chỉ số Nước
         if (formData.waterIndex) {
-            try {
-                await api.post('/Utility/water/input', {
-                    apartmentId: Number(selectedApartmentId),
-                    registrationDate: formattedDate,
-                    newIndex: Number(formData.waterIndex)
-                });
-                successCount++;
-                setFormData(prev => ({ ...prev, waterIndex: '' }));
-            } catch (error) {
-                errors.push(`Nước: ${error.response?.data?.message || "Lỗi lưu số nước"}`);
-            }
+            await processUtility('Nước', formData.waterIndex, '/Utility/water/input');
         }
 
-        // Thông báo kết quả tổng hợp
         if (successCount > 0) notify.success(`Đã lưu thành công ${successCount} chỉ số!`);
         if (errors.length > 0) errors.forEach(err => notify.error(err));
 
-        // Reload lại bảng lịch sử
         await fetchHistory();
         setIsSubmitting(false);
     };
@@ -150,7 +170,7 @@ const UtilityManagement = () => {
                                         required
                                     >
                                         <option value="">-- Chọn căn hộ --</option>
-                                        {apartments.map(apt => (
+                                        {apartments.filter(apt => apt.status === 2).map(apt => (
                                             <option key={apt.apartmentId} value={apt.apartmentId}>
                                                 {apt.apartmentCode} - {apt.apartmentName}
                                             </option>
