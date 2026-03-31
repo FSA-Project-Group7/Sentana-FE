@@ -25,6 +25,8 @@ import ResidentDashboard from './pages/resident/ResidentDashboard';
 import ResidentLayout from './components/ResidentLayout';
 import ResidentProfile from './pages/resident/ResidentProfile';
 
+import FirstLoginSetup from './pages/FirstLoginSetup';
+import MaintenanceRequest from './pages/resident/MaintenanceRequest';
 
 function App() {
   useEffect(() => {
@@ -58,12 +60,17 @@ function App() {
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<Login />} />
         </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/first-login-setup" element={<FirstLoginSetup />} />
+        </Route>
         <Route element={<ProtectedRoute allowedRole="Resident" />}>
           <Route path="/resident" element={<ResidentLayout />}>
             <Route index element={<ResidentPage />} />
             <Route path="dashboard" element={<ResidentDashboard />} />
             <Route path="profile" element={<ResidentProfile />} />
 
+            <Route path="maintenance" element={<MaintenanceRequest />} />
           </Route>
         </Route>
 
