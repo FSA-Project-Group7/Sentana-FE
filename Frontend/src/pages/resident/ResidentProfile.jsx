@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
+import { notify } from '../../utils/notificationAlert'; // Tích hợp thông báo xịn xò
 
 const ResidentProfile = () => {
     const [userInfo, setUserInfo] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // --- STATE CẬP NHẬT THÔNG TIN ---
     const [showModal, setShowModal] = useState(false);
     const [editForm, setEditForm] = useState({
         fullName: '',
@@ -14,25 +16,38 @@ const ResidentProfile = () => {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // --- STATE ĐỔI MẬT KHẨU ---
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({
+        otpCode: '',
+        oldPassword: '',
+        newPassword: '',
+        confirmNewPassword: ''
+    });
+    const [isRequestingOtp, setIsRequestingOtp] = useState(false);
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+    // Bật tắt hiển thị mật khẩu
+    const [showOldPassword, setShowOldPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
     const fetchProfile = async () => {
         setLoading(true);
         try {
             const res = await api.get('/Auth/profile');
             const data = res.data?.data || res.data;
 
-            console.log("🔍 DATA ĐÃ NÂNG CẤP TỪ BACKEND:", data);
-
             setUserInfo({
                 ...data,
                 contractStart: data.contractStart ? new Date(data.contractStart).toLocaleDateString('vi-VN') : 'N/A',
                 contractEnd: data.contractEnd ? new Date(data.contractEnd).toLocaleDateString('vi-VN') : 'N/A',
-
                 status: data.status || (data.apartmentCode ? 'Đang cư trú' : 'Chưa có hợp đồng')
             });
 
         } catch (error) {
             console.error("Lỗi khi tải Profile:", error);
-            alert("Không thể tải thông tin cá nhân!");
+            notify.error("Không thể tải thông tin cá nhân!");
         } finally {
             setLoading(false);
         }
@@ -51,6 +66,7 @@ const ResidentProfile = () => {
         }
     };
 
+    // --- XỬ LÝ CẬP NHẬT THÔNG TIN ---
     const handleOpenModal = () => {
         setEditForm({
             fullName: userInfo?.fullName || '',
@@ -73,18 +89,13 @@ const ResidentProfile = () => {
                 BirthDay: editForm.birthDay ? new Date(editForm.birthDay).toISOString() : null
             };
 
-            console.log("Đang gửi dữ liệu lên BE:", payload);
-
             await api.put('/Auth/profile', payload);
-
-            alert("Cập nhật thông tin thành công!");
+            notify.success("Cập nhật thông tin thành công!");
             setShowModal(false);
             fetchProfile();
 
         } catch (error) {
-            console.error("Lỗi chi tiết từ Backend:", error.response?.data);
             let errorMessage = "Không thể cập nhật thông tin lúc này.";
-
             if (error.response?.data?.errors) {
                 const validationErrors = error.response.data.errors;
                 const firstErrorKey = Object.keys(validationErrors)[0];
@@ -94,10 +105,61 @@ const ResidentProfile = () => {
             } else if (typeof error.response?.data === 'string') {
                 errorMessage = error.response.data;
             }
-
-            alert("LỖI TỪ HỆ THỐNG:\n" + errorMessage);
+            notify.error("LỖI: " + errorMessage);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    // --- XỬ LÝ ĐỔI MẬT KHẨU ---
+    const handleRequestOtp = async () => {
+        setIsRequestingOtp(true);
+        try {
+            const res = await api.post('/Auth/request-change-password-otp');
+            notify.success(res.data?.message || "Đã gửi mã OTP về email của bạn. Vui lòng kiểm tra hộp thư!");
+            
+            setPasswordForm({ otpCode: '', oldPassword: '', newPassword: '', confirmNewPassword: '' });
+            setShowOldPassword(false);
+            setShowNewPassword(false);
+            setShowConfirmPassword(false);
+            setShowPasswordModal(true);
+        } catch (error) {
+            notify.error(error.response?.data?.message || "Không thể yêu cầu mã OTP lúc này.");
+        } finally {
+            setIsRequestingOtp(false);
+        }
+    };
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        
+        if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+            notify.warning("Mật khẩu xác nhận không khớp!");
+            return;
+        }
+
+        setIsChangingPassword(true);
+        try {
+            const payload = {
+                OtpCode: passwordForm.otpCode,
+                OldPassword: passwordForm.oldPassword,
+                NewPassword: passwordForm.newPassword,
+                ConfirmNewPassword: passwordForm.confirmNewPassword
+            };
+
+            const res = await api.put('/Auth/change-password', payload);
+            notify.success(res.data?.message || "Đổi mật khẩu thành công!");
+            setShowPasswordModal(false);
+        } catch (error) {
+            let errorMessage = error.response?.data?.message || "Lỗi khi đổi mật khẩu. Mã OTP có thể đã hết hạn.";
+            if (error.response?.data?.errors) {
+                const validationErrors = error.response.data.errors;
+                const firstErrorKey = Object.keys(validationErrors)[0];
+                errorMessage = validationErrors[firstErrorKey][0];
+            }
+            notify.error(errorMessage);
+        } finally {
+            setIsChangingPassword(false);
         }
     };
 
@@ -116,6 +178,7 @@ const ResidentProfile = () => {
                 <div className="col-lg-10">
                     <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
                         <div className="row g-0">
+                            {/* KHU VỰC AVATAR */}
                             <div className="col-md-4 bg-light p-4 p-md-5 text-center d-flex flex-column align-items-center justify-content-center border-end">
                                 <div className="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center mb-4" style={{ width: '120px', height: '120px', border: '4px solid #dee2e6' }}>
                                     <i className="bi bi-person-fill text-secondary" style={{ fontSize: '4rem' }}></i>
@@ -131,12 +194,23 @@ const ResidentProfile = () => {
                                 </div>
                             </div>
 
+                            {/* KHU VỰC CHI TIẾT */}
                             <div className="col-md-8 p-4 p-md-5 bg-white">
                                 <div className="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
                                     <h5 className="fw-bold text-dark mb-0"><i className="bi bi-card-list me-2"></i>Chi tiết hồ sơ</h5>
-                                    <button onClick={handleOpenModal} className="btn btn-sm btn-outline-primary fw-semibold">
-                                        <i className="bi bi-pencil-square me-1"></i> Cập nhật
-                                    </button>
+                                    <div>
+                                        <button onClick={handleOpenModal} className="btn btn-sm btn-outline-primary fw-semibold">
+                                            <i className="bi bi-pencil-square me-1"></i> Cập nhật
+                                        </button>
+                                        <button onClick={handleRequestOtp} disabled={isRequestingOtp} className="btn btn-sm btn-outline-primary fw-semibold ms-2">
+                                            {isRequestingOtp ? (
+                                                <span className="spinner-border spinner-border-sm me-1"></span>
+                                            ) : (
+                                                <i className="bi bi-key me-1"></i>
+                                            )} 
+                                            Đổi mật khẩu
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="row g-4">
@@ -177,7 +251,10 @@ const ResidentProfile = () => {
                 </div>
             </div>
 
-            {showModal && <div className="modal-backdrop fade show"></div>}
+            {/* MÀN MỜ CHUNG CHO CÁC MODAL */}
+            {(showModal || showPasswordModal) && <div className="modal-backdrop fade show"></div>}
+
+            {/* MODAL CẬP NHẬT THÔNG TIN */}
             {showModal && (
                 <div className="modal fade show d-block" tabIndex="-1">
                     <div className="modal-dialog modal-dialog-centered">
@@ -239,6 +316,93 @@ const ResidentProfile = () => {
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Hủy bỏ</button>
                                     <button type="submit" className="btn btn-primary px-4" disabled={isSubmitting}>
                                         {isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL ĐỔI MẬT KHẨU (Giao diện đồng bộ + Toggle Password) */}
+            {showPasswordModal && (
+                <div className="modal fade show d-block" tabIndex="-1">
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-0 shadow-lg">
+                            <div className="modal-header bg-primary text-white">
+                                <h5 className="modal-title fw-bold">Đổi mật khẩu</h5>
+                                <button type="button" className="btn-close btn-close-white" onClick={() => setShowPasswordModal(false)}></button>
+                            </div>
+                            <form onSubmit={handleChangePassword}>
+                                <div className="modal-body p-4">
+                                    <div className="alert alert-primary bg-primary-subtle border-0 small mb-4">
+                                        <i className="bi bi-info-circle-fill me-2"></i>
+                                        Mã OTP gồm 6 chữ số đã được gửi đến hộp thư email của bạn. Vui lòng kiểm tra và nhập vào bên dưới.
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label fw-semibold">Mã OTP (*)</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Nhập mã OTP 6 số"
+                                            value={passwordForm.otpCode}
+                                            onChange={(e) => setPasswordForm({ ...passwordForm, otpCode: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label fw-semibold">Mật khẩu hiện tại (*)</label>
+                                        <div className="input-group">
+                                            <input
+                                                type={showOldPassword ? "text" : "password"}
+                                                className="form-control"
+                                                placeholder="Nhập mật khẩu đang sử dụng"
+                                                value={passwordForm.oldPassword}
+                                                onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                                                required
+                                            />
+                                            <button className="btn btn-outline-secondary" type="button" onClick={() => setShowOldPassword(!showOldPassword)}>
+                                                <i className={`bi ${showOldPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label fw-semibold">Mật khẩu mới (*)</label>
+                                        <div className="input-group">
+                                            <input
+                                                type={showNewPassword ? "text" : "password"}
+                                                className="form-control"
+                                                placeholder="Ít nhất 8 ký tự (chữ, số, ký tự đặc biệt)"
+                                                value={passwordForm.newPassword}
+                                                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                                                required
+                                            />
+                                            <button className="btn btn-outline-secondary" type="button" onClick={() => setShowNewPassword(!showNewPassword)}>
+                                                <i className={`bi ${showNewPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="form-label fw-semibold">Xác nhận mật khẩu (*)</label>
+                                        <div className="input-group">
+                                            <input
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                className="form-control"
+                                                placeholder="Nhập lại mật khẩu mới"
+                                                value={passwordForm.confirmNewPassword}
+                                                onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
+                                                required
+                                            />
+                                            <button className="btn btn-outline-secondary" type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                                <i className={`bi ${showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-footer bg-light">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowPasswordModal(false)}>Hủy bỏ</button>
+                                    <button type="submit" className="btn btn-primary px-4" disabled={isChangingPassword}>
+                                        {isChangingPassword ? 'Đang xử lý...' : 'Xác nhận đổi'}
                                     </button>
                                 </div>
                             </form>
