@@ -24,7 +24,6 @@ import PaymentManagement from './pages/admin/PaymentManagement';
 import ResidentDashboard from './pages/resident/ResidentDashboard';
 import ResidentLayout from './components/ResidentLayout';
 import ResidentProfile from './pages/resident/ResidentProfile';
-import FirstLoginSetup from './pages/FirstLoginSetup';
 
 
 function App() {
@@ -58,11 +57,6 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<Login />} />
-        </Route>
-
-        {/* First-login setup: accessible to any authenticated user */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/first-login-setup" element={<FirstLoginSetup />} />
         </Route>
         <Route element={<ProtectedRoute allowedRole="Resident" />}>
           <Route path="/resident" element={<ResidentLayout />}>
