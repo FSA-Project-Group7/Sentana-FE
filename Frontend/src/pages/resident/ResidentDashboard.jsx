@@ -5,18 +5,19 @@ const ResidentDashboard = () => {
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal Thanh toán
     const [showPayModal, setShowPayModal] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [file, setFile] = useState(null);
     const [note, setNote] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // 1. Lấy danh sách hóa đơn của chính Cư dân này đang đăng nhập
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [detailData, setDetailData] = useState(null);
+    const [loadingDetail, setLoadingDetail] = useState(false);
+
     const fetchMyInvoices = async () => {
         setLoading(true);
         try {
-            // LƯU Ý: Đảm bảo Backend có API này (lấy hóa đơn theo AccountId từ Token)
             const res = await api.get('/Invoice/my-invoices');
             const dataList = res.data?.data || res.data;
             setInvoices(Array.isArray(dataList) ? dataList : []);
@@ -31,7 +32,6 @@ const ResidentDashboard = () => {
         fetchMyInvoices();
     }, []);
 
-    // 2. Mở Modal Thanh toán
     const handleOpenPay = (invoice) => {
         setSelectedInvoice(invoice);
         setFile(null);
@@ -39,29 +39,52 @@ const ResidentDashboard = () => {
         setShowPayModal(true);
     };
 
-    // 3. Xử lý Upload Ảnh (Gửi FormData chứa File lên Backend)
+    const handleOpenDetail = async (invoice) => {
+        setSelectedInvoice(invoice);
+        setShowDetailModal(true);
+        setLoadingDetail(true);
+        try {
+            const res = await api.get(`/Invoice/my-invoices?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
+            
+            const dataList = res.data?.data || res.data;
+            if (dataList && dataList.length > 0) {
+                setDetailData(dataList[0]);
+            }
+        } catch (error) {
+            alert("Không thể tải chi tiết hóa đơn.");
+        } finally {
+            setLoadingDetail(false);
+        }
+    };
+
+    const closeModal = () => {
+        setShowPayModal(false);
+        setShowDetailModal(false);
+        setSelectedInvoice(null);
+        setDetailData(null);
+    };
+
     const handleSubmitPayment = async (e) => {
         e.preventDefault();
         if (!file) {
-            alert("Vui lòng chọn ảnh biên lai chuyển khoản!");
+            alert("Vui lòng chọn ảnh biên lai giao dịch!");
             return;
         }
 
         setIsSubmitting(true);
         const formData = new FormData();
         formData.append('InvoiceId', selectedInvoice.invoiceId);
-        formData.append('ImageFile', file); // Biến ImageFile phải khớp với DTO bên BE
+        formData.append('ImageFile', file);
         if (note) formData.append('Note', note);
 
         try {
-            // LƯU Ý: Đường dẫn này phụ thuộc vào PaymentController của bạn
             const res = await api.post('/Payment/submit-proof', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
             alert(res.data?.message || "Đã gửi biên lai thành công! Vui lòng chờ Ban quản lý duyệt.");
-            setShowPayModal(false);
-            fetchMyInvoices(); // Tải lại danh sách để cập nhật trạng thái
+            closeModal();
+            fetchMyInvoices();
         } catch (error) {
             alert("LỖI: " + (error.response?.data?.message || "Không thể gửi biên lai."));
         } finally {
@@ -69,9 +92,15 @@ const ResidentDashboard = () => {
         }
     };
 
-    // Helper: Định dạng tiền tệ
     const formatMoney = (amount) => {
-        return amount?.toLocaleString('vi-VN') + ' đ';
+        return (amount || 0).toLocaleString('vi-VN') + ' đ';
+    };
+
+    const getStatusBadge = (statusName) => {
+        if (statusName === 'Paid') return <span className="badge bg-success">Đã thanh toán</span>;
+        if (statusName === 'Unpaid') return <span className="badge bg-danger">Chưa thanh toán</span>;
+        if (statusName === 'PendingVerification' || statusName === 'Pending') return <span className="badge bg-warning text-dark">Đang chờ duyệt</span>;
+        return <span className="badge bg-secondary">{statusName || 'Không rõ'}</span>;
     };
 
     return (
@@ -97,17 +126,13 @@ const ResidentDashboard = () => {
                             <div className={`card h-100 shadow-sm border-0 ${inv.statusName === 'Unpaid' ? 'border-top border-danger border-4' : 'border-top border-success border-4'}`}>
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between align-items-center mb-3">
-                                        <h5 className="card-title fw-bold mb-0">Tháng {inv.billingMonth}/{inv.billingYear}</h5>
-                                        {inv.statusName === 'Unpaid' ? (
-                                            <span className="badge bg-danger">Chưa thanh toán</span>
-                                        ) : inv.statusName === 'Pending' ? (
-                                            <span className="badge bg-warning text-dark">Đang chờ duyệt</span>
-                                        ) : (
-                                            <span className="badge bg-success">Đã thanh toán</span>
-                                        )}
+                                        <h5 className="card-title fw-bold mb-0 text-primary">
+                                            {inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}
+                                        </h5>
+                                        {getStatusBadge(inv.statusName)}
                                     </div>
 
-                                    <div className="mb-3">
+                                    <div className="mb-4">
                                         <div className="d-flex justify-content-between small mb-1">
                                             <span className="text-muted">Tổng tiền:</span>
                                             <span className="fw-bold">{formatMoney(inv.totalMoney)}</span>
@@ -122,14 +147,16 @@ const ResidentDashboard = () => {
                                         </div>
                                     </div>
 
-                                    {inv.statusName === 'Unpaid' && inv.debt > 0 && (
-                                        <button
-                                            className="btn btn-primary w-100 fw-bold"
-                                            onClick={() => handleOpenPay(inv)}
-                                        >
-                                            <i className="bi bi-qr-code-scan me-2"></i> Thanh toán ngay
+                                    <div className="d-flex gap-2 mt-auto">
+                                        <button className="btn btn-outline-info w-100 fw-bold" onClick={() => handleOpenDetail(inv)}>
+                                            <i className="bi bi-receipt me-1"></i> Chi tiết
                                         </button>
-                                    )}
+                                        {inv.statusName === 'Unpaid' && inv.debt > 0 && (
+                                            <button className="btn btn-primary w-100 fw-bold" onClick={() => handleOpenPay(inv)}>
+                                                <i className="bi bi-qr-code-scan me-1"></i> Thanh toán
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -137,20 +164,91 @@ const ResidentDashboard = () => {
                 </div>
             )}
 
+            {/* MÀN MỜ CHUNG */}
+            {(showPayModal || showDetailModal) && <div className="modal-backdrop fade show"></div>}
+
+            {/* MODAL XEM CHI TIẾT HÓA ĐƠN */}
+            {showDetailModal && (
+                <div className="modal fade show d-block" tabIndex="-1">
+                    <div className="modal-dialog modal-lg modal-dialog-centered">
+                        <div className="modal-content">
+                            <div className="modal-header bg-info text-white">
+                                <h5 className="modal-title fw-bold">Chi Tiết Hóa Đơn</h5>
+                                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
+                            </div>
+                            <div className="modal-body">
+                                {loadingDetail || !detailData ? (
+                                    <div className="text-center p-4"><div className="spinner-border text-info"></div></div>
+                                ) : (
+                                    <div>
+                                        <div className="row mb-4 bg-light p-3 rounded mx-0">
+                                            <div className="col-md-6 mb-2">
+                                                <span className="text-muted d-block small">Kỳ thanh toán:</span> 
+                                                <strong className="text-primary fs-6">
+                                                    {detailData.billingPeriod || `Tháng ${detailData.billingMonth}/${detailData.billingYear}`}
+                                                </strong>
+                                            </div>
+                                            <div className="col-md-6 mb-2">
+                                                <span className="text-muted d-block small">Mã Phòng:</span> 
+                                                <strong className="fs-6">{detailData.apartmentCode}</strong>
+                                            </div>
+                                            <div className="col-md-6 mb-2">
+                                                <span className="text-muted d-block small">Trạng thái:</span> 
+                                                {getStatusBadge(detailData.statusName)}
+                                            </div>
+                                            <div className="col-md-6 mb-2">
+                                                <span className="text-muted d-block small">Ngày lập hóa đơn:</span> 
+                                                <strong>{detailData.dayCreat || "Đang cập nhật"}</strong>
+                                            </div>
+                                        </div>
+
+                                        <h6 className="fw-bold text-primary border-bottom pb-2 mb-3">
+                                            <i className="bi bi-list-columns-reverse me-2"></i>Bảng Kê Phân Bổ Chi Phí
+                                        </h6>
+                                        <table className="table table-bordered text-center align-middle">
+                                            <thead className="table-light text-muted small text-uppercase">
+                                                <tr>
+                                                    <th className="text-start ps-3">Hạng mục khoản thu</th>
+                                                    <th>Thành tiền (VNĐ)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {detailData.details && detailData.details.map((d, idx) => (
+                                                    <tr key={idx}>
+                                                        <td className="text-start ps-3 py-2">{d.feeName}</td>
+                                                        <td className="fw-semibold py-2">{formatMoney(d.amount)}</td>
+                                                    </tr>
+                                                ))}
+                                                <tr className="table-secondary">
+                                                    <td className="text-end pe-3 fw-bold py-3">TỔNG CỘNG:</td>
+                                                    <td className="fw-bold text-danger fs-5 py-3">{formatMoney(detailData.totalMoney)}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer bg-light">
+                                <button type="button" className="btn btn-secondary fw-bold" onClick={closeModal}>Đóng</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL UPLOAD BIÊN LAI */}
-            {showPayModal && <div className="modal-backdrop fade show"></div>}
             {showPayModal && (
                 <div className="modal fade show d-block" tabIndex="-1">
                     <div className="modal-dialog modal-dialog-centered">
                         <div className="modal-content">
                             <div className="modal-header bg-primary text-white">
-                                <h5 className="modal-title fw-bold">Gửi Biên Lai Thanh Toán</h5>
-                                <button type="button" className="btn-close btn-close-white" onClick={() => setShowPayModal(false)}></button>
+                                <h5 className="modal-title fw-bold">Gửi Biên Lai Giao Dịch</h5>
+                                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
                             </div>
                             <form onSubmit={handleSubmitPayment}>
                                 <div className="modal-body">
                                     <div className="alert alert-info small mb-4">
-                                        Vui lòng chuyển khoản số tiền <strong className="text-danger">{formatMoney(selectedInvoice?.debt)}</strong> theo thông tin của Ban quản lý, sau đó tải ảnh chụp màn hình giao dịch lên đây.
+                                        Vui lòng chuyển khoản số tiền <strong className="text-danger">{formatMoney(selectedInvoice?.debt)}</strong> theo thông tin của Ban quản lý, sau đó tải ảnh chụp màn hình giao dịch lên đây để được xác nhận.
                                     </div>
 
                                     <div className="mb-3">
@@ -175,7 +273,7 @@ const ResidentDashboard = () => {
                                     </div>
                                 </div>
                                 <div className="modal-footer bg-light">
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowPayModal(false)}>Hủy</button>
+                                    <button type="button" className="btn btn-secondary" onClick={closeModal}>Hủy</button>
                                     <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                                         {isSubmitting ? 'Đang tải lên...' : 'Xác nhận Gửi'}
                                     </button>
