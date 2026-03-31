@@ -24,8 +24,9 @@ import PaymentManagement from './pages/admin/PaymentManagement';
 import ResidentDashboard from './pages/resident/ResidentDashboard';
 import ResidentLayout from './components/ResidentLayout';
 import ResidentProfile from './pages/resident/ResidentProfile';
-import FirstLoginSetup from './pages/FirstLoginSetup';
 
+import FirstLoginSetup from './pages/FirstLoginSetup';
+import MaintenanceRequest from './pages/resident/MaintenanceRequest';
 
 function App() {
   useEffect(() => {
@@ -60,7 +61,6 @@ function App() {
           <Route path="/login" element={<Login />} />
         </Route>
 
-        {/* First-login setup: accessible to any authenticated user */}
         <Route element={<ProtectedRoute />}>
           <Route path="/first-login-setup" element={<FirstLoginSetup />} />
         </Route>
@@ -70,6 +70,7 @@ function App() {
             <Route path="dashboard" element={<ResidentDashboard />} />
             <Route path="profile" element={<ResidentProfile />} />
 
+            <Route path="maintenance" element={<MaintenanceRequest />} />
           </Route>
         </Route>
 

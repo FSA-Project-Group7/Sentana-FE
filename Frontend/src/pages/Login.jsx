@@ -24,32 +24,47 @@ const Login = () => {
       });
       console.log("Dữ liệu BE trả về:", response.data);
 
-      const { token, role, refreshToken, requiresPasswordChange } = response.data.data;
+      // Thêm ?. an toàn để phòng trường hợp backend trả về rỗng
+      const responseData = response.data?.data || response.data?.Data || {};
+      const { token, role, refreshToken, requiresPasswordChange } = responseData;
+
+      // =================================================================
+      // ĐÂY LÀ CHỖ SỬA LỖI: Chặn chuyển trang nếu không có token
+      // =================================================================
+      if (!token) {
+        // Lấy thông báo lỗi từ backend nếu có, nếu không lấy câu mặc định
+        const errorMsg = response.data?.message || response.data?.Message || 'Sai tài khoản hoặc mật khẩu!';
+        setError(errorMsg);
+        setPassword(''); // Xóa mật khẩu đi để khách nhập lại
+        setIsLoading(false);
+        return; // Lệnh return này sẽ khóa không cho chạy các code ở dưới
+      }
 
       localStorage.setItem('token', token);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('role', role);
-      localStorage.setItem('requiresPasswordChange', requiresPasswordChange ? 'true' : 'false');
-
-      // Redirect first-login users before anyone else
-      if (requiresPasswordChange) {
-        navigate('/first-login-setup');
-        return;
-      }
 
       if (role === 'Manager') {
         navigate('/admin');
       } else if (role === 'Resident') {
         navigate('/resident');
-      } else if (role === 'Technician') {
-        navigate('/technician');
       } else {
         navigate('/');
       }
 
     } catch (err) {
       console.error("Lỗi đăng nhập:", err);
-      setError('Sai tài khoản hoặc mật khẩu!');
+      
+      // Bắt thêm thông báo lỗi chi tiết từ backend nếu có (tránh câu chung chung)
+      const errData = err.response?.data;
+      let msg = 'Sai tài khoản hoặc mật khẩu!';
+      
+      if (errData?.message || errData?.Message) {
+        msg = errData.message || errData.Message;
+      }
+
+      setError(msg);
+      setPassword(''); // Xóa mật khẩu khi có lỗi
     } finally {
       setIsLoading(false);
     }
