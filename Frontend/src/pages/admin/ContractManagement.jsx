@@ -203,7 +203,14 @@ const ContractManagement = () => {
             await api[method](url, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
             toast.success(isDraftSubmit ? "Đã lưu nháp!" : "Phát hành hợp đồng thành công!");
             closeDrawer(); fetchData();
-        } catch (error) { toast.error("Backend từ chối thao tác."); }
+        } catch (error) {
+            // Log ra console để Tech Lead dễ soi
+            console.error("Chi tiết lỗi BE:", error.response?.data);
+
+            // Lấy đúng câu chửi của Backend để hiển thị lên màn hình
+            const backendMessage = error.response?.data?.message || error.response?.data?.Message || "Lỗi dữ liệu đầu vào!";
+            toast.error("BE báo lỗi: " + backendMessage);
+        }
         finally { setIsSubmitting(false); }
     };
 
