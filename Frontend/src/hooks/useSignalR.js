@@ -11,7 +11,7 @@ export const useSignalR = () => {
             console.warn("SignalR: Không tìm thấy token xác thực, dừng kết nối.");
             return;
         }
-        const hubUrl = "https://localhost:7200/hubs/notification";
+        const hubUrl = import.meta.env.VITE_SIGNALR_HUB_URL;
 
         const newConnection = new signalR.HubConnectionBuilder()
             .withUrl(hubUrl, {
