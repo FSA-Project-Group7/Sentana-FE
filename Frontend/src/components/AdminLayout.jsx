@@ -31,6 +31,7 @@ const AdminLayout = () => {
         { path: '/admin/technicians', label: 'Kỹ thuật viên', icon: 'bi-person-gear me-2' },
         { path: '/admin/accounts', label: 'Tài khoản hệ thống', icon: 'bi-person-lock me-2' },
         { path: '/admin/services', label: 'Dịch vụ tiện ích', icon: 'bi-tools me-2' },
+        { path: '/admin/maintenance', label: 'Yêu cầu Bảo trì', icon: 'bi-tools text-primary me-2' },
         { path: '/admin/utilities', label: 'Quản lý Điện Nước', icon: 'bi-lightning-charge-fill text-warning me-2' },
         { path: '/admin/contracts', label: 'Quản lý Hợp đồng', icon: 'bi-file-earmark-text-fill text-success me-2' },
         { path: '/admin/invoices', label: 'Quản lý Hóa đơn', icon: 'bi-receipt text-danger me-2' },

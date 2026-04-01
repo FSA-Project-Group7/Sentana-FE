@@ -1,254 +1,411 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import Pagination from '../../components/common/Pagination';
+import { notify } from '../../utils/notificationAlert';
+import { useSignalR } from '../../hooks/useSignalR';
 
-// 🎨 CSS SAAS ĐỒNG BỘ VỚI MÀN HÌNH CONTRACT
-const customStyles = `
-.modern-card { background: #ffffff; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #f1f5f9; transition: all 0.3s ease; }
-.modern-card:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08); transform: translateY(-2px); }
-.page-header { background: linear-gradient(135deg, #10b981 0%, #047857 100%); color: white; padding: 32px 40px; border-radius: 24px; margin-bottom: 32px; box-shadow: 0 20px 25px -5px rgba(4, 120, 87, 0.15); position: relative; overflow: hidden; }
-.page-header::after { content: ''; position: absolute; top: -50%; right: -10%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%); border-radius: 50%; pointer-events: none; }
-
-.btn-gradient-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; font-weight: 700; letter-spacing: 0.3px; border-radius: 12px; padding: 12px 24px; transition: all 0.2s; }
-.btn-gradient-success:hover { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; box-shadow: 0 8px 16px rgba(5, 150, 105, 0.25); transform: translateY(-1px); }
-.form-control, .form-select { padding: 12px 16px; border-radius: 12px; border: 1px solid #e2e8f0; background-color: #f8fafc; font-weight: 500; transition: all 0.2s; }
-.form-control:focus, .form-select:focus { background-color: #ffffff; border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); }
-
-.table-custom { border-collapse: separate; border-spacing: 0 12px; margin-top: -12px; width: 100%; }
-.table-custom th { background: transparent; color: #64748b; font-weight: 800; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; border: none; padding: 0 24px 8px 24px; }
-.table-custom td { background: #ffffff; padding: 20px 24px; vertical-align: middle; color: #334155; border-top: 1px solid #f8fafc; border-bottom: 1px solid #f8fafc; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-.table-custom td:first-child { border-left: 1px solid #f8fafc; border-top-left-radius: 16px; border-bottom-left-radius: 16px; }
-.table-custom td:last-child { border-right: 1px solid #f8fafc; border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
-.table-custom tbody tr:hover td { background-color: #f8fafc; border-color: #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.04); transform: scale(1.001); z-index: 1; position: relative; }
-
-.status-badge { padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.3px; text-transform: uppercase; }
-.img-preview { width: 64px; height: 64px; object-fit: cover; border-radius: 12px; border: 2px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; }
-.img-preview:hover { transform: scale(1.1); }
-.file-name-chip { display: inline-block; background: #e2e8f0; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-top: 8px; }
-`;
-
-const MaintenanceRequest = () => {
-    // --- 1. STATE MANAGEMENT ---
+const MaintenanceManagement = () => {
     const [requests, setRequests] = useState([]);
-    const [apartments, setApartments] = useState([]);
-    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const pageSize = 10;
 
-    // Form State ĐÚNG CHUẨN BACKEND
-    const [formData, setFormData] = useState({ 
-        apartmentId: '', 
-        categoryId: '', 
-        title: '', 
-        description: '', 
-        file: null 
-    });
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [technicians, setTechnicians] = useState([]);
+    const [assignForm, setAssignForm] = useState({ technicianId: '', priority: 2 });
+    const [isAssigning, setIsAssigning] = useState(false);
 
-    // --- 2. FETCH DATA ---
-    const fetchData = async () => {
-        setLoading(true);
+    const connection = useSignalR();
+
+    useEffect(() => {
+        if (!connection) return;
+
+        connection.start()
+            .then(() => {
+                // Tối ưu UX: Lắng nghe SignalR và update trực tiếp state 'requests' 
+                // thay vì gọi lại API fetchRequests() để tránh giật lag bảng dữ liệu.
+                connection.on("ReceiveNewMaintenanceRequest", (newReq) => {
+                    notify.info(`🚨 Sự cố mới: ${newReq.title} tại P.${newReq.apartmentCode || newReq.apartmentName}`);
+                    setRequests(prev => [newReq, ...prev]);
+                });
+
+                connection.on("ReceiveFixedTask", (fixedReq) => {
+                    notify.success(`✅ Thợ đã xử lý xong sự cố #${fixedReq.requestId}`);
+                    setRequests(prev => prev.map(req =>
+                        req.requestId === fixedReq.requestId
+                            ? { ...req, status: 'Resolved', resolutionNote: fixedReq.resolutionNote }
+                            : req
+                    ));
+                });
+
+                connection.on("TaskProcessing", (procReq) => {
+                    setRequests(prev => prev.map(req =>
+                        req.requestId === procReq.requestId ? { ...req, status: 'InProgress' } : req
+                    ));
+                });
+            })
+            .catch(err => console.error('SignalR Connection Error: ', err));
+
+        return () => connection.stop();
+    }, [connection]);
+
+    useEffect(() => {
+        fetchRequests(currentPage);
+    }, [currentPage]);
+
+    const fetchRequests = async (page) => {
         try {
-            // Lấy lịch sử yêu cầu của user
-            const reqRes = await api.get('/maintenance/my-requests');
-            setRequests(reqRes.data?.data || reqRes.data?.Data || []);
-            
-            // Lấy danh sách hợp đồng để lọc ra Căn hộ của riêng cư dân này (Active)
-            const contractRes = await api.get('/contract/view-all-contract').catch(() => ({ data: [] }));
-            const allContracts = Array.isArray(contractRes.data?.data || contractRes.data?.Data) ? (contractRes.data?.data || contractRes.data?.Data) : [];
-            const myAccountId = localStorage.getItem('accountId'); 
-            
-            const myActiveContracts = allContracts.filter(c => 
-                (String(c.accountId) === String(myAccountId) || String(c.residentAccountId) === String(myAccountId)) 
-                && c.status === 1
-            );
-
-            const myApts = [];
-            myActiveContracts.forEach(c => {
-                if (c.apartment && !myApts.find(a => a.apartmentId === c.apartment.apartmentId)) {
-                    myApts.push(c.apartment);
-                }
+            setLoading(true);
+            const res = await api.get('/Maintenance/request', {
+                params: { pageIndex: page, pageSize: pageSize }
             });
-            setApartments(myApts);
-
-            // Hardcode danh mục vì hệ thống chưa có API Get Category
-            setCategories([
-                { categoryId: 1, categoryName: 'Sự cố Nước / Ống nước' },
-                { categoryId: 2, categoryName: 'Sự cố Điện / Chập cháy' },
-                { categoryId: 3, categoryName: 'Hư hỏng Nội thất' },
-                { categoryId: 4, categoryName: 'Sự cố Khác' }
-            ]);
-        } catch (error) { toast.error("Không thể tải dữ liệu hệ thống."); }
-        setLoading(false);
-    };
-
-    useEffect(() => { fetchData(); }, []);
-
-    // --- 3. FORM LOGIC & GUARDRAILS ---
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) {
-            setFormData(prev => ({ ...prev, file: null }));
-            return;
-        }
-        if (!file.type.startsWith("image/")) { 
-            toast.error("Hệ thống chỉ hỗ trợ upload file hình ảnh!"); 
-            e.target.value = ''; 
-            return; 
-        }
-        if (file.size > 5 * 1024 * 1024) { 
-            toast.error("Ảnh quá lớn! Vui lòng chọn ảnh dưới 5MB."); 
-            e.target.value = ''; 
-            return; 
-        }
-        setFormData(prev => ({ ...prev, file }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        // Business Guard
-        if (!formData.apartmentId || !formData.categoryId || !formData.title.trim() || !formData.description.trim()) {
-            return toast.warning("Vui lòng điền đầy đủ các trường có dấu (*).");
-        }
-
-        setIsSubmitting(true);
-        const payload = new FormData();
-        payload.append("ApartmentId", formData.apartmentId);
-        payload.append("CategoryId", formData.categoryId);
-        payload.append("Title", formData.title);
-        payload.append("Description", formData.description);
-        if (formData.file) payload.append("Photo", formData.file);
-
-        try {
-            await api.post('/maintenance/requests', payload, { headers: { 'Content-Type': 'multipart/form-data' } });
-            toast.success("Đã gửi yêu cầu bảo trì thành công! Ban Quản Lý sẽ sớm liên hệ.");
-            
-            setFormData({ apartmentId: '', categoryId: '', title: '', description: '', file: null });
-            const fileInput = document.getElementById('photoUpload');
-            if(fileInput) fileInput.value = '';
-            
-            fetchData(); 
+            const data = res.data?.data || res.data;
+            setRequests(data.items || []);
+            setTotalPages(Math.ceil((data.totalCount || 0) / pageSize));
         } catch (error) {
-            toast.error(error.response?.data?.message || "Lỗi hệ thống khi gửi báo cáo.");
+            notify.error("Không thể tải danh sách sự cố.");
         } finally {
-            setIsSubmitting(false);
+            setLoading(false);
         }
     };
 
-    // --- 4. UI HELPERS ---
-    const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day: '2-digit', month: '2-digit', year: 'numeric'}) : "N/A";
-    
-    const getStatusBadge = (status) => {
-        const s = String(status).toUpperCase();
-        if (s.includes('PENDING') || s === '0') return <span className="status-badge bg-warning bg-opacity-10 text-warning border border-warning"><i className="bi bi-hourglass-split"></i> Chờ tiếp nhận</span>;
-        if (s.includes('IN_PROGRESS') || s.includes('PROCESSING') || s === '1' || s === '3') return <span className="status-badge bg-primary bg-opacity-10 text-primary border border-primary"><i className="bi bi-tools"></i> Đang sửa chữa</span>;
-        if (s.includes('DONE') || s.includes('FIXED') || s === '2' || s === '4') return <span className="status-badge bg-success bg-opacity-10 text-success border border-success"><i className="bi bi-check-circle-fill"></i> Đã hoàn thành</span>;
-        return <span className="status-badge bg-secondary bg-opacity-10 text-secondary border border-secondary">{status}</span>;
+    const fetchAvailableTechnicians = async () => {
+        try {
+            const res = await api.get('/Technicians/available');
+            const data = res.data?.data || res.data || [];
+            setTechnicians(Array.isArray(data) ? data : []);
+        } catch (error) {
+            notify.error("Không thể tải danh sách Kỹ thuật viên rảnh.");
+        }
     };
 
-    // --- 5. RENDER UI ---
-    return (
-        <div className="container-fluid p-4" style={{ backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
-            <style>{customStyles}</style>
-            <ToastContainer position="top-right" autoClose={3000} theme="colored" />
+    const handleOpenAssignModal = (req) => {
+        setSelectedRequest(req);
+        setAssignForm({ technicianId: '', priority: req.priority || 2 });
+        fetchAvailableTechnicians();
+    };
 
-            <div className="page-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div style={{zIndex: 2}}>
-                    <h2 className="fw-bolder mb-1"><i className="bi bi-wrench-adjustable-circle me-2"></i>Trung Tâm Hỗ Trợ & Bảo Trì</h2>
-                    <p className="mb-0 text-white-50 fw-medium" style={{ fontSize: '0.95rem' }}>Gửi yêu cầu sửa chữa thiết bị hư hỏng trong căn hộ của bạn.</p>
+    const submitAssignTechnician = async (e) => {
+        e.preventDefault();
+        if (!assignForm.technicianId) return notify.error("Vui lòng chọn Kỹ thuật viên!");
+
+        setIsAssigning(true);
+        try {
+            await api.put(`/Maintenance/requests/${selectedRequest.requestId}/assign`, {
+                technicianId: parseInt(assignForm.technicianId),
+                priority: parseInt(assignForm.priority)
+            });
+
+            setRequests(prev => prev.map(req =>
+                req.requestId === selectedRequest.requestId
+                    ? {
+                        ...req,
+                        status: 'Accepted',
+                        assignedTechnicianName: technicians.find(t => t.id == assignForm.technicianId || t.accountId == assignForm.technicianId)?.fullName,
+                        priority: assignForm.priority
+                    }
+                    : req
+            ));
+
+            notify.success("Gán Kỹ thuật viên thành công!");
+            document.getElementById('closeAssignModal').click();
+        } catch (error) {
+            notify.error(error.response?.data?.message || "Lỗi khi gán Kỹ thuật viên.");
+        } finally {
+            setIsAssigning(false);
+        }
+    };
+
+    const renderStatusBadge = (status) => {
+        switch (String(status)) {
+            case '1': case 'Pending': return <span className="badge bg-warning text-dark"><i className="bi bi-hourglass-split me-1"></i> Chờ tiếp nhận</span>;
+            case '2': case 'Accepted': return <span className="badge bg-info text-dark"><i className="bi bi-person-check me-1"></i> Đã phân công</span>;
+            case '3': case 'InProgress': return <span className="badge bg-primary"><i className="bi bi-tools me-1"></i> Đang xử lý</span>;
+            case '4': case 'Resolved': return <span className="badge bg-success"><i className="bi bi-check2-circle me-1"></i> Đã hoàn tất</span>;
+            default: return <span className="badge bg-secondary">Không xác định</span>;
+        }
+    };
+
+    const renderPriorityText = (priority) => {
+        switch (String(priority)) {
+            case '1': return <span className="text-secondary fw-semibold">Thấp</span>;
+            case '2': return <span className="text-primary fw-semibold">Vừa</span>;
+            case '3': return <span className="text-warning fw-semibold">Cao</span>;
+            case '4': return <span className="text-danger fw-bold">Khẩn cấp</span>;
+            default: return 'Chưa rõ';
+        }
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Chưa có';
+        const d = new Date(dateString);
+        return `${d.toLocaleDateString('vi-VN')} ${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+    };
+
+    return (
+        <div className="container-fluid p-0">
+            {/* === HEADER === */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 className="fw-bold mb-0">Quản Lý Sự Cố & Bảo Trì</h2>
+                    <div className="text-muted small mt-2">Theo dõi và điều phối yêu cầu sửa chữa từ cư dân</div>
+                </div>
+                <button className="btn btn-primary shadow-sm fw-bold" onClick={() => fetchRequests(currentPage)}>
+                    <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
+                </button>
+            </div>
+
+            {/* === MAIN DATA TABLE === */}
+            <div className="card shadow-sm border-0 mb-4">
+                <div className="card-body p-0">
+                    {loading ? (
+                        <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
+                    ) : requests.length === 0 ? (
+                        <div className="text-center p-5 text-muted">
+                            <i className="bi bi-inbox display-4 d-block mb-3 opacity-50"></i>
+                            Chưa có yêu cầu bảo trì nào.
+                        </div>
+                    ) : (
+                        <div className="table-responsive">
+                            <table className="table table-hover align-middle mb-0">
+                                <thead className="table-light text-muted small text-uppercase">
+                                    <tr>
+                                        <th className="ps-4 py-3">Mã YC</th>
+                                        <th className="py-3">Người báo cáo</th>
+                                        <th className="py-3" style={{ minWidth: '200px' }}>Tiêu đề sự cố</th>
+                                        <th className="py-3">Danh mục</th>
+                                        <th className="py-3">Trạng thái</th>
+                                        <th className="py-3">Kỹ thuật viên</th>
+                                        <th className="py-3">Ngày gửi</th>
+                                        <th className="text-end pe-4 py-3">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {requests.map((req) => (
+                                        <tr key={req.requestId}>
+                                            <td className="ps-4 fw-semibold text-secondary">#{req.requestId}</td>
+
+                                            <td>
+                                                <div className="fw-semibold text-dark">{req.residentName}</div>
+                                                <div className="badge bg-light text-dark border mt-1 px-2 py-1">
+                                                    P.{req.apartmentName || req.apartmentCode}
+                                                </div>
+                                            </td>
+
+                                            <td className="fw-semibold text-dark text-truncate" style={{ maxWidth: '250px' }}>
+                                                {req.title}
+                                            </td>
+
+                                            <td>{req.categoryName}</td>
+                                            <td>{renderStatusBadge(req.status)}</td>
+
+                                            <td>
+                                                {req.assignedTechnicianName ? (
+                                                    <span className="text-primary fw-medium">
+                                                        <i className="bi bi-person-gear me-1"></i> {req.assignedTechnicianName}
+                                                    </span>
+                                                ) : (
+                                                    <div className="d-flex align-items-center">
+                                                        <span className="text-muted fst-italic small me-2">Chưa có thợ</span>
+                                                        <button
+                                                            className="btn btn-sm btn-outline-primary rounded-circle d-flex align-items-center justify-content-center"
+                                                            style={{ width: '28px', height: '28px' }}
+                                                            title="Phân công Kỹ thuật viên"
+                                                            onClick={() => handleOpenAssignModal(req)}
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#assignTechnicianModal"
+                                                        >
+                                                            <i className="bi bi-plus-lg"></i>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            <td className="small text-muted">{formatDate(req.createDay)}</td>
+
+                                            <td className="text-end pe-4">
+                                                <button
+                                                    className="btn btn-light btn-sm border rounded-circle text-primary shadow-sm"
+                                                    title="Xem chi tiết"
+                                                    onClick={() => setSelectedRequest(req)}
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#maintenanceDetailModal"
+                                                >
+                                                    <i className="bi bi-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            <div className="row g-4">
-                <div className="col-lg-4">
-                    <div className="modern-card p-4 sticky-top" style={{top: '20px'}}>
-                        <h5 className="fw-bold mb-4 text-dark"><i className="bi bi-send-plus-fill text-success me-2 fs-4"></i>Tạo Báo Cáo Sự Cố</h5>
-                        <form onSubmit={handleSubmit}>
-                            <div className="mb-3">
-                                <label className="form-label fw-bold small text-muted">Căn hộ xảy ra sự cố <span className="text-danger">*</span></label>
-                                <select className="form-select shadow-none" value={formData.apartmentId} onChange={e => setFormData({...formData, apartmentId: e.target.value})} required>
-                                    <option value="">-- Chọn Căn hộ của bạn --</option>
-                                    {apartments.map(a => <option key={a.apartmentId || a.ApartmentId} value={a.apartmentId || a.ApartmentId}>Phòng {a.apartmentCode || a.ApartmentCode}</option>)}
-                                </select>
+            {totalPages > 1 && (
+                <div className="d-flex justify-content-end">
+                    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                </div>
+            )}
+
+            {/* === MODAL: DETAIL === */}
+            {selectedRequest && (
+                <div className="modal fade" id="maintenanceDetailModal" tabIndex="-1" aria-hidden="true">
+                    <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                        <div className="modal-content border-0 shadow">
+                            <div className="modal-header bg-light border-bottom">
+                                <h5 className="modal-title fw-bold text-primary">Chi tiết yêu cầu</h5>
+                                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
                             </div>
-                            <div className="mb-3">
-                                <label className="form-label fw-bold small text-muted">Loại sự cố <span className="text-danger">*</span></label>
-                                <select className="form-select shadow-none" value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})} required>
-                                    <option value="">-- Chọn Danh mục --</option>
-                                    {categories.map(c => <option key={c.categoryId} value={c.categoryId}>{c.categoryName}</option>)}
-                                </select>
+                            <div className="modal-body p-4">
+                                <h4 className="fw-bold text-dark mb-4 pb-3 border-bottom">
+                                    {selectedRequest.title}
+                                </h4>
+
+                                <div className="row g-4">
+                                    <div className="col-md-7">
+                                        <div className="mb-3">
+                                            <span className="text-muted small text-uppercase fw-bold d-block mb-1">Người báo cáo</span>
+                                            <div className="fs-6 fw-semibold text-dark">
+                                                {selectedRequest.residentName}
+                                                <span className="badge bg-light text-dark border ms-2">P.{selectedRequest.apartmentName || selectedRequest.apartmentCode}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-3">
+                                            <span className="text-muted small text-uppercase fw-bold d-block mb-1">Mô tả chi tiết</span>
+                                            <div className="p-3 bg-light rounded border text-secondary" style={{ whiteSpace: 'pre-wrap', fontSize: '15px' }}>
+                                                {selectedRequest.description || "Không có mô tả chi tiết."}
+                                            </div>
+                                        </div>
+
+                                        {selectedRequest.resolutionNote && (
+                                            <div className="mb-3">
+                                                <span className="text-success small text-uppercase fw-bold d-block mb-1">Báo cáo khắc phục (Từ thợ)</span>
+                                                <div className="p-3 bg-success bg-opacity-10 border border-success-subtle rounded text-dark fw-medium">
+                                                    {selectedRequest.resolutionNote}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="col-md-5">
+                                        <div className="card bg-light border-0 shadow-sm mb-3">
+                                            <div className="card-body p-3">
+                                                <div className="d-flex justify-content-between mb-2">
+                                                    <span className="text-muted small">Trạng thái:</span>
+                                                    {renderStatusBadge(selectedRequest.status)}
+                                                </div>
+                                                <div className="d-flex justify-content-between mb-2">
+                                                    <span className="text-muted small">Mức độ:</span>
+                                                    <span>{renderPriorityText(selectedRequest.priority)}</span>
+                                                </div>
+                                                <div className="d-flex justify-content-between mb-2">
+                                                    <span className="text-muted small">Kỹ thuật viên:</span>
+                                                    <span className="fw-semibold">{selectedRequest.assignedTechnicianName || 'Chưa phân công'}</span>
+                                                </div>
+                                                <div className="d-flex justify-content-between">
+                                                    <span className="text-muted small">Ngày gửi:</span>
+                                                    <span className="fw-semibold text-end">{formatDate(selectedRequest.createDay)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <span className="text-muted small text-uppercase fw-bold d-block mb-2">Ảnh đính kèm</span>
+                                        {selectedRequest.imageUrl ? (
+                                            <div className="rounded border overflow-hidden shadow-sm">
+                                                <img
+                                                    src={selectedRequest.imageUrl}
+                                                    alt="Sự cố"
+                                                    className="img-fluid w-100"
+                                                    style={{ maxHeight: '200px', objectFit: 'cover' }}
+                                                    onError={(e) => { e.target.src = 'https://via.placeholder.com/400x200?text=Lỗi+tải+ảnh' }}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="p-3 text-center bg-light border rounded text-muted small">
+                                                Cư dân không đính kèm ảnh
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="mb-3">
-                                <label className="form-label fw-bold small text-muted">Tiêu đề ngắn gọn <span className="text-danger">*</span></label>
-                                <input type="text" className="form-control shadow-none" placeholder="VD: Ống nước nhà vệ sinh rò rỉ" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
+                            <div className="modal-footer bg-light border-0">
+                                <button type="button" className="btn btn-secondary px-4" data-bs-dismiss="modal">Đóng</button>
                             </div>
-                            <div className="mb-4">
-                                <label className="form-label fw-bold small text-muted">Mô tả chi tiết <span className="text-danger">*</span></label>
-                                <textarea className="form-control shadow-none" rows="4" placeholder="Mô tả cụ thể vị trí, tình trạng hư hỏng..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required></textarea>
-                            </div>
-                            <div className="mb-4">
-                                <label className="form-label fw-bold small text-muted">Hình ảnh đính kèm (Tùy chọn)</label>
-                                <input id="photoUpload" type="file" className="form-control shadow-none bg-white" accept="image/*" onChange={handleFileChange} />
-                                {formData.file && <div className="file-name-chip mt-2"><i className="bi bi-image me-1"></i> {formData.file.name}</div>}
-                            </div>
-                            <button type="submit" className="btn btn-gradient-success w-100 shadow" disabled={isSubmitting}>
-                                {isSubmitting ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-rocket-takeoff-fill me-2"></i>}
-                                {isSubmitting ? "Hệ thống đang xử lý..." : "Gửi Báo Cáo Sự Cố"}
-                            </button>
-                        </form>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                <div className="col-lg-8">
-                    <div className="modern-card p-4 h-100">
-                        <h5 className="fw-bold mb-4 text-dark"><i className="bi bi-clock-history text-primary me-2 fs-4"></i>Lịch sử Yêu cầu của bạn</h5>
-                        
-                        {loading ? (
-                            <div className="text-center py-5"><div className="spinner-border text-success mb-3"></div></div>
-                        ) : requests.length === 0 ? (
-                            <div className="text-center py-5 mt-5">
-                                <i className="bi bi-clipboard-check text-muted opacity-25 d-block mb-3" style={{fontSize: '5rem'}}></i>
-                                <h5 className="fw-bold text-dark">Bạn chưa gửi yêu cầu nào</h5>
-                                <p className="text-muted">Các báo cáo sự cố của bạn sẽ được hiển thị và theo dõi tại đây.</p>
-                            </div>
-                        ) : (
-                            <div className="table-responsive" style={{overflowX: 'visible'}}>
-                                <table className="table table-custom w-100 mb-0">
-                                    <thead><tr><th className="ps-4">Thời gian & Phòng</th><th>Sự cố & Trạng thái</th><th>Hình ảnh</th></tr></thead>
-                                    <tbody>
-                                        {requests.map((req, idx) => (
-                                            <tr key={req.id || req.RequestId || idx}>
-                                                <td className="ps-4">
-                                                    <div className="text-muted fw-bold small mb-1"><i className="bi bi-calendar-event me-1"></i> {formatDate(req.createdAt || req.CreateDay || req.CreatedAt)}</div>
-                                                    <span className="badge bg-dark bg-opacity-10 text-dark rounded-pill px-3 py-1 mt-1"><i className="bi bi-door-open text-warning me-1"></i>P.{req.apartmentCode || req.ApartmentCode || 'N/A'}</span>
-                                                </td>
-                                                <td>
-                                                    <div className="fw-bold text-dark fs-6 mb-1">{req.title || req.Title}</div>
-                                                    <div className="small text-muted mb-2 text-truncate" style={{maxWidth: '350px'}}>{req.description || req.Description}</div>
-                                                    <div className="d-flex align-items-center gap-2 mt-2">
-                                                        <span className="badge bg-secondary bg-opacity-10 text-secondary border">{req.categoryName || req.Category}</span>
-                                                        {getStatusBadge(req.status || req.Status)}
-                                                    </div>
-                                                    {(req.resolutionNote || req.ResolutionNote) && (
-                                                        <div className="alert alert-success mt-3 mb-0 py-2 px-3 small border-0 fw-semibold">
-                                                            <i className="bi bi-check2-all me-1"></i> Kỹ thuật viên: {req.resolutionNote || req.ResolutionNote}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="pe-4 text-end">
-                                                    {(req.photoUrl || req.PhotoUrl) ? (
-                                                        <a href={req.photoUrl || req.PhotoUrl} target="_blank" rel="noreferrer">
-                                                            <img src={req.photoUrl || req.PhotoUrl} alt="Minh chứng" className="img-preview" title="Nhấn để xem ảnh lớn" />
-                                                        </a>
-                                                    ) : <span className="badge bg-light text-muted border">Không đính kèm</span>}
-                                                </td>
-                                            </tr>
+            {/* === MODAL: ASSIGN TECHNICIAN === */}
+            <div className="modal fade" id="assignTechnicianModal" tabIndex="-1" aria-hidden="true">
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content border-0 shadow">
+                        <div className="modal-header bg-primary text-white">
+                            <h5 className="modal-title fw-bold">Phân công Kỹ thuật viên</h5>
+                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" id="closeAssignModal"></button>
+                        </div>
+                        <form onSubmit={submitAssignTechnician}>
+                            <div className="modal-body p-4">
+                                {selectedRequest && (
+                                    <p className="mb-4 text-secondary">
+                                        Chọn thợ để xử lý sự cố: <strong className="text-dark">{selectedRequest.title}</strong> tại <strong>P.{selectedRequest.apartmentName || selectedRequest.apartmentCode}</strong>.
+                                    </p>
+                                )}
+
+                                <div className="mb-4">
+                                    <label className="form-label fw-bold">Kỹ thuật viên (*)</label>
+                                    <select
+                                        className="form-select"
+                                        value={assignForm.technicianId}
+                                        onChange={(e) => setAssignForm({ ...assignForm, technicianId: e.target.value })}
+                                        required
+                                    >
+                                        <option value="" disabled>-- Chọn Kỹ thuật viên --</option>
+                                        {technicians.map(tech => (
+                                            <option key={tech.accountId || tech.id} value={tech.accountId || tech.id}>
+                                                {tech.fullName || tech.name || `KTV - ID: ${tech.accountId || tech.id}`}
+                                            </option>
                                         ))}
-                                    </tbody>
-                                </table>
+                                    </select>
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="form-label fw-bold">Mức độ ưu tiên</label>
+                                    <div className="d-flex gap-3">
+                                        {[
+                                            { id: 'pri1', val: 1, label: 'Thấp', cls: 'text-secondary' },
+                                            { id: 'pri2', val: 2, label: 'Vừa', cls: 'text-primary' },
+                                            { id: 'pri3', val: 3, label: 'Cao', cls: 'text-warning' },
+                                            { id: 'pri4', val: 4, label: 'Khẩn cấp', cls: 'text-danger fw-bold' }
+                                        ].map(pri => (
+                                            <div className="form-check" key={pri.id}>
+                                                <input
+                                                    className="form-check-input"
+                                                    type="radio"
+                                                    name="priority"
+                                                    id={pri.id}
+                                                    value={pri.val}
+                                                    checked={assignForm.priority == pri.val}
+                                                    onChange={(e) => setAssignForm({ ...assignForm, priority: e.target.value })}
+                                                />
+                                                <label className={`form-check-label ${pri.cls} fw-semibold`} htmlFor={pri.id}>{pri.label}</label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                        )}
+                            <div className="modal-footer bg-light border-0">
+                                <button type="button" className="btn btn-white border px-4" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" className="btn btn-primary px-4 fw-bold" disabled={isAssigning}>
+                                    {isAssigning ? <span className="spinner-border spinner-border-sm me-2"></span> : null}
+                                    Xác nhận Gán
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -256,4 +413,4 @@ const MaintenanceRequest = () => {
     );
 };
 
-export default MaintenanceRequest;
+export default MaintenanceManagement;
