@@ -1,14 +1,14 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://localhost:7200/api',
+    baseURL: import.meta.env.VITE_API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     }
 });
 
-let isRefreshing = false; 
-let failedQueue = []; 
+let isRefreshing = false;
+let failedQueue = [];
 
 // Hàm xử lý hàng đợi
 const processQueue = (error, token = null) => {
@@ -19,7 +19,7 @@ const processQueue = (error, token = null) => {
             prom.resolve(token);
         }
     });
-    failedQueue = []; 
+    failedQueue = [];
 };
 
 api.interceptors.request.use((config) => {
@@ -28,27 +28,27 @@ api.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
-    },
+},
     (error) => Promise.reject(error)
 );
 
 api.interceptors.response.use(
     (response) => {
-    return response;
-},async (error) => {
+        return response;
+    }, async (error) => {
         const originalRequest = error.config;
         if (originalRequest.url.includes('/Auth/Login')) {
             return Promise.reject(error);
         }
 
         if (error.response && error.response.status === 401 && !originalRequest._retry) {
-            
+
             if (isRefreshing) {
-                return new Promise(function(resolve, reject) {
+                return new Promise(function (resolve, reject) {
                     failedQueue.push({ resolve, reject });
                 }).then(token => {
                     originalRequest.headers.Authorization = 'Bearer ' + token;
-                    return api(originalRequest); 
+                    return api(originalRequest);
                 }).catch(err => {
                     return Promise.reject(err);
                 });
@@ -65,11 +65,10 @@ api.interceptors.response.use(
                     throw new Error("Không có Refresh Token.");
                 }
 
-                const refreshResponse = await axios.post('https://localhost:7200/api/Auth/refresh-token', {
+                const refreshResponse = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/Auth/refresh-token`, {
                     accessToken: currentAccessToken,
                     refreshToken: currentRefreshToken
                 });
-
                 const newAccessToken = refreshResponse.data.data.accessToken;
                 const newRefreshToken = refreshResponse.data.data.refreshToken;
 
@@ -83,16 +82,16 @@ api.interceptors.response.use(
 
             } catch (refreshError) {
                 processQueue(refreshError, null);
-                
+
                 console.error("Cấp lại Token thất bại. Phiên đăng nhập đã hết hạn.", refreshError);
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('role');
-                window.location.href = '/'; 
-                
+                window.location.href = '/';
+
                 return Promise.reject(refreshError);
             } finally {
-                isRefreshing = false; 
+                isRefreshing = false;
             }
         }
 

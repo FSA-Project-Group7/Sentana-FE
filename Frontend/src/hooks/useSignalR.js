@@ -5,19 +5,25 @@ export const useSignalR = () => {
     const [connection, setConnection] = useState(null);
 
     useEffect(() => {
-        // Lấy token từ localStorage (giống với cách axiosConfig đang làm)
         const token = localStorage.getItem('token');
 
-        // Khởi tạo kết nối
+        if (!token) {
+            console.warn("SignalR: Không tìm thấy token xác thực, dừng kết nối.");
+            return;
+        }
+        const hubUrl = import.meta.env.VITE_SIGNALR_HUB_URL;
+
         const newConnection = new signalR.HubConnectionBuilder()
-            // Đổi URL này theo domain thực tế của Backend
-            .withUrl("https://localhost:7193/hubs/notification", {
+            .withUrl(hubUrl, {
                 accessTokenFactory: () => token
             })
-            .withAutomaticReconnect() // Tự động kết nối lại nếu rớt mạng
+            .withAutomaticReconnect()
             .build();
 
         setConnection(newConnection);
+        return () => {
+            setConnection(null);
+        };
     }, []);
 
     return connection;

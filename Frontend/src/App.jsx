@@ -3,10 +3,27 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
+
+// Components & Pages
 import Home from './pages/Home';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
+import FirstLoginSetup from './pages/FirstLoginSetup';
+import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
+
+// Resident
+import ResidentLayout from './components/ResidentLayout';
 import ResidentPage from './pages/resident/ResidentPage';
+import ResidentDashboard from './pages/resident/ResidentDashboard';
+import ResidentProfile from './pages/resident/ResidentProfile';
+import MaintenanceRequest from './pages/resident/MaintenanceRequest';
+
+// Technician
+import TechnicianLayout from './components/TechnicianLayout';
+import TechnicianTasks from './pages/technician/TechnicianTasks';
+
+// Admin / Manager
 import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import BuildingManagement from './pages/admin/BuildingManagement';
@@ -17,15 +34,8 @@ import AccountManagement from './pages/admin/AccountManagement';
 import ResidentManagement from './pages/admin/ResidentManagement';
 import UtilityManagement from './pages/admin/UtilityManagement';
 import ContractManagement from './pages/admin/ContractManagement';
-import ProtectedRoute from './components/ProtectedRoute';
-import PublicRoute from './components/PublicRoute';
 import InvoiceManagement from './pages/admin/InvoiceManagement';
 import PaymentManagement from './pages/admin/PaymentManagement';
-import ResidentDashboard from './pages/resident/ResidentDashboard';
-import ResidentLayout from './components/ResidentLayout';
-import ResidentProfile from './pages/resident/ResidentProfile';
-import FirstLoginSetup from './pages/FirstLoginSetup';
-import MaintenanceRequest from './pages/resident/MaintenanceRequest';
 import MaintenanceManagement from './pages/admin/MaintenanceManagement';
 
 function App() {
@@ -54,9 +64,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         <Route path="/" element={<Home />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<Login />} />
         </Route>
@@ -64,16 +74,26 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/first-login-setup" element={<FirstLoginSetup />} />
         </Route>
+
+        {/* Resident Routes */}
         <Route element={<ProtectedRoute allowedRole="Resident" />}>
           <Route path="/resident" element={<ResidentLayout />}>
             <Route index element={<ResidentPage />} />
             <Route path="dashboard" element={<ResidentDashboard />} />
             <Route path="profile" element={<ResidentProfile />} />
-
             <Route path="maintenance" element={<MaintenanceRequest />} />
           </Route>
         </Route>
 
+        {/* Technician Routes */}
+        <Route element={<ProtectedRoute allowedRole="Technician" />}>
+          <Route path="/technician" element={<TechnicianLayout />}>
+            <Route index element={<TechnicianTasks />} />
+            <Route path="tasks" element={<TechnicianTasks />} />
+          </Route>
+        </Route>
+
+        {/* Admin/Manager Routes */}
         <Route element={<ProtectedRoute allowedRole="Manager" />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
@@ -91,6 +111,7 @@ function App() {
           </Route>
         </Route>
       </Routes>
+
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -106,4 +127,5 @@ function App() {
     </BrowserRouter>
   );
 }
+
 export default App;

@@ -88,13 +88,20 @@ const MaintenanceManagement = () => {
 
     const submitAssignTechnician = async (e) => {
         e.preventDefault();
-        if (!assignForm.technicianId) return notify.error("Vui lòng chọn Kỹ thuật viên!");
+
+        // Parse số và kiểm tra an toàn
+        const techId = parseInt(assignForm.technicianId);
+        const priorityLevel = parseInt(assignForm.priority);
+
+        if (isNaN(techId)) {
+            return notify.error("Lỗi dữ liệu: Không lấy được ID của Kỹ thuật viên này!");
+        }
 
         setIsAssigning(true);
         try {
             await api.put(`/Maintenance/requests/${selectedRequest.requestId}/assign`, {
-                technicianId: parseInt(assignForm.technicianId),
-                priority: parseInt(assignForm.priority)
+                technicianId: techId,
+                priority: priorityLevel
             });
 
             setRequests(prev => prev.map(req =>
@@ -102,8 +109,8 @@ const MaintenanceManagement = () => {
                     ? {
                         ...req,
                         status: 'Accepted',
-                        assignedTechnicianName: technicians.find(t => t.id == assignForm.technicianId || t.accountId == assignForm.technicianId)?.fullName,
-                        priority: assignForm.priority
+                        assignedTechnicianName: technicians.find(t => (t.technicianId || t.accountId || t.id) === techId)?.fullName || 'Đã phân công',
+                        priority: priorityLevel
                     }
                     : req
             ));
@@ -365,11 +372,16 @@ const MaintenanceManagement = () => {
                                         required
                                     >
                                         <option value="" disabled>-- Chọn Kỹ thuật viên --</option>
-                                        {technicians.map(tech => (
-                                            <option key={tech.accountId || tech.id} value={tech.accountId || tech.id}>
-                                                {tech.fullName || tech.name || `KTV - ID: ${tech.accountId || tech.id}`}
-                                            </option>
-                                        ))}
+                                        {technicians.map(tech => {
+                                            const tId = tech.technicianId || tech.accountId || tech.id || tech.userId;
+                                            const tName = tech.fullName || tech.name || tech.userName || `KTV - ID: ${tId}`;
+
+                                            return (
+                                                <option key={tId} value={tId}>
+                                                    {tName}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
 

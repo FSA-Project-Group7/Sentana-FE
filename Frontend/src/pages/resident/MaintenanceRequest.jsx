@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
-import { toast } from 'react-toastify'; 
+import { toast } from 'react-toastify';
 
 const customStyles = `
 .modern-card { background: #ffffff; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #f1f5f9; transition: all 0.3s ease; }
@@ -17,12 +17,12 @@ const MaintenanceRequest = () => {
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const [formData, setFormData] = useState({ 
-        apartmentId: '', 
-        categoryId: '', 
-        title: '', 
-        description: '', 
-        file: null 
+    const [formData, setFormData] = useState({
+        apartmentId: '',
+        categoryId: '',
+        title: '',
+        description: '',
+        file: null
     });
 
     const fetchData = async () => {
@@ -30,7 +30,7 @@ const MaintenanceRequest = () => {
         try {
             const reqRes = await api.get('/maintenance/my-requests');
             setRequests(reqRes.data?.data || reqRes.data?.Data || []);
-            
+
             const aptRes = await api.get('/maintenance/my-apartments');
             const rawApts = aptRes.data?.data || aptRes.data?.Data || [];
             setApartments(Array.isArray(rawApts) ? rawApts : []);
@@ -41,9 +41,9 @@ const MaintenanceRequest = () => {
                 { categoryId: 3, categoryName: 'Hư hỏng Nội thất' },
                 { categoryId: 4, categoryName: 'Sự cố Khác' }
             ]);
-        } catch (error) { 
+        } catch (error) {
             console.error("Lỗi fetch:", error);
-            toast.error("Không thể tải dữ liệu phòng."); 
+            toast.error("Không thể tải dữ liệu phòng.");
         }
         setLoading(false);
     };
@@ -52,29 +52,29 @@ const MaintenanceRequest = () => {
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
-        if (file && file.size > 5 * 1024 * 1024) { 
-            toast.error("Ảnh quá lớn (>5MB)"); 
+        if (file && file.size > 5 * 1024 * 1024) {
+            toast.error("Ảnh quá lớn (>5MB)");
             e.target.value = '';
-            return; 
+            return;
         }
         setFormData(prev => ({ ...prev, file }));
     };
 
-   const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!formData.apartmentId || !formData.categoryId || !formData.title.trim() || !formData.description.trim()) {
             return toast.warning("Vui lòng điền đủ tất cả các trường có dấu (*)");
         }
 
         setIsSubmitting(true);
         const payload = new FormData();
-        
+
         payload.append("ApartmentId", formData.apartmentId);
         payload.append("CategoryId", formData.categoryId);
         payload.append("Title", formData.title.trim());
         payload.append("Description", formData.description.trim());
-        
+
         if (formData.file) {
             payload.append("Photo", formData.file);
         }
@@ -87,27 +87,27 @@ const MaintenanceRequest = () => {
                     'Content-Type': 'multipart/form-data'
                 }
             });
-            
+
             toast.success(response.data?.message || response.data?.Message || "Gửi báo cáo thành công!");
-            
+
             // Clear Form
             setFormData({ apartmentId: '', categoryId: '', title: '', description: '', file: null });
             const fileInput = document.getElementById('photoUpload');
-            if(fileInput) fileInput.value = '';
-            fetchData(); 
+            if (fileInput) fileInput.value = '';
+            fetchData();
         } catch (error) {
             console.error("Log lỗi BE:", error.response?.data);
-            
+
             const errData = error.response?.data;
             let errorMsg = "Có lỗi xảy ra khi lưu vào Database.";
-            
+
             if (errData?.errors) {
                 const validationErrors = Object.values(errData.errors).flat().join(" | ");
                 errorMsg = `Lỗi dữ liệu: ${validationErrors}`;
             } else if (errData?.message || errData?.Message) {
                 errorMsg = errData.message || errData.Message;
             }
-            
+
             toast.error(errorMsg);
         } finally {
             setIsSubmitting(false);
@@ -137,7 +137,7 @@ const MaintenanceRequest = () => {
                         <form onSubmit={handleSubmit}>
                             <div className="mb-3">
                                 <label className="form-label fw-bold small">Căn hộ của bạn *</label>
-                                <select className="form-select" value={formData.apartmentId} onChange={e => setFormData({...formData, apartmentId: e.target.value})} required>
+                                <select className="form-select" value={formData.apartmentId} onChange={e => setFormData({ ...formData, apartmentId: e.target.value })} required>
                                     <option value="">-- Chọn Căn hộ --</option>
                                     {apartments.map((a, idx) => (
                                         <option key={a.apartmentId || a.ApartmentId || idx} value={a.apartmentId || a.ApartmentId}>
@@ -148,18 +148,18 @@ const MaintenanceRequest = () => {
                             </div>
                             <div className="mb-3">
                                 <label className="form-label fw-bold small">Loại sự cố *</label>
-                                <select className="form-select" value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})} required>
+                                <select className="form-select" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })} required>
                                     <option value="">-- Chọn Danh mục --</option>
                                     {categories.map(c => <option key={c.categoryId} value={c.categoryId}>{c.categoryName}</option>)}
                                 </select>
                             </div>
                             <div className="mb-3">
                                 <label className="form-label fw-bold small">Tiêu đề *</label>
-                                <input type="text" className="form-control" placeholder="Tên sự cố..." value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required />
+                                <input type="text" className="form-control" placeholder="Tên sự cố..." value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
                             </div>
                             <div className="mb-3">
                                 <label className="form-label fw-bold small">Mô tả *</label>
-                                <textarea className="form-control" rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required></textarea>
+                                <textarea className="form-control" rows="3" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} required></textarea>
                             </div>
                             <div className="mb-4">
                                 <label className="form-label fw-bold small text-muted">Hình ảnh đính kèm (Tùy chọn)</label>
