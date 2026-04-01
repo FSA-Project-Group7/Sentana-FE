@@ -36,11 +36,6 @@ import UtilityManagement from './pages/admin/UtilityManagement';
 import ContractManagement from './pages/admin/ContractManagement';
 import InvoiceManagement from './pages/admin/InvoiceManagement';
 import PaymentManagement from './pages/admin/PaymentManagement';
-import ResidentDashboard from './pages/resident/ResidentDashboard';
-import ResidentLayout from './components/ResidentLayout';
-import ResidentProfile from './pages/resident/ResidentProfile';
-import FirstLoginSetup from './pages/FirstLoginSetup';
-import MaintenanceRequest from './pages/resident/MaintenanceRequest';
 import MaintenanceManagement from './pages/admin/MaintenanceManagement';
 
 function App() {
