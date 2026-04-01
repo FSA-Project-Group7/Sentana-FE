@@ -26,6 +26,7 @@ import ResidentLayout from './components/ResidentLayout';
 import ResidentProfile from './pages/resident/ResidentProfile';
 import FirstLoginSetup from './pages/FirstLoginSetup';
 import MaintenanceRequest from './pages/resident/MaintenanceRequest';
+import MaintenanceManagement from './pages/admin/MaintenanceManagement';
 
 function App() {
   useEffect(() => {
@@ -86,6 +87,7 @@ function App() {
             <Route path="contracts" element={<ContractManagement />} />
             <Route path="invoices" element={<InvoiceManagement />} />
             <Route path="payments" element={<PaymentManagement />} />
+            <Route path="maintenance" element={<MaintenanceManagement />} />
           </Route>
         </Route>
       </Routes>
