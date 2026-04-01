@@ -27,6 +27,7 @@ import ResidentProfile from './pages/resident/ResidentProfile';
 import FirstLoginSetup from './pages/FirstLoginSetup';
 import MaintenanceRequest from './pages/resident/MaintenanceRequest';
 import MaintenanceManagement from './pages/admin/MaintenanceManagement';
+import MyContract from './pages/resident/MyContract';
 
 function App() {
   useEffect(() => {
@@ -71,6 +72,7 @@ function App() {
             <Route path="profile" element={<ResidentProfile />} />
 
             <Route path="maintenance" element={<MaintenanceRequest />} />
+            <Route path="contract" element={<MyContract />} />
           </Route>
         </Route>
 
