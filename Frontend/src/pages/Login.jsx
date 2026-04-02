@@ -22,9 +22,7 @@ const Login = () => {
         username: username,
         password: password
       });
-      console.log("Dữ liệu BE trả về:", response.data);
 
-      // Thêm ?. an toàn để phòng trường hợp backend trả về rỗng
       const responseData = response.data?.data || response.data?.Data || {};
       const { token, role, refreshToken, requiresPasswordChange } = responseData;
 
@@ -44,6 +42,11 @@ const Login = () => {
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('role', role);
 
+      if (requiresPasswordChange === true) {
+        navigate('/first-login-setup');
+        return;
+      }
+
       if (role === 'Manager') {
         navigate('/admin');
       } else if (role === 'Resident') {
@@ -54,11 +57,11 @@ const Login = () => {
 
     } catch (err) {
       console.error("Lỗi đăng nhập:", err);
-      
+
       // Bắt thêm thông báo lỗi chi tiết từ backend nếu có (tránh câu chung chung)
       const errData = err.response?.data;
       let msg = 'Sai tài khoản hoặc mật khẩu!';
-      
+
       if (errData?.message || errData?.Message) {
         msg = errData.message || errData.Message;
       }
