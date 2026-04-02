@@ -8,30 +8,41 @@ const TechnicianProfile = () => {
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                // 1. Lấy ID từ localStorage (Tên biến có thể là accountId, userId, hoặc id tùy nhóm bạn thiết lập lúc Login)
-                const currentAccountId = localStorage.getItem('accountId') || localStorage.getItem('userId') || localStorage.getItem('id');
+                // 1. Vét sạch dữ liệu từ LocalStorage (bao quát mọi cách lưu của tính năng Login)
+                let localUser = {};
+                const userObjStr = localStorage.getItem('user') || localStorage.getItem('userInfo');
+                if (userObjStr) {
+                    try { localUser = JSON.parse(userObjStr); } catch (e) { console.warn("Lỗi parse user JSON"); }
+                }
+
+                const currentId = localUser.accountId || localUser.id || localStorage.getItem('accountId') || localStorage.getItem('userId');
 
                 let apiData = {};
-                // 2. Thử gọi API lấy thông tin chi tiết (nếu BE có API này)
-                if (currentAccountId) {
+                // 2. Thử gọi API Backend nếu có (Bắt theo chuẩn API RESTful)
+                if (currentId) {
                     try {
-                        const res = await api.get(`/Accounts/${currentAccountId}`);
+                        const res = await api.get(`/Accounts/${currentId}`);
                         apiData = res.data?.data || res.data;
                     } catch (err) {
-                        console.warn("Không gọi được API Accounts, sẽ dùng dữ liệu LocalStorage");
+                        try { // Fallback thử endpoint Technicians
+                            const techRes = await api.get(`/Technicians/${currentId}`);
+                            apiData = techRes.data?.data || techRes.data;
+                        } catch (e) { }
                     }
                 }
 
-                // 3. Hợp nhất dữ liệu: Ưu tiên API, nếu không có thì lấy LocalStorage, nếu không có nữa thì dùng chuỗi rỗng
-                setProfile({
-                    fullName: apiData.fullName || apiData.name || localStorage.getItem('fullName') || localStorage.getItem('userName') || "Chưa cập nhật tên",
-                    email: apiData.email || localStorage.getItem('email') || "Chưa cập nhật email",
-                    accountId: apiData.accountId || apiData.id || currentAccountId || "N/A",
-                    phoneNumber: apiData.phoneNumber || apiData.phone || "Chưa cập nhật",
-                    specialization: apiData.specialization || "Kỹ thuật tòa nhà", // Giả định
-                    avatar: apiData.avatar || apiData.avatarUrl || "",
-                    joinDate: apiData.joinDate || apiData.createDate || apiData.createdAt
-                });
+                // 3. Mapping dữ liệu: Kết hợp giữa API trả về và LocalStorage
+                const finalProfile = {
+                    fullName: apiData.fullName || apiData.name || localUser.fullName || localUser.userName || localStorage.getItem('fullName') || localStorage.getItem('name') || "Chưa có dữ liệu",
+                    email: apiData.email || localUser.email || localStorage.getItem('email') || "Chưa có dữ liệu",
+                    accountId: apiData.accountId || apiData.id || localUser.accountId || localUser.id || currentId || "N/A",
+                    phoneNumber: apiData.phoneNumber || apiData.phone || localUser.phoneNumber || localUser.phone || localStorage.getItem('phoneNumber') || "Chưa cập nhật",
+                    specialization: apiData.specialization || localUser.specialization || "Kỹ thuật bảo trì tòa nhà",
+                    avatar: apiData.avatar || apiData.avatarUrl || localUser.avatar,
+                    joinDate: apiData.joinDate || apiData.createDate || apiData.createdAt || localUser.createDate
+                };
+
+                setProfile(finalProfile);
 
             } catch (error) {
                 console.error("Lỗi khi load profile:", error);
@@ -43,7 +54,7 @@ const TechnicianProfile = () => {
     }, []);
 
     const formatDate = (dateString) => {
-        if (!dateString) return "Chưa cập nhật";
+        if (!dateString) return "Chưa có thông tin";
         return new Date(dateString).toLocaleDateString('vi-VN');
     };
 
@@ -82,7 +93,7 @@ const TechnicianProfile = () => {
                                             <div className="fw-bold fs-5 text-dark">{profile?.fullName}</div>
                                         </div>
                                         <div className="col-sm-6">
-                                            <label className="text-muted small fw-bold text-uppercase d-block mb-1">Mã nhân sự (ID)</label>
+                                            <label className="text-muted small fw-bold text-uppercase d-block mb-1">Mã nhân sự</label>
                                             <div className="fw-bold fs-5 text-dark text-warning">#{profile?.accountId}</div>
                                         </div>
                                         <div className="col-sm-6">
