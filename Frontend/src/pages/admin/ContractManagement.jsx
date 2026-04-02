@@ -46,6 +46,7 @@ const ContractManagement = () => {
     const [selectedTerminateId, setSelectedTerminateId] = useState(null);
     const [actionDate, setActionDate] = useState('');
     const [additionalCost, setAdditionalCost] = useState('');
+    const [terminationReason, setTerminationReason] = useState(''); // 👉 Đã thêm state này
     const [terminateResult, setTerminateResult] = useState(null);
     const [isTerminating, setIsTerminating] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -54,7 +55,7 @@ const ContractManagement = () => {
     const preventInvalidNumber = (e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); };
     const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
     const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : "";
-    const closeDrawer = () => { setActiveDrawer(null); setDeleteConfirmText(''); setTerminateResult(null); };
+    const closeDrawer = () => { setActiveDrawer(null); setDeleteConfirmText(''); setTerminateResult(null); setTerminationReason(''); };
 
     // --- BỘ NÃO STATE MACHINE ---
     const analyzeStateMachine = (contract) => {
@@ -116,7 +117,7 @@ const ContractManagement = () => {
         const state = analyzeStateMachine(contract);
         setSelectedContract(contract);
 
-        setActionDate(''); setAdditionalCost(''); setTerminateResult(null);
+        setActionDate(''); setAdditionalCost(''); setTerminateResult(null); setTerminationReason('');
         setExtendNewEndDate(''); setExtendOldEndDate('');
 
         if (actionType === 'VIEW') {
@@ -176,10 +177,10 @@ const ContractManagement = () => {
         const newArr = [...formData[listName]]; newArr[index][field] = value; setFormData({ ...formData, [listName]: newArr });
     };
 
-    const addResidentRow = () => setFormData(prev => ({ ...prev, additionalResidents: [...prev.additionalResidents, { accountId: '', relationshipId: '' }] }));
-    const removeResidentRow = (index) => setFormData(prev => ({ ...prev, additionalResidents: prev.additionalResidents.filter((_, i) => i !== index) }));
-    const addServiceRow = () => setFormData(prev => ({ ...prev, selectedServices: [...prev.selectedServices, { serviceId: '', actualPrice: '' }] }));
-    const removeServiceRow = (index) => setFormData(prev => ({ ...prev, selectedServices: prev.selectedServices.filter((_, i) => i !== index) }));
+    const addResidentRow = () => setFormData(prev => ({ ...prev, additionalResidents: [...(prev.additionalResidents || []), { accountId: '', relationshipId: '' }] }));
+    const removeResidentRow = (index) => setFormData(prev => ({ ...prev, additionalResidents: (prev.additionalResidents || []).filter((_, i) => i !== index) }));
+    const addServiceRow = () => setFormData(prev => ({ ...prev, selectedServices: [...(prev.selectedServices || []), { serviceId: '', actualPrice: '' }] }));
+    const removeServiceRow = (index) => setFormData(prev => ({ ...prev, selectedServices: (prev.selectedServices || []).filter((_, i) => i !== index) }));
 
     const handleSaveContract = async (isDraftSubmit) => {
         if (!formData.apartmentId || !formData.residentAccountId || !formData.startDay || !formData.endDay) return toast.warning("Thiếu trường bắt buộc!");
@@ -194,8 +195,8 @@ const ContractManagement = () => {
         payload.append("Status", isDraftSubmit ? 2 : 1);
         if (formData.file) payload.append("File", formData.file);
 
-        formData.additionalResidents.forEach((r, i) => { if (r.accountId && r.relationshipId) { payload.append(`AdditionalResidents[${i}].AccountId`, r.accountId); payload.append(`AdditionalResidents[${i}].RelationshipId`, r.relationshipId); } });
-        formData.selectedServices.forEach((s, i) => { if (s.serviceId) { payload.append(`Services[${i}].ServiceId`, s.serviceId); if (s.actualPrice) payload.append(`Services[${i}].ActualPrice`, s.actualPrice); } });
+        (formData.additionalResidents || []).forEach((r, i) => { if (r.accountId && r.relationshipId) { payload.append(`AdditionalResidents[${i}].AccountId`, r.accountId); payload.append(`AdditionalResidents[${i}].RelationshipId`, r.relationshipId); } });
+        (formData.selectedServices || []).forEach((s, i) => { if (s.serviceId) { payload.append(`Services[${i}].ServiceId`, s.serviceId); if (s.actualPrice) payload.append(`Services[${i}].ActualPrice`, s.actualPrice); } });
 
         try {
             const url = isEditMode ? `/contract/${editContractId}/update-contract` : '/contract/create-contract';
@@ -204,10 +205,7 @@ const ContractManagement = () => {
             toast.success(isDraftSubmit ? "Đã lưu nháp!" : "Phát hành hợp đồng thành công!");
             closeDrawer(); fetchData();
         } catch (error) {
-            // Log ra console để Tech Lead dễ soi
             console.error("Chi tiết lỗi BE:", error.response?.data);
-
-            // Lấy đúng câu chửi của Backend để hiển thị lên màn hình
             const backendMessage = error.response?.data?.message || error.response?.data?.Message || "Lỗi dữ liệu đầu vào!";
             toast.error("BE báo lỗi: " + backendMessage);
         }
@@ -231,7 +229,12 @@ const ContractManagement = () => {
 
         setIsTerminating(true);
         try {
-            const res = await api.put(`/contract/${selectedTerminateId}/terminate`, { terminationDate: actionDate, additionalCost: Number(additionalCost || 0) });
+            const res = await api.put(`/contract/${selectedTerminateId}/terminate`,
+                {
+                    terminationDate: actionDate,
+                    additionalCost: Number(additionalCost || 0),
+                    terminationReason: terminationReason // 👉 Đã truyền lý do xuống API
+                });
             setTerminateResult(res?.data?.data || res?.data?.Data || res?.data);
             toast.success("Đã chốt thanh lý!"); fetchData();
         } catch (error) { toast.error("Thanh lý thất bại."); } finally { setIsTerminating(false); }
@@ -256,10 +259,10 @@ const ContractManagement = () => {
         catch (error) { toast.error("Lỗi xóa vĩnh viễn!"); }
     };
 
-    // --- COMPUTATIONS & FILTERING ---
-    const safeApartments = apartments.filter(Boolean);
-    const safeResidents = residents.filter(Boolean);
-    const safeServices = systemServices.filter(Boolean);
+    // 👉 ĐÃ BỌC ÁO GIÁP AN TOÀN CHO TẤT CẢ CÁC MẢNG (Tránh lỗi filter undefined)
+    const safeApartments = (apartments || []).filter(Boolean);
+    const safeResidents = (residents || []).filter(Boolean);
+    const safeServices = (systemServices || []).filter(Boolean);
 
     const availableApartments = safeApartments.filter(a => {
         const st = a.status ?? a.Status;
@@ -271,21 +274,21 @@ const ContractManagement = () => {
         return st == null || st === 1 || String(st).toLowerCase() === 'active';
     });
 
-    const selectedResidentIds = [Number(formData.residentAccountId), ...formData.additionalResidents.map(r => Number(r.accountId))].filter(id => id !== 0 && !isNaN(id));
-    const selectedServiceIds = formData.selectedServices.map(s => Number(s.serviceId)).filter(id => id !== 0 && !isNaN(id));
+    const selectedResidentIds = [Number(formData.residentAccountId), ...(formData.additionalResidents || []).map(r => Number(r.accountId))].filter(id => id !== 0 && !isNaN(id));
+    const selectedServiceIds = (formData.selectedServices || []).map(s => Number(s.serviceId)).filter(id => id !== 0 && !isNaN(id));
 
     const dashboardStats = useMemo(() => {
         let active = 0, expiring = 0, overdue = 0;
-        contracts.filter(Boolean).forEach(c => {
+        (contracts || []).filter(Boolean).forEach(c => {
             const type = analyzeStateMachine(c).type;
             if (type === 'ACTIVE' || type === 'PENDING') active++;
             if (type === 'EXPIRING_SOON') expiring++;
             if (type === 'OVERDUE') overdue++;
         });
-        return { total: contracts.filter(Boolean).length, active, expiring, overdue };
+        return { total: (contracts || []).filter(Boolean).length, active, expiring, overdue };
     }, [contracts]);
 
-    const filteredContracts = contracts.filter(Boolean).filter(c => {
+    const filteredContracts = (contracts || []).filter(Boolean).filter(c => {
         const searchStr = searchTerm.toLowerCase();
         const matchSearch = (c.contractCode || '').toLowerCase().includes(searchStr) ||
             (c.account?.info?.fullName || c.account?.fullName || '').toLowerCase().includes(searchStr) ||
@@ -560,8 +563,8 @@ const ContractManagement = () => {
                         </div>
 
                         <div className="form-section">
-                            <div className="d-flex justify-content-between align-items-center mb-4"><div className="form-section-title mb-0"><i className="bi bi-2-circle-fill me-2 text-primary fs-5"></i>Cư Dân Phụ (Add-ons)</div><button type="button" className="btn btn-sm btn-outline-primary rounded-pill px-3" onClick={addResidentRow} disabled={formData.additionalResidents.length >= 4}><i className="bi bi-plus-lg me-1"></i> Thêm Cư dân</button></div>
-                            {formData.additionalResidents.length === 0 ? <div className="text-center p-4 bg-light rounded-3 text-muted border border-dashed small fw-semibold">Phòng chỉ có 1 chủ hộ, không có người ở ghép.</div> : formData.additionalResidents.map((res, index) => (
+                            <div className="d-flex justify-content-between align-items-center mb-4"><div className="form-section-title mb-0"><i className="bi bi-2-circle-fill me-2 text-primary fs-5"></i>Cư Dân Phụ (Add-ons)</div><button type="button" className="btn btn-sm btn-outline-primary rounded-pill px-3" onClick={addResidentRow} disabled={(formData.additionalResidents || []).length >= 4}><i className="bi bi-plus-lg me-1"></i> Thêm Cư dân</button></div>
+                            {(formData.additionalResidents || []).length === 0 ? <div className="text-center p-4 bg-light rounded-3 text-muted border border-dashed small fw-semibold">Phòng chỉ có 1 chủ hộ, không có người ở ghép.</div> : (formData.additionalResidents || []).map((res, index) => (
                                 <div className="d-flex gap-2 mb-2 p-2 bg-light rounded-3 border" key={index}>
                                     <select className="form-select border-0 shadow-none bg-transparent fw-semibold py-2" value={res.accountId} onChange={(e) => handleListChange('additionalResidents', index, 'accountId', e.target.value)}>
                                         <option value="">-- Chọn Cư dân --</option>
@@ -577,7 +580,7 @@ const ContractManagement = () => {
 
                         <div className="form-section mb-0">
                             <div className="d-flex justify-content-between align-items-center mb-4"><div className="form-section-title mb-0"><i className="bi bi-3-circle-fill me-2 text-primary fs-5"></i>Dịch Vụ (Add-ons)</div><button type="button" className="btn btn-sm btn-outline-success rounded-pill px-3" onClick={addServiceRow}><i className="bi bi-plus-lg me-1"></i> Thêm Dịch vụ</button></div>
-                            {formData.selectedServices.length === 0 ? <div className="text-center p-4 bg-light rounded-3 text-muted border border-dashed small fw-semibold">Không đăng ký dịch vụ cố định nào.</div> : formData.selectedServices.map((srv, index) => (
+                            {(formData.selectedServices || []).length === 0 ? <div className="text-center p-4 bg-light rounded-3 text-muted border border-dashed small fw-semibold">Không đăng ký dịch vụ cố định nào.</div> : (formData.selectedServices || []).map((srv, index) => (
                                 <div className="d-flex gap-2 mb-2 p-2 bg-light rounded-3 border" key={index}>
                                     <select className="form-select border-0 shadow-none bg-transparent fw-semibold py-2" value={srv.serviceId} onChange={(e) => handleListChange('selectedServices', index, 'serviceId', e.target.value)}>
                                         <option value="">-- Chọn Dịch vụ --</option>
@@ -627,7 +630,14 @@ const ContractManagement = () => {
                                 <span className="input-icon fw-bold">₫</span>
                                 <input type="number" min="0" onKeyDown={preventInvalidNumber} className="form-control form-control-icon form-control-lg py-3 shadow-none bg-light border-0" value={additionalCost} onChange={e => setAdditionalCost(e.target.value)} placeholder="0" />
                             </div>
-
+                            <label className="fw-bold mb-2 small text-danger">Lý do thu phí phát sinh / Ghi chú</label>
+                            <textarea 
+                                className="form-control mb-4 shadow-none bg-light border-0" 
+                                rows="3" 
+                                placeholder="Nhập lý do phạt hoặc ghi chú thanh lý..."
+                                value={terminationReason}
+                                onChange={(e) => setTerminationReason(e.target.value)}
+                            ></textarea>
                             <div className="bg-white p-4 rounded-4 border border-dark shadow-sm">
                                 <h6 className="fw-bold mb-3 text-primary text-uppercase" style={{ letterSpacing: '0.5px' }}>Bản Tính Nháp Trước Khi Chốt</h6>
                                 <div className="d-flex justify-content-between mb-2"><span className="text-muted">Tiền Cọc (Deposit):</span> <strong className="fs-6 text-dark">{formatCurrency(selectedContract?.deposit || 0)}</strong></div>
