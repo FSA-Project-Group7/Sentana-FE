@@ -71,8 +71,8 @@ const Home = () => {
                     </div>
 
                     {/* Cột Sidebar bên phải (Ẩn trên màn hình nhỏ) */}
-                    <div className="d-none d-lg-block" style={{ width: '220px', flexShrink: 0 }}>	
-<Sidebar activeSection={activeSection} />
+                    <div className="d-none d-lg-block" style={{ width: '220px', flexShrink: 0 }}>
+                        <Sidebar activeSection={activeSection} />
                     </div>
 
                 </div>
@@ -111,7 +111,7 @@ const Home = () => {
                             <p className="text-light mb-2" style={{ fontSize: '0.95rem', opacity: '0.8' }}>
                                 <strong>Dự án:</strong> Hệ thống Quản lý Chung cư / Phòng trọ
                             </p>
-<p className="text-light mb-2" style={{ fontSize: '0.95rem', opacity: '0.8' }}>
+                            <p className="text-light mb-2" style={{ fontSize: '0.95rem', opacity: '0.8' }}>
                                 <strong>Công nghệ:</strong> ReactJS, ASP.NET Core, SQL Server
                             </p>
                             <p className="text-light mb-2" style={{ fontSize: '0.95rem', opacity: '0.8' }}>

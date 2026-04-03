@@ -1,27 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../../utils/axiosConfig';
 
 const ResidentPage = () => {
-    const announcements = [
-        { id: 1, title: 'Bảo trì định kỳ thang máy tòa A', date: '17/03/2026', category: 'Bảo trì', content: 'Từ 22h00 - 04h00 sáng mai sẽ tiến hành bảo trì thang máy số 1 và số 2.' },
-        { id: 2, title: 'Phát hành hóa đơn dịch vụ tháng 03/2026', date: '15/03/2026', category: 'Tài chính', content: 'Hóa đơn tháng 3 đã được cập nhật. Quý cư dân vui lòng kiểm tra và thanh toán.' },
-        { id: 3, title: 'Đăng ký bãi đỗ xe ô tô tháng tới', date: '10/03/2026', category: 'Thông báo', content: 'BQL bắt đầu tiếp nhận form đăng ký gia hạn bãi đỗ xe ô tô dưới tầng hầm B2.' },
-        { id: 4, title: 'Lịch phun thuốc diệt muỗi toàn khu', date: '08/03/2026', category: 'Sức khỏe', content: 'Cuối tuần này, BQL sẽ tổ chức phun thuốc diệt muỗi, côn trùng tại các khu vực chung.' },
-        { id: 5, title: 'Bảo dưỡng hệ thống PCCC', date: '05/03/2026', category: 'An toàn', content: 'Sẽ có chuông báo cháy thử nghiệm đổ chuông trong khoảng từ 9h - 9h30 sáng thứ 7.' }
-    ];
-
+    const [newsList, setNewsList] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [startIndex, setStartIndex] = useState(0);
+    const [selectedNews, setSelectedNews] = useState(null); // Lưu thông tin tin tức đang xem chi tiết
 
-    const visibleNews = [
-        announcements[startIndex % announcements.length],
-        announcements[(startIndex + 1) % announcements.length],
-        announcements[(startIndex + 2) % announcements.length]
-    ];
+    // --- FETCH DỮ LIỆU TIN TỨC TỪ BACKEND ---
+    useEffect(() => {
+        const fetchNews = async () => {
+            try {
+                const res = await api.get('/News');
+                const data = res.data?.data || res.data || [];
+                // Lấy danh sách tin tức (Backend đã sort sẵn tin mới nhất lên đầu)
+                setNewsList(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error("Lỗi tải bảng tin:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const nextSlide = () => setStartIndex((prev) => (prev + 1) % announcements.length);
-    const prevSlide = () => setStartIndex((prev) => (prev === 0 ? announcements.length - 1 : prev - 1));
+        fetchNews();
+    }, []);
+
+    // --- LOGIC SLIDER ---
+    const nextSlide = () => {
+        if (newsList.length > 3) {
+            setStartIndex((prev) => (prev + 1) % newsList.length);
+        }
+    };
+
+    const prevSlide = () => {
+        if (newsList.length > 3) {
+            setStartIndex((prev) => (prev === 0 ? newsList.length - 1 : prev - 1));
+        }
+    };
+
+    // Lấy tối đa 3 tin tức để hiển thị trên màn hình
+    const getVisibleNews = () => {
+        if (newsList.length === 0) return [];
+        if (newsList.length <= 3) return newsList;
+
+        return [
+            newsList[startIndex % newsList.length],
+            newsList[(startIndex + 1) % newsList.length],
+            newsList[(startIndex + 2) % newsList.length]
+        ];
+    };
+
+    const visibleNews = getVisibleNews();
+
+    // Helper format ngày hiển thị
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
 
     return (
-        <div className="container">
+        <div className="container py-4">
             <div className="text-center mb-5">
                 <h2
                     className="fw-bold text-white mb-2"
@@ -36,85 +75,141 @@ const ResidentPage = () => {
                     Cập nhật những thông báo mới nhất từ Ban quản lý tòa nhà
                 </p>
             </div>
-            <div className="position-relative px-2 px-md-5">
-                <button
-                    onClick={prevSlide}
-                    className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 start-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark"
-                    style={{ width: '50px', height: '50px', transition: 'all 0.2s' }}
-                >
-                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-                        <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
-                    </svg>
-                </button>
 
-                <div className="row g-4">
-                    {visibleNews.map((news, index) => (
-                        <div className="col-lg-4 col-md-6 col-12" key={`${news.id}-${index}`}>
-                            <div className="card border-0 shadow-sm bg-white rounded-3 h-100 d-flex flex-column hover-shadow-lg" style={{ transition: 'transform 0.3s ease, box-shadow 0.3s ease', minHeight: '320px' }}>
-                                <div className="card-body p-4 d-flex flex-column">
-                                    <div className="d-flex align-items-center mb-3">
-                                        <span className="badge bg-light text-dark border me-3 py-2 px-3">{news.category}</span>
-                                    </div>
+            {loading ? (
+                <div className="text-center py-5">
+                    <div className="spinner-border text-white" role="status"></div>
+                </div>
+            ) : newsList.length === 0 ? (
+                <div className="text-center py-5 bg-white bg-opacity-75 rounded-3 shadow-sm">
+                    <i className="bi bi-megaphone display-4 text-muted mb-3 d-block opacity-50"></i>
+                    <h5 className="text-muted">Hiện tại chưa có thông báo nào từ Ban Quản Lý.</h5>
+                </div>
+            ) : (
+                <div className="position-relative px-2 px-md-5">
+                    {/* Nút lùi (Chỉ hiện khi có > 3 tin) */}
+                    {newsList.length > 3 && (
+                        <button
+                            onClick={prevSlide}
+                            className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 start-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark"
+                            style={{ width: '45px', height: '45px', transition: 'all 0.2s', marginLeft: '-15px' }}
+                        >
+                            <i className="bi bi-chevron-left fs-5"></i>
+                        </button>
+                    )}
 
-                                    <h5 className="fw-bold text-dark mb-3" style={{
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden',
-                                        height: '3rem',
-                                        lineHeight: '1.5rem'
-                                    }}>
-                                        {news.title}
-                                    </h5>
+                    <div className="row g-4">
+                        {visibleNews.map((news, index) => (
+                            <div className="col-lg-4 col-md-6 col-12" key={`${news.newsId}-${index}`}>
+                                <div
+                                    className="card border-0 shadow-sm bg-white rounded-3 h-100 d-flex flex-column hover-shadow-lg"
+                                    style={{ transition: 'transform 0.3s ease, box-shadow 0.3s ease', minHeight: '320px' }}
+                                >
+                                    <div className="card-body p-4 d-flex flex-column">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            {/* Do DB không có category, ta để mặc định là Thông báo */}
+                                            <span className="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle py-2 px-3 rounded-pill">
+                                                <i className="bi bi-info-circle-fill me-1"></i> Thông báo
+                                            </span>
+                                        </div>
 
-                                    <p className="text-muted fs-6 mb-4 flex-grow-1" style={{
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 4,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden',
-                                        height: '10rem',
-                                        lineHeight: '1.5rem'
-                                    }}>
-                                        {news.content}
-                                    </p>
+                                        <h5 className="fw-bold text-dark mb-3" style={{
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden',
+                                            height: '3rem',
+                                            lineHeight: '1.5rem'
+                                        }}>
+                                            {news.title}
+                                        </h5>
 
-                                    <div className="mt-auto pt-3 border-top d-flex align-items-center text-muted small fw-medium">
-                                        <i className="bi bi-calendar3 me-2"></i> {news.date}
+                                        <p className="text-muted fs-6 mb-4 flex-grow-1" style={{
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 4,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden',
+                                            height: '6rem',
+                                            lineHeight: '1.5rem',
+                                            whiteSpace: 'pre-wrap'
+                                        }}>
+                                            {news.description}
+                                        </p>
+
+                                        <div className="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                                            <div className="text-muted small fw-medium">
+                                                <i className="bi bi-calendar3 me-2"></i> {formatDate(news.createdAt)}
+                                            </div>
+                                            <span
+                                                className="text-primary small fw-bold"
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => setSelectedNews(news)}
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#residentNewsDetailModal"
+                                            >
+                                                Xem chi tiết <i className="bi bi-arrow-right ms-1"></i>
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
+
+                    {/* Nút tiến (Chỉ hiện khi có > 3 tin) */}
+                    {newsList.length > 3 && (
+                        <button
+                            onClick={nextSlide}
+                            className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 end-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark"
+                            style={{ width: '45px', height: '45px', transition: 'all 0.2s', marginRight: '-15px' }}
+                        >
+                            <i className="bi bi-chevron-right fs-5"></i>
+                        </button>
+                    )}
                 </div>
+            )}
 
-                <button
-                    onClick={nextSlide}
-                    className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 end-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark"
-                    style={{ width: '50px', height: '50px', transition: 'all 0.2s' }}
-                >
-                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-                        <path fillRule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z" />
-                    </svg>
-                </button>
-
-            </div>
+            {/* --- MODAL XEM CHI TIẾT TIN TỨC --- */}
+            {selectedNews && (
+                <div className="modal fade" id="residentNewsDetailModal" tabIndex="-1" aria-hidden="true">
+                    <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                        <div className="modal-content border-0 shadow-lg rounded-4">
+                            <div className="modal-header border-bottom px-4 py-3">
+                                <div className="d-flex align-items-center">
+                                    <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-flex justify-content-center align-items-center me-3" style={{ width: '40px', height: '40px' }}>
+                                        <i className="bi bi-building"></i>
+                                    </div>
+                                    <div>
+                                        <h6 className="mb-0 fw-bold text-dark">Ban Quản Lý Sentana</h6>
+                                        <small className="text-muted">Đăng lúc: {formatDate(selectedNews.createdAt)}</small>
+                                    </div>
+                                </div>
+                                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div className="modal-body p-4">
+                                <h4 className="fw-bold text-dark mb-4">{selectedNews.title}</h4>
+                                <div className="text-dark" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '15px' }}>
+                                    {selectedNews.description}
+                                </div>
+                            </div>
+                            <div className="modal-footer bg-light border-0 px-4 py-3 rounded-bottom-4">
+                                <button type="button" className="btn btn-secondary px-4 rounded-pill" data-bs-dismiss="modal">Đóng</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style jsx="true">{`
-                .hover-shadow-lg:hover { transform: translateY(-5px); box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important; }
-                .hover-dark:hover { background-color: #212529 !important; }
-                .hover-dark:hover i { color: white !important; }
-
-                .line-clamp-2 {
-                    display: -webkit-box;
-                    -webkit-line-clamp: 2;
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
+                .hover-shadow-lg:hover { 
+                    transform: translateY(-5px); 
+                    box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important; 
                 }
-                .line-clamp-4 {
-                    display: -webkit-box;
-                    -webkit-line-clamp: 4; 
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
+                .hover-dark:hover { 
+                    background-color: #212529 !important; 
+                }
+                .hover-dark:hover i { 
+                    color: white !important; 
                 }
             `}</style>
         </div>

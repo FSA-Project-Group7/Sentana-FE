@@ -11,6 +11,7 @@ export const useSignalR = () => {
             console.warn("SignalR: Không tìm thấy token xác thực, dừng kết nối.");
             return;
         }
+
         const hubUrl = import.meta.env.VITE_SIGNALR_HUB_URL;
 
         const newConnection = new signalR.HubConnectionBuilder()
@@ -21,8 +22,11 @@ export const useSignalR = () => {
             .build();
 
         setConnection(newConnection);
+
         return () => {
-            setConnection(null);
+            if (newConnection) {
+                newConnection.stop().then(() => console.log("SignalR Disconnected"));
+            }
         };
     }, []);
 

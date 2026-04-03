@@ -1,12 +1,8 @@
 import React from 'react';
 
-const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => {
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-
-    if (totalPages <= 1) return null;
-
-    const indexOfFirstItem = (currentPage - 1) * itemsPerPage;
-    const indexOfLastItem = Math.min(currentPage * itemsPerPage, totalItems);
+const Pagination = ({ totalPages, currentPage, onPageChange }) => {
+    // Chốt chặn bọc thép: Nếu totalPages không phải số hợp lệ hoặc chỉ có 1 trang thì không hiển thị
+    if (!totalPages || isNaN(totalPages) || totalPages <= 1) return null;
 
     return (
         <div className="d-flex justify-content-between align-items-center p-3 border-top bg-light mt-3 rounded-bottom">

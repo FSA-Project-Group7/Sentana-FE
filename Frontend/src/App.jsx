@@ -22,6 +22,8 @@ import MaintenanceRequest from './pages/resident/MaintenanceRequest';
 // Technician
 import TechnicianLayout from './components/TechnicianLayout';
 import TechnicianTasks from './pages/technician/TechnicianTasks';
+import TechnicianDashboard from './pages/technician/TechnicianDashboard';
+import TechnicianProfile from './pages/technician/TechnicianProfile';
 
 // Admin / Manager
 import AdminLayout from './components/AdminLayout';
@@ -90,8 +92,9 @@ function App() {
         {/* Technician Routes */}
         <Route element={<ProtectedRoute allowedRole="Technician" />}>
           <Route path="/technician" element={<TechnicianLayout />}>
-            <Route index element={<TechnicianTasks />} />
+            <Route index element={<TechnicianDashboard />} />
             <Route path="tasks" element={<TechnicianTasks />} />
+            <Route path="profile" element={<TechnicianProfile />} />
           </Route>
         </Route>
 
