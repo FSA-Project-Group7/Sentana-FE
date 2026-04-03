@@ -21,7 +21,7 @@ const MaintenanceRequest = () => {
 
     // Phân trang
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 3; // CHỐT LẠI 3 ĐỂ CHIỀU CAO 2 CỘT CÂN BẰNG 100%
+    const itemsPerPage = 3;
 
     const connection = useSignalR();
 
