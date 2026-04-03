@@ -11,7 +11,7 @@ const TechnicianDashboard = () => {
     const [newsList, setNewsList] = useState([]);
     const [loadingNews, setLoadingNews] = useState(true);
     const [startIndex, setStartIndex] = useState(0);
-    const [detailNews, setDetailNews] = useState(null); // Modal Xem chi tiết
+    const [detailNews, setDetailNews] = useState(null);
 
     useEffect(() => {
         fetchDashboardData();

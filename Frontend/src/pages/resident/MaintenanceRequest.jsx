@@ -25,21 +25,22 @@ const MaintenanceRequest = () => {
 
     const connection = useSignalR();
 
-    // ==========================================
-    // 1. SIGNALR & FETCH DATA
-    // ==========================================
     useEffect(() => {
-        if (connection) {
-            connection.start()
-                .then(() => {
-                    connection.on("ReceiveTaskFixed", (task) => {
-                        notify.success(`🛠️ Kỹ thuật viên đã xử lý xong: ${task.title}`);
-                        fetchData();
-                    });
-                })
-                .catch(err => console.error('Lỗi SignalR: ', err));
-            return () => connection.stop();
-        }
+        if (!connection) return;
+
+        // BẮT SỰ KIỆN: THỢ ĐÃ SỬA XONG
+        const handleFixedReq = (payload) => {
+            notify.success(`✅ Sự cố "${payload.title}" của bạn đã được thợ xử lý xong! Vui lòng vào nghiệm thu.`);
+            if (typeof setReloadTrigger === 'function') {
+                setReloadTrigger(prev => prev + 1);
+            }
+        };
+        connection.on("ReceiveFixedTask", handleFixedReq);
+
+        return () => {
+            // Hủy đăng ký khi rời trang
+            connection.off("ReceiveFixedTask", handleFixedReq);
+        };
     }, [connection]);
 
     const fetchData = async () => {
