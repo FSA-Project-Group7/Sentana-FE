@@ -206,11 +206,12 @@ const InvoiceManagement = () => {
                             </select>
                         </div>
                         <div className="col-md-3">
-                            <label className="form-label small fw-bold text-muted mb-1">Trạng thái</label>
+                        <label className="form-label small fw-bold text-muted mb-1">Trạng thái</label>
                             <select className="form-select form-select-sm" name="status" value={filters.status} onChange={handleFilterChange}>
                                 <option value="">Tất cả</option>
-                                <option value="0">Chưa thanh toán (Unpaid)</option>
-                                <option value="1">Đã thanh toán (Paid)</option>
+                                <option value="1">Chưa thanh toán (Unpaid)</option>
+                                <option value="2">Chờ xác duyệt (Pending)</option>
+                                <option value="3">Đã thanh toán (Paid)</option>
                             </select>
                         </div>
                     </div>
