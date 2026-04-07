@@ -881,13 +881,62 @@ const ContractManagement = () => {
                             ></textarea>
                             <div className="bg-white p-4 rounded-4 border border-dark shadow-sm">
                                 <h6 className="fw-bold mb-3 text-primary text-uppercase" style={{ letterSpacing: '0.5px' }}>Bản Tính Nháp Trước Khi Chốt</h6>
-                                <div className="d-flex justify-content-between mb-2"><span className="text-muted">Tiền Cọc (Deposit):</span> <strong className="fs-6 text-dark">{formatCurrency(selectedContract?.deposit || 0)}</strong></div>
-                                <div className="d-flex justify-content-between mb-3"><span className="text-muted">Phí phát sinh (Additional):</span> <strong className="text-danger fs-6">- {formatCurrency(additionalCost || 0)}</strong></div>
+                                <div className="d-flex justify-content-between mb-2">
+                                    <span className="text-muted">Tổng hóa đơn (Total Invoice):</span> 
+                                    <strong className="fs-6 text-dark">{formatCurrency(terminateResult?.totalInvoice || 0)}</strong>
+                                </div>
+                                <div className="d-flex justify-content-between mb-2">
+                                    <span className="text-muted">Đã thanh toán (Total Paid):</span> 
+                                    <strong className="text-success fs-6">{formatCurrency(terminateResult?.totalPaid || 0)}</strong>
+                                </div>
+                                <div className="d-flex justify-content-between mb-3">
+                                    <span className="text-muted">
+                                        <i className="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+                                        Hóa đơn chưa trả:
+                                    </span> 
+                                    <strong className={`fs-6 ${(terminateResult?.totalInvoice || 0) - (terminateResult?.totalPaid || 0) > 0 ? 'text-danger' : 'text-success'}`}>
+                                        {formatCurrency(Math.max(0, (terminateResult?.totalInvoice || 0) - (terminateResult?.totalPaid || 0)))}
+                                    </strong>
+                                </div>
+                                <div className="d-flex justify-content-between mb-3">
+                                    <span className="text-muted">Phí phát sinh (Additional Cost):</span> 
+                                    <strong className="text-danger fs-6">{formatCurrency(additionalCost || 0)}</strong>
+                                </div>
                                 <hr className="my-2" />
-                                {((selectedContract?.deposit || 0) - Number(additionalCost || 0)) < 0 ? (
-                                    <div className="text-danger fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3"><span>Khách BÙ THÊM:</span> <span>{formatCurrency(Math.abs((selectedContract?.deposit || 0) - Number(additionalCost || 0)))}</span></div>
+                                <div className="small text-muted mb-2 fst-italic">
+                                    <i className="bi bi-calculator me-1"></i>
+                                    Công thức: Refund = Đã thanh toán - Tổng hóa đơn - Phí phát sinh
+                                </div>
+                                {terminateResult ? (
+                                    terminateResult.refundAmount < 0 ? (
+                                        <div className="text-danger fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3">
+                                            <span>
+                                                <i className="bi bi-exclamation-circle-fill me-2"></i>
+                                                Khách còn NỢ:
+                                            </span> 
+                                            <span>{formatCurrency(Math.abs(terminateResult.refundAmount))}</span>
+                                        </div>
+                                    ) : terminateResult.refundAmount > 0 ? (
+                                        <div className="text-success fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3">
+                                            <span>
+                                                <i className="bi bi-check-circle-fill me-2"></i>
+                                                BQL TRẢ LẠI:
+                                            </span> 
+                                            <span>{formatCurrency(terminateResult.refundAmount)}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="text-secondary fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3">
+                                            <span>
+                                                <i className="bi bi-check-circle-fill me-2"></i>
+                                                ĐÃ THANH TOÁN ĐỦ
+                                            </span> 
+                                            <span>{formatCurrency(0)}</span>
+                                        </div>
+                                    )
                                 ) : (
-                                    <div className="text-success fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3"><span>BQL TRẢ LẠI:</span> <span>{formatCurrency((selectedContract?.deposit || 0) - Number(additionalCost || 0))}</span></div>
+                                    <div className="text-muted fw-bold fs-6 text-center mt-3">
+                                        <i className="bi bi-calculator me-2"></i>Nhấn "Tính toán" để xem kết quả
+                                    </div>
                                 )}
                             </div>
 
