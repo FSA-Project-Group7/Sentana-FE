@@ -196,7 +196,16 @@ const ContractManagement = () => {
             setActiveDrawer(actionType);
         }
         else if (actionType === 'SETTLE') {
-            setActiveDrawer('SETTLE'); 
+            // Fetch deposit settlement details before showing settle drawer
+            try {
+                const res = await api.get(`/contract/${contract.contractId || contract.ContractId}/deposit-settlement`);
+                const settlementData = res.data;
+                setSelectedContract({ ...contract, settlementData });
+                setSettleAdditionalCost(settlementData.additionalCost || '');
+                setActiveDrawer('SETTLE');
+            } catch (error) {
+                toast.error("Không thể tải thông tin quyết toán!");
+            }
         }
         else if (actionType === 'DELETE') {
             if (!state.permissions.canSoftDelete) return toast.warning(`BẢO VỆ: ${state.permissions.reasonNoDelete}`);
@@ -246,6 +255,28 @@ const ContractManagement = () => {
             return toast.warning("🚨 HỢP LỆ: Bắt buộc phải tải lên bản Scan PDF có chữ ký!");
         }
 
+        // Validate additional residents
+        if (formData.additionalResidents && formData.additionalResidents.length > 0) {
+            for (let i = 0; i < formData.additionalResidents.length; i++) {
+                const resident = formData.additionalResidents[i];
+                const accountId = Number(resident.accountId);
+                
+                if (!resident.accountId || accountId <= 0) {
+                    return toast.warning(`🚨 Người ở ghép thứ ${i + 1}: Vui lòng chọn tài khoản hợp lệ!`);
+                }
+                
+                if (!resident.relationshipId) {
+                    return toast.warning(`🚨 Người ở ghép thứ ${i + 1}: Vui lòng chọn mối quan hệ!`);
+                }
+
+                // Check if account exists in residents list
+                const residentExists = residents.find(r => r.accountId === accountId);
+                if (!residentExists) {
+                    return toast.warning(`🚨 Người ở ghép thứ ${i + 1}: Tài khoản không tồn tại trong hệ thống!`);
+                }
+            }
+        }
+
         setIsSubmitting(true);
         const payload = new FormData();
         payload.append("ApartmentId", formData.apartmentId); 
@@ -254,11 +285,20 @@ const ContractManagement = () => {
         payload.append("EndDay", formData.endDay);
         payload.append("MonthlyRent", rent); 
         payload.append("Deposit", deposit); 
-        payload.append("Status", 1); // 👉 Mặc định luôn là trạng thái Active/Pending (1)
         if (formData.file) payload.append("File", formData.file);
 
-        (formData.additionalResidents || []).forEach((r, i) => { if (r.accountId && r.relationshipId) { payload.append(`AdditionalResidents[${i}].AccountId`, r.accountId); payload.append(`AdditionalResidents[${i}].RelationshipId`, r.relationshipId); } });
-        (formData.selectedServices || []).forEach((s, i) => { if (s.serviceId) { payload.append(`Services[${i}].ServiceId`, s.serviceId); if (s.actualPrice) payload.append(`Services[${i}].ActualPrice`, s.actualPrice); } });
+        (formData.additionalResidents || []).forEach((r, i) => { 
+            if (r.accountId && r.relationshipId) { 
+                payload.append(`AdditionalResidents[${i}].AccountId`, r.accountId); 
+                payload.append(`AdditionalResidents[${i}].RelationshipId`, r.relationshipId); 
+            } 
+        });
+        (formData.selectedServices || []).forEach((s, i) => { 
+            if (s.serviceId) { 
+                payload.append(`Services[${i}].ServiceId`, s.serviceId); 
+                if (s.actualPrice) payload.append(`Services[${i}].ActualPrice`, s.actualPrice); 
+            } 
+        });
 
         try {
             const url = isEditMode ? `/contract/${editContractId}/update-contract` : '/contract/create-contract';
@@ -745,6 +785,42 @@ const ContractManagement = () => {
                     <button className="btn-close btn-close-white" onClick={closeDrawer}></button>
                 </div>
                 <div className="drawer-body bg-light">
+                    {selectedContract?.settlementData && (
+                        <div className="alert alert-light border shadow-sm mb-4">
+                            <h6 className="fw-bold text-primary mb-3">Thông Tin Hợp Đồng</h6>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Mã hợp đồng:</span>
+                                <strong>{selectedContract.settlementData.contractCode}</strong>
+                            </div>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Căn hộ:</span>
+                                <strong>{selectedContract.settlementData.apartmentName}</strong>
+                            </div>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Cư dân:</span>
+                                <strong>{selectedContract.settlementData.residentName}</strong>
+                            </div>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Tiền cọc gốc:</span>
+                                <strong className="text-success">{formatCurrency(selectedContract.settlementData.deposit)}</strong>
+                            </div>
+                            {selectedContract.settlementData.additionalCost > 0 && (
+                                <div className="d-flex justify-content-between mb-2">
+                                    <span className="text-muted">Phí phát sinh hiện tại:</span>
+                                    <strong className="text-danger">{formatCurrency(selectedContract.settlementData.additionalCost)}</strong>
+                                </div>
+                            )}
+                            {selectedContract.settlementData.refundAmount !== null && (
+                                <div className="d-flex justify-content-between mb-2">
+                                    <span className="text-muted">Số tiền hoàn trả dự kiến:</span>
+                                    <strong className={selectedContract.settlementData.refundAmount >= 0 ? 'text-success' : 'text-danger'}>
+                                        {formatCurrency(selectedContract.settlementData.refundAmount)}
+                                    </strong>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="form-section">
                         <div className="alert alert-info border-0 shadow-sm mb-4">
                             <strong>Hướng dẫn:</strong> Nhập các khoản phí phát sinh (nếu có) sau khi kiểm tra phòng. Hệ thống sẽ tự động đối trừ vào tiền cọc.
