@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import About from '../components/About';
 import Contact from '../components/Contact';
@@ -8,8 +9,25 @@ import Rooms from '../components/Rooms';
 import bannerImg from '../assets/banner.jpg';
 
 const Home = () => {
-
+    const navigate = useNavigate();
     const [activeSection, setActiveSection] = useState('about');
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        const role = localStorage.getItem('role');
+
+        if (token && role) {
+            const roleRoutes = {
+                'Manager': '/admin',
+                'Resident': '/resident',
+                'Technician': '/technician'
+            };
+            
+            if (roleRoutes[role]) {
+                navigate(roleRoutes[role], { replace: true });
+            }
+        }
+    }, [navigate]);
 
     useEffect(() => {
         const handleScroll = () => {
