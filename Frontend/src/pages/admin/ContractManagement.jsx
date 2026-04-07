@@ -4,7 +4,6 @@ import Pagination from '../../components/common/Pagination';
 import Select from 'react-select';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-// ✅ Import file CSS đã tách
 import './ContractManagement.css';
 
 const ContractManagement = () => {
@@ -29,7 +28,7 @@ const ContractManagement = () => {
     // ==========================================
     // 2. UI & FORM STATES
     // ==========================================
-    const [activeDrawer, setActiveDrawer] = useState(null); // 'FORM', 'VIEW', 'EXTEND', 'TERMINATE', 'CANCEL'
+    const [activeDrawer, setActiveDrawer] = useState(null); // 'FORM', 'VIEW', 'EXTEND', 'TERMINATE', 'CANCEL', 'SETTLE'
     const [selectedContract, setSelectedContract] = useState(null);
 
     const initialFormState = { apartmentId: '', residentAccountId: '', startDay: '', endDay: '', monthlyRent: '', deposit: '', file: null, existingFileUrl: '', additionalResidents: [], selectedServices: [] };
@@ -46,25 +45,66 @@ const ContractManagement = () => {
     const [selectedTerminateId, setSelectedTerminateId] = useState(null);
     const [actionDate, setActionDate] = useState('');
     const [additionalCost, setAdditionalCost] = useState('');
-    const [terminationReason, setTerminationReason] = useState(''); // 👉 Đã thêm state này
+    const [terminationReason, setTerminationReason] = useState(''); 
     const [terminateResult, setTerminateResult] = useState(null);
     const [isTerminating, setIsTerminating] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+    const [settleAdditionalCost, setSettleAdditionalCost] = useState('');
+    const [settleNote, setSettleNote] = useState('');
+    const [isSettling, setIsSettling] = useState(false);
 
     // --- HELPERS ---
     const preventInvalidNumber = (e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); };
     const formatCurrency = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
     const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : "";
-    const closeDrawer = () => { setActiveDrawer(null); setDeleteConfirmText(''); setTerminateResult(null); setTerminationReason(''); };
+    
+    const closeDrawer = () => { 
+        setActiveDrawer(null); 
+        setDeleteConfirmText(''); 
+        setTerminateResult(null); 
+        setTerminationReason(''); 
+        setSettleAdditionalCost(''); 
+        setSettleNote(''); 
+    };
+
+    // 👉 HÀM BẮT LỖI THÔNG MINH TỪ BACKEND ASP.NET CORE
+    const parseBackendError = (error) => {
+        const resData = error.response?.data;
+        if (!resData) return "Lỗi kết nối đến máy chủ!";
+
+        if (resData.errors && typeof resData.errors === 'object' && !Array.isArray(resData.errors)) {
+            const errorMessages = Object.values(resData.errors).flat();
+            if (errorMessages.length > 0) return errorMessages.join(' | ');
+        }
+        
+        if (resData.message || resData.Message) {
+            return resData.message || resData.Message;
+        }
+
+        if (typeof resData === 'string') return resData;
+        
+        return "Lỗi dữ liệu đầu vào không hợp lệ!";
+    };
 
     // --- BỘ NÃO STATE MACHINE ---
     const analyzeStateMachine = (contract) => {
         if (!contract) return { type: 'UNKNOWN', label: 'Lỗi', bg: 'secondary', permissions: {} };
 
         const dbStatus = contract.status ?? contract.Status;
-        if (dbStatus === 2) return { type: 'DRAFT', label: 'Bản Nháp', bg: 'secondary', permissions: { canEditCore: true, canEditAddons: true, canSubmit: true, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: true } };
+        const settlementStatus = contract.settlementStatus ?? contract.SettlementStatus;
+
         if (dbStatus === -1) return { type: 'CANCELLED', label: 'Đã Hủy', bg: 'secondary', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: true } };
-        if (dbStatus === 0) return { type: 'TERMINATED', label: 'Đã Thanh Lý', bg: 'dark', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: false, reasonNoDelete: "Chứa công nợ lịch sử" } };
+        
+        if (dbStatus === 0) {
+            if (settlementStatus === 1) {
+                return { type: 'PENDING_INSPECTION', label: 'Chờ Kiểm Tra Phòng', bg: 'warning', icon: 'bi-search', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: false, canSettle: true, reasonNoDelete: "Đang chờ kiểm tra phòng" } };
+            }
+            if (settlementStatus === 2) {
+                return { type: 'PENDING_SETTLEMENT', label: 'Chờ Thu/Chi Tiền', bg: 'danger', icon: 'bi-currency-dollar', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: false, canSettle: true, reasonNoDelete: "Chưa thanh toán xong công nợ" } };
+            }
+            return { type: 'TERMINATED', label: 'Đã Tất Toán', bg: 'dark', icon: 'bi-check-all', permissions: { canEditCore: false, canEditAddons: false, canSubmit: false, canCancel: false, canTerminate: false, canExtend: false, canSoftDelete: false, reasonNoDelete: "Chứa công nợ lịch sử" } };
+        }
 
         const startDay = contract.startDay ?? contract.StartDay;
         const endDay = contract.endDay ?? contract.EndDay;
@@ -118,7 +158,7 @@ const ContractManagement = () => {
         setSelectedContract(contract);
 
         setActionDate(''); setAdditionalCost(''); setTerminateResult(null); setTerminationReason('');
-        setExtendNewEndDate(''); setExtendOldEndDate('');
+        setExtendNewEndDate(''); setExtendOldEndDate(''); setSettleAdditionalCost(''); setSettleNote('');
 
         if (actionType === 'VIEW') {
             setActiveDrawer('VIEW');
@@ -155,6 +195,9 @@ const ContractManagement = () => {
             setActionDate(new Date().toISOString().substring(0, 10));
             setActiveDrawer(actionType);
         }
+        else if (actionType === 'SETTLE') {
+            setActiveDrawer('SETTLE'); 
+        }
         else if (actionType === 'DELETE') {
             if (!state.permissions.canSoftDelete) return toast.warning(`BẢO VỆ: ${state.permissions.reasonNoDelete}`);
             if (window.confirm("Đưa hợp đồng này vào thùng rác?")) {
@@ -182,17 +225,36 @@ const ContractManagement = () => {
     const addServiceRow = () => setFormData(prev => ({ ...prev, selectedServices: [...(prev.selectedServices || []), { serviceId: '', actualPrice: '' }] }));
     const removeServiceRow = (index) => setFormData(prev => ({ ...prev, selectedServices: (prev.selectedServices || []).filter((_, i) => i !== index) }));
 
-    const handleSaveContract = async (isDraftSubmit) => {
-        if (!formData.apartmentId || !formData.residentAccountId || !formData.startDay || !formData.endDay) return toast.warning("Thiếu trường bắt buộc!");
-        if (new Date(formData.startDay) >= new Date(formData.endDay)) return toast.warning("Ngày kết thúc phải lớn hơn ngày bắt đầu!");
-        if (!isEditMode && !formData.file && !isDraftSubmit) return toast.warning("Bắt buộc tải PDF khi Phát hành chính thức!");
+    const handleSaveContract = async () => {
+        if (!formData.apartmentId || !formData.residentAccountId || !formData.startDay || !formData.endDay) {
+            return toast.warning("Thiếu thông tin Cư dân, Căn hộ hoặc Ngày tháng!");
+        }
+        if (new Date(formData.startDay) >= new Date(formData.endDay)) {
+            return toast.warning("Ngày kết thúc phải lớn hơn ngày bắt đầu!");
+        }
+
+        const rent = Number(formData.monthlyRent || 0);
+        const deposit = Number(formData.deposit || 0);
+
+        if (rent <= 0) {
+            return toast.warning("🚨 HỢP LỆ: Giá thuê hợp đồng bắt buộc phải lớn hơn 0 VNĐ!");
+        }
+        if (deposit < 0) {
+            return toast.warning("🚨 HỢP LỆ: Tiền cọc không được là số âm!");
+        }
+        if (!isEditMode && !formData.file) {
+            return toast.warning("🚨 HỢP LỆ: Bắt buộc phải tải lên bản Scan PDF có chữ ký!");
+        }
 
         setIsSubmitting(true);
         const payload = new FormData();
-        payload.append("ApartmentId", formData.apartmentId); payload.append("ResidentAccountId", formData.residentAccountId);
-        payload.append("StartDay", formData.startDay); payload.append("EndDay", formData.endDay);
-        payload.append("MonthlyRent", formData.monthlyRent || 0); payload.append("Deposit", formData.deposit || 0);
-        payload.append("Status", isDraftSubmit ? 2 : 1);
+        payload.append("ApartmentId", formData.apartmentId); 
+        payload.append("ResidentAccountId", formData.residentAccountId);
+        payload.append("StartDay", formData.startDay); 
+        payload.append("EndDay", formData.endDay);
+        payload.append("MonthlyRent", rent); 
+        payload.append("Deposit", deposit); 
+        payload.append("Status", 1); // 👉 Mặc định luôn là trạng thái Active/Pending (1)
         if (formData.file) payload.append("File", formData.file);
 
         (formData.additionalResidents || []).forEach((r, i) => { if (r.accountId && r.relationshipId) { payload.append(`AdditionalResidents[${i}].AccountId`, r.accountId); payload.append(`AdditionalResidents[${i}].RelationshipId`, r.relationshipId); } });
@@ -202,12 +264,12 @@ const ContractManagement = () => {
             const url = isEditMode ? `/contract/${editContractId}/update-contract` : '/contract/create-contract';
             const method = isEditMode ? 'put' : 'post';
             await api[method](url, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
-            toast.success(isDraftSubmit ? "Đã lưu nháp!" : "Phát hành hợp đồng thành công!");
+            toast.success("Phát hành hợp đồng thành công!");
             closeDrawer(); fetchData();
         } catch (error) {
             console.error("Chi tiết lỗi BE:", error.response?.data);
-            const backendMessage = error.response?.data?.message || error.response?.data?.Message || "Lỗi dữ liệu đầu vào!";
-            toast.error("BE báo lỗi: " + backendMessage);
+            const backendMessage = parseBackendError(error);
+            toast.error("LỖI TỪ MÁY CHỦ: " + backendMessage);
         }
         finally { setIsSubmitting(false); }
     };
@@ -220,7 +282,11 @@ const ContractManagement = () => {
         try {
             await api.put(`/contract/${extendContractId}/extend`, { newEndDate: extendNewEndDate });
             toast.success("Gia hạn thành công!"); closeDrawer(); fetchData();
-        } catch (error) { toast.error("Lỗi gia hạn."); } finally { setIsExtending(false); }
+        } catch (error) { 
+            const backendMessage = parseBackendError(error);
+            toast.error("Gia hạn thất bại: " + backendMessage); 
+        } 
+        finally { setIsExtending(false); }
     };
 
     const handleExecuteTerminate = async (e) => {
@@ -233,11 +299,15 @@ const ContractManagement = () => {
                 {
                     terminationDate: actionDate,
                     additionalCost: Number(additionalCost || 0),
-                    terminationReason: terminationReason // 👉 Đã truyền lý do xuống API
+                    terminationReason: terminationReason
                 });
             setTerminateResult(res?.data?.data || res?.data?.Data || res?.data);
             toast.success("Đã chốt thanh lý!"); fetchData();
-        } catch (error) { toast.error("Thanh lý thất bại."); } finally { setIsTerminating(false); }
+        } catch (error) { 
+            const backendMessage = parseBackendError(error);
+            toast.error("Thanh lý thất bại: " + backendMessage); 
+        } 
+        finally { setIsTerminating(false); }
     };
 
     const handleExecuteCancel = async () => {
@@ -245,7 +315,28 @@ const ContractManagement = () => {
         try {
             await api.delete(`/contract/${selectedTerminateId}/soft-delete`);
             toast.success("Đã Hủy hợp đồng!"); closeDrawer(); fetchData();
-        } catch (error) { toast.error("Lỗi khi hủy."); }
+        } catch (error) { 
+            const backendMessage = parseBackendError(error);
+            toast.error("Lỗi khi hủy: " + backendMessage); 
+        }
+    };
+
+    const handleExecuteSettle = async () => {
+        setIsSettling(true);
+        try {
+            await api.put(`/contract/${selectedContract.contractId || selectedContract.ContractId}/settle`, {
+                additionalCost: Number(settleAdditionalCost || 0),
+                note: settleNote
+            });
+            toast.success("Đã hoàn tất quyết toán hợp đồng!");
+            closeDrawer();
+            fetchData(); 
+        } catch (error) {
+            const backendMessage = parseBackendError(error);
+            toast.error("Quyết toán thất bại: " + backendMessage);
+        } finally {
+            setIsSettling(false);
+        }
     };
 
     const handleRestoreContract = async (id) => {
@@ -259,7 +350,6 @@ const ContractManagement = () => {
         catch (error) { toast.error("Lỗi xóa vĩnh viễn!"); }
     };
 
-    // 👉 ĐÃ BỌC ÁO GIÁP AN TOÀN CHO TẤT CẢ CÁC MẢNG (Tránh lỗi filter undefined)
     const safeApartments = (apartments || []).filter(Boolean);
     const safeResidents = (residents || []).filter(Boolean);
     const safeServices = (systemServices || []).filter(Boolean);
@@ -299,8 +389,9 @@ const ContractManagement = () => {
             if (filterStatus === '1') matchStatus = type === 'ACTIVE' || type === 'PENDING';
             else if (filterStatus === 'expiring') matchStatus = type === 'EXPIRING_SOON';
             else if (filterStatus === 'overdue') matchStatus = type === 'OVERDUE';
+            else if (filterStatus === 'pending_inspection') matchStatus = type === 'PENDING_INSPECTION';
+            else if (filterStatus === 'pending_settlement') matchStatus = type === 'PENDING_SETTLEMENT';
             else if (filterStatus === '0') matchStatus = type === 'TERMINATED' || type === 'CANCELLED';
-            else if (filterStatus === 'draft') matchStatus = type === 'DRAFT';
         }
         return matchSearch && matchStatus;
     });
@@ -308,7 +399,7 @@ const ContractManagement = () => {
     const currentItems = filteredContracts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     const renderTimeline = (contract, stateMachine) => {
-        if (!contract || !contract.startDay || !contract.endDay || stateMachine.type === 'DRAFT' || stateMachine.type === 'CANCELLED') return null;
+        if (!contract || !contract.startDay || !contract.endDay || stateMachine.type === 'CANCELLED') return null;
         const start = new Date(contract.startDay); const end = new Date(contract.endDay); const today = new Date();
         const total = end - start; const passed = today - start;
         let progress = total > 0 ? (passed / total) * 100 : 0;
@@ -330,7 +421,7 @@ const ContractManagement = () => {
 
     return (
         <div className="container-fluid p-0 pb-5" style={{ backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
-            <ToastContainer enableMultiContainer containerId="contractToast" position="top-right" autoClose={3000} limit={1} />
+            <ToastContainer enableMultiContainer containerId="contractToast" position="top-right" autoClose={5000} limit={2} />
 
             <div className="px-5 pt-4">
                 <div className="page-header d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -375,11 +466,12 @@ const ContractManagement = () => {
                     <div style={{ minWidth: '220px' }}>
                         <select className="form-control-icon form-select bg-light border-0 fw-semibold text-secondary shadow-none w-100" style={{ paddingLeft: '16px !important' }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                             <option value="all">Hiển thị: Tất cả</option>
-                            <option value="draft">🔘 Bản nháp (Draft)</option>
                             <option value="1">🟢 Đang hiệu lực / Chờ</option>
                             <option value="expiring">🟡 Sắp hết hạn</option>
                             <option value="overdue">🔴 Quá hạn (Vi phạm)</option>
-                            <option value="0">⚫ Đã thanh lý</option>
+                            <option value="pending_inspection">🟠 Chờ kiểm tra phòng</option>
+                            <option value="pending_settlement">🔴 Chờ khách thanh toán</option>
+                            <option value="0">⚫ Đã tất toán hoàn toàn</option>
                         </select>
                     </div>
                 </div>
@@ -425,6 +517,19 @@ const ContractManagement = () => {
                                                             <li><button className="dropdown-item d-flex align-items-center fw-bold text-dark" onClick={() => handleActionClick('VIEW', contract)}>
                                                                 <i className="bi bi-eye-fill me-3 fs-5 text-secondary"></i> Xem chi tiết HĐ
                                                             </button></li>
+                                                            
+                                                            {state.permissions.canSettle && (
+                                                                <li>
+                                                                    <button 
+                                                                        className="dropdown-item d-flex align-items-center text-primary fw-bold bg-primary bg-opacity-10 mt-1" 
+                                                                        onClick={() => handleActionClick('SETTLE', contract)}
+                                                                    >
+                                                                        <i className={`bi ${state.type === 'PENDING_INSPECTION' ? 'bi-search' : 'bi-currency-dollar'} me-3 fs-5`}></i> 
+                                                                        {state.type === 'PENDING_INSPECTION' ? 'Điền biên bản kiểm tra phòng' : 'Xác nhận Đã thu/chi tiền'}
+                                                                    </button>
+                                                                </li>
+                                                            )}
+
                                                             <li><button className={`dropdown-item d-flex align-items-center ${!state.permissions.canEditCore && !state.permissions.canEditAddons ? 'strict-disabled' : 'text-primary'}`} onClick={() => handleActionClick('EDIT', contract)} title={!state.permissions.canEditCore ? "Chỉ sửa Dịch vụ & Người phụ" : ""}>
                                                                 <i className="bi bi-pencil-square me-3 fs-5"></i> {state.permissions.canEditCore ? 'Sửa toàn bộ' : 'Cập nhật Add-ons'} {(!state.permissions.canEditCore && !state.permissions.canEditAddons) && <i className="bi bi-lock-fill lock-icon"></i>}
                                                             </button></li>
@@ -483,12 +588,32 @@ const ContractManagement = () => {
                                         ) : <div className="text-muted fst-italic text-center bg-light p-2 rounded">Không có file đính kèm</div>}
                                     </div></div>
                                 </div>
-                                {sm.type === 'TERMINATED' && (
-                                    <div className="form-section shadow-sm bg-white border-dark border-2">
-                                        <h6 className="fw-bold text-danger border-bottom border-danger pb-2 mb-3"><i className="bi bi-calculator me-2"></i>Trạng thái Đối soát (Đã đóng)</h6>
-                                        <div className="alert alert-secondary border-0 mb-0">
-                                            Hợp đồng này đã được thanh lý. Xem thông tin hoàn trả cụ thể trong tab Hóa đơn & Công nợ của hệ thống.
+
+                                {(sm.type === 'TERMINATED' || sm.type === 'PENDING_INSPECTION' || sm.type === 'PENDING_SETTLEMENT') && (
+                                    <div className="form-section shadow-sm bg-white border-dark border-2 mt-4">
+                                        <h6 className="fw-bold text-danger border-bottom border-danger pb-2 mb-3">
+                                            <i className="bi bi-calculator me-2"></i>Chi Tiết Quyết Toán
+                                        </h6>
+                                        <div className="row mb-2">
+                                            <div className="col-6 text-muted">Tiền cọc ban đầu:</div>
+                                            <div className="col-6 fw-semibold">{formatCurrency(selectedContract.deposit)}</div>
                                         </div>
+                                        <div className="row mb-2">
+                                            <div className="col-6 text-muted">Phạt / Hư hỏng (Additional):</div>
+                                            <div className="col-6 fw-bold text-danger">- {formatCurrency(selectedContract.additionalCost || 0)}</div>
+                                        </div>
+                                        <hr className="my-2" />
+                                        <div className="row mb-2">
+                                            <div className="col-6 text-dark fw-bold">Tổng tiền hoàn trả (Refund):</div>
+                                            <div className="col-6 fw-bolder fs-5 text-success">{formatCurrency(selectedContract.refundAmount || 0)}</div>
+                                        </div>
+                                        
+                                        {selectedContract.settledAt && (
+                                            <div className="mt-3 small text-muted fst-italic">
+                                                <i className="bi bi-check-circle-fill text-success me-1"></i> 
+                                                Hoàn tất quyết toán vào: {new Date(selectedContract.settledAt).toLocaleString('vi-VN')}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </>
@@ -513,7 +638,7 @@ const ContractManagement = () => {
                         );
                     })()}
 
-                    <form id="drawerForm" onSubmit={(e) => { e.preventDefault(); handleSaveContract(false); }}>
+                    <form id="drawerForm" onSubmit={(e) => { e.preventDefault(); handleSaveContract(); }}>
                         <div className="form-section">
                             <div className="form-section-title"><i className="bi bi-1-circle-fill me-2 text-primary fs-5"></i>Thông tin Lõi (Core Data)</div>
                             <div className="row g-4">
@@ -597,7 +722,6 @@ const ContractManagement = () => {
                 </div>
                 <div className="drawer-footer">
                     <button type="button" className="btn btn-light px-4 py-2 border fw-bold rounded-pill" onClick={closeDrawer}>Hủy thao tác</button>
-                    {!isEditMode && <button type="button" className="btn btn-secondary px-4 py-2 fw-bold shadow-sm rounded-pill" onClick={() => handleSaveContract(true)} disabled={isSubmitting}>Lưu Nháp</button>}
                     <button type="submit" form="drawerForm" className="btn btn-gradient-primary px-5 py-2 fw-bold shadow rounded-pill" disabled={isSubmitting}>{isSubmitting ? <span className="spinner-border spinner-border-sm"></span> : (isEditMode ? "Lưu Cập Nhật Data" : "Phát Hành")}</button>
                 </div>
             </div>
@@ -613,6 +737,47 @@ const ContractManagement = () => {
                     </div>
                 </div>
                 <div className="drawer-footer"><button className="btn btn-light border rounded-pill px-4 fw-bold" onClick={closeDrawer}>Hủy</button><button className="btn btn-gradient-warning text-white fw-bold px-5 rounded-pill shadow" onClick={handleExecuteExtend} disabled={isSubmitting || !extendNewEndDate}>{isSubmitting ? <span className="spinner-border spinner-border-sm"></span> : "Xác nhận Gia Hạn"}</button></div>
+            </div>
+
+            <div className={`custom-drawer ${activeDrawer === 'SETTLE' ? 'open' : ''}`} style={{ width: '500px' }}>
+                <div className="drawer-header bg-primary text-white">
+                    <h5 className="fw-bold mb-0">Xử Lý Quyết Toán</h5>
+                    <button className="btn-close btn-close-white" onClick={closeDrawer}></button>
+                </div>
+                <div className="drawer-body bg-light">
+                    <div className="form-section">
+                        <div className="alert alert-info border-0 shadow-sm mb-4">
+                            <strong>Hướng dẫn:</strong> Nhập các khoản phí phát sinh (nếu có) sau khi kiểm tra phòng. Hệ thống sẽ tự động đối trừ vào tiền cọc.
+                        </div>
+
+                        <label className="fw-bold mb-2 small text-muted">Phí phạt / Hư hỏng tài sản (VNĐ)</label>
+                        <div className="input-icon-wrapper mb-4">
+                            <span className="input-icon fw-bold">₫</span>
+                            <input 
+                                type="number" min="0" onKeyDown={preventInvalidNumber}
+                                className="form-control form-control-icon form-control-lg py-3 shadow-none bg-white" 
+                                value={settleAdditionalCost} 
+                                onChange={e => setSettleAdditionalCost(e.target.value)} 
+                                placeholder="VD: 500000" 
+                            />
+                        </div>
+
+                        <label className="fw-bold mb-2 small text-muted">Ghi chú quyết toán</label>
+                        <textarea 
+                            className="form-control shadow-none bg-white mb-4" 
+                            rows="3" 
+                            value={settleNote}
+                            onChange={e => setSettleNote(e.target.value)}
+                            placeholder="Ghi chú lại tình trạng phòng..."
+                        ></textarea>
+                    </div>
+                </div>
+                <div className="drawer-footer">
+                    <button className="btn btn-light border rounded-pill px-4 fw-bold" onClick={closeDrawer}>Hủy</button>
+                    <button className="btn btn-primary rounded-pill fw-bold px-5 shadow" onClick={handleExecuteSettle} disabled={isSettling}>
+                        {isSettling ? <span className="spinner-border spinner-border-sm"></span> : "Xác nhận & Chốt sổ"}
+                    </button>
+                </div>
             </div>
 
             <div className={`custom-drawer ${activeDrawer === 'TERMINATE' || activeDrawer === 'CANCEL' ? 'open' : ''}`} style={{ width: '500px' }}>
