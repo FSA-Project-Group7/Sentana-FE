@@ -556,7 +556,7 @@ const ContractManagement = () => {
                                     })}
                                 </tbody>
                             </table>
-                            <div className="p-3 d-flex justify-content-center w-100"><Pagination totalItems={filteredContracts.length} itemsPerPage={itemsPerPage} currentPage={currentPage} onPageChange={setCurrentPage} /></div>
+                            <div className="p-3 d-flex justify-content-center w-100"><Pagination totalPages={Math.ceil(filteredContracts.length / itemsPerPage)} currentPage={currentPage} onPageChange={setCurrentPage} /></div>
                         </div>
                     )}
                 </div>
