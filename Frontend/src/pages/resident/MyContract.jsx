@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../utils/axiosConfig';
 
 const MyContract = () => {
+    const navigate = useNavigate();
     const [contracts, setContracts] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -51,11 +53,19 @@ const MyContract = () => {
                             </h5>
                             <p className="mb-0 text-muted small">Căn hộ: <strong className="text-dark">Phòng {contract.apartmentCode}</strong></p>
                         </div>
-                        {contract.fileUrl && (
-                            <a href={contract.fileUrl} target="_blank" rel="noreferrer" className="btn btn-outline-primary btn-sm rounded-pill px-4 fw-bold">
-                                <i className="bi bi-download me-2"></i>Tải PDF
-                            </a>
-                        )}
+                        <div className="d-flex gap-2">
+                            <button 
+                                className="btn btn-primary btn-sm rounded-pill px-4 fw-bold"
+                                onClick={() => navigate(`/resident/my-contract/${contract.contractId}`)}
+                            >
+                                <i className="bi bi-eye me-2"></i>Xem chi tiết
+                            </button>
+                            {contract.fileUrl && (
+                                <a href={contract.fileUrl} target="_blank" rel="noreferrer" className="btn btn-outline-primary btn-sm rounded-pill px-4 fw-bold">
+                                    <i className="bi bi-download me-2"></i>Tải PDF
+                                </a>
+                            )}
+                        </div>
                     </div>
 
                     <div className="card-body p-4 pt-0">
