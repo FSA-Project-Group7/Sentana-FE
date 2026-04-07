@@ -40,6 +40,7 @@ import InvoiceManagement from './pages/admin/InvoiceManagement';
 import PaymentManagement from './pages/admin/PaymentManagement';
 import MaintenanceManagement from './pages/admin/MaintenanceManagement';
 import MyContract from './pages/resident/MyContract';
+import MyContractDetail from './pages/resident/MyContractDetail';
 
 function App() {
   useEffect(() => {
@@ -85,7 +86,8 @@ function App() {
             <Route path="dashboard" element={<ResidentDashboard />} />
             <Route path="profile" element={<ResidentProfile />} />
             <Route path="maintenance" element={<MaintenanceRequest />} />
-            <Route path="contract" element={<MyContract />} />
+            <Route path="my-contract" element={<MyContract />} />
+            <Route path="my-contract/:id" element={<MyContractDetail />} />
           </Route>
         </Route>
 
