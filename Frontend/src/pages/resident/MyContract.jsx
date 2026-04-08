@@ -26,22 +26,49 @@ const MyContract = () => {
     const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
     const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : "N/A";
 
-    if (loading) return <div className="text-center py-5 mt-5"><div className="spinner-border text-primary"></div></div>;
+    if (loading) return <div className="text-center py-5 mt-5"><div className="spinner-border text-white"></div></div>;
 
     if (contracts.length === 0) return (
-        <div className="container py-5 text-center mt-4">
-            <i className="bi bi-file-earmark-x text-muted opacity-25 d-block mb-3" style={{ fontSize: '4rem' }}></i>
-            <h4 className="fw-bold text-dark">Chưa có hợp đồng</h4>
-            <p className="text-muted">Bạn chưa có hợp đồng nào được lưu trữ trên hệ thống.</p>
+        <div className="container pb-5">
+            <div className="row justify-content-center">
+                <div className="col-lg-10 mb-5">
+                    <h2 className="fw-bold text-white mb-2" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.8)' }}>
+                        <i className="bi bi-folder2-open me-2"></i>
+                        Hồ Sơ Hợp Đồng
+                    </h2>
+                    <p className="text-light" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.8)' }}>Quản lý hợp đồng thuê căn hộ của bạn</p>
+                </div>
+            </div>
+            <div className="row justify-content-center">
+                <div className="col-lg-10">
+                    <div className="bg-white rounded-4 shadow-lg p-5 text-center">
+                        <i className="bi bi-file-earmark-x text-muted opacity-25 d-block mb-3" style={{ fontSize: '4rem' }}></i>
+                        <h4 className="fw-bold text-dark">Chưa có hợp đồng</h4>
+                        <p className="text-muted mb-0">Bạn chưa có hợp đồng nào được lưu trữ trên hệ thống.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 
     return (
-        <div className="container py-4">
-            <h3 className="fw-bold mb-4 text-primary"><i className="bi bi-folder2-open me-2"></i>Hồ Sơ Hợp Đồng</h3>
+        <div className="container pb-5">
+            {/* Header */}
+            <div className="row justify-content-center">
+                <div className="col-lg-10 mb-4">
+                    <h2 className="fw-bold text-white mb-2" style={{ textShadow: '2px 2px 8px rgba(0,0,0,0.8)' }}>
+                        <i className="bi bi-folder2-open me-2"></i>
+                        Hồ Sơ Hợp Đồng
+                    </h2>
+                    <p className="text-light" style={{ textShadow: '1px 1px 4px rgba(0,0,0,0.8)' }}>Quản lý hợp đồng thuê căn hộ của bạn</p>
+                </div>
+            </div>
+            
+            <div className="row justify-content-center">
+                <div className="col-lg-10">
             
             {contracts.map((contract, index) => (
-                <div key={contract.contractId || index} className={`card border-0 shadow-sm rounded-4 mb-4 ${contract.status === 1 ? 'border-start border-primary border-5' : 'bg-light'}`}>
+                <div key={contract.contractId || index} className={`card border-0 shadow-lg rounded-4 mb-4 ${contract.status === 1 ? 'border-start border-primary border-5' : 'bg-light'}`}>
                     <div className="card-header bg-white p-4 border-bottom-0 d-flex justify-content-between align-items-center rounded-top-4">
                         <div>
                             <h5 className="fw-bold mb-1 text-dark">
@@ -110,6 +137,8 @@ const MyContract = () => {
                     </div>
                 </div>
             ))}
+                </div>
+            </div>
         </div>
     );
 };
