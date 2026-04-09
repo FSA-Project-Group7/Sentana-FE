@@ -6,17 +6,17 @@ import { notify } from '../../utils/notificationAlert';
 const ResidentDashboard = () => {
     const navigate = useNavigate();
 
-    // States cho Hóa đơn (Giữ y nguyên)
+    // States cho Hóa đơn
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // States cho Điện nước (Thêm mới)
+    // States cho Điện nước
     const [utilities, setUtilities] = useState([]);
     
     // State Tab
-    const [activeTab, setActiveTab] = useState('invoice'); // 'invoice' hoặc 'utility'
+    const [activeTab, setActiveTab] = useState('invoice');
 
-    // Modals (Giữ y nguyên)
+    // Modals
     const [showPayModal, setShowPayModal] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [file, setFile] = useState(null);
@@ -26,6 +26,10 @@ const ResidentDashboard = () => {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [detailData, setDetailData] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
+
+    // STATE CHO POPUP ẢNH BIÊN LAI
+    const [showProofModal, setShowProofModal] = useState(false);
+    const [proofImageUrl, setProofImageUrl] = useState(null);
 
     const fetchMyInvoices = async () => {
         try {
@@ -47,13 +51,11 @@ const ResidentDashboard = () => {
         const fetchData = async () => {
             setLoading(true);
             
-            // 1. LẤY DANH SÁCH HÓA ĐƠN
             try {
                 const invoiceRes = await api.get('/Invoice/my-invoices');
                 const invData = invoiceRes.data?.data || invoiceRes.data?.Data || [];
                 setInvoices(Array.isArray(invData) ? invData : []);
             } catch (error) {
-                console.error("Lỗi khi tải hóa đơn:", error);
                 if (error.response?.status === 404) {
                     setInvoices([]); 
                 } else {
@@ -61,7 +63,6 @@ const ResidentDashboard = () => {
                 }
             }
 
-            // 2. LẤY DANH SÁCH ĐIỆN NƯỚC (Thêm mới)
             try {
                 const utilRes = await api.get('/Utility/history/my');
                 const utilData = utilRes.data?.data || utilRes.data?.Data || [];
@@ -82,7 +83,7 @@ const ResidentDashboard = () => {
     };
 
     // ==========================================
-    // XỬ LÝ MODAL AN TOÀN (Giữ y nguyên)
+    // XỬ LÝ CÁC MODAL
     // ==========================================
     const handleOpenPay = (invoice) => {
         setSelectedInvoice(invoice);
@@ -110,16 +111,38 @@ const ResidentDashboard = () => {
         }
     };
 
+    const handleViewProof = async (invoice) => {
+        setSelectedInvoice(invoice); 
+        try {
+            const payRes = await api.get(`/Payment/invoice/${invoice.invoiceId}`);
+            const payData = payRes.data?.data || payRes.data?.Data || [];
+            
+            const proofs = payData.filter(p => p.proofUrl || p.paymentProofImage).map(p => p.proofUrl || p.paymentProofImage);
+
+            if (proofs.length > 0) {
+                setProofImageUrl(proofs[0]);
+                setShowProofModal(true);
+                document.body.style.overflow = 'hidden'; 
+            } else {
+                notify.warning("Chưa tìm thấy ảnh biên lai cho hóa đơn này.");
+            }
+        } catch (error) {
+            notify.error("Lỗi khi tải ảnh biên lai.");
+        }
+    };
+
     const closeModal = () => {
         setShowPayModal(false);
         setShowDetailModal(false);
+        setShowProofModal(false);
         setSelectedInvoice(null);
         setDetailData(null);
+        setProofImageUrl(null);
         document.body.style.overflow = 'auto'; 
     };
 
     // ==========================================
-    // SUBMIT THANH TOÁN (Giữ y nguyên)
+    // SUBMIT THANH TOÁN
     // ==========================================
     const handleSubmitPayment = async (e) => {
         e.preventDefault();
@@ -127,17 +150,13 @@ const ResidentDashboard = () => {
 
         setIsSubmitting(true);
         const formData = new FormData();
-        
         formData.append('File', file); 
         if (note) formData.append('Note', note);
 
         try {
             const res = await api.post(`/payment/${selectedInvoice.invoiceId}/upload-proof`, formData, {
-                headers: { 
-                    'Content-Type': 'multipart/form-data' 
-                }
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
-            
             notify.success(res.data?.message || "Đã gửi biên lai thành công!");
             closeModal();
             fetchMyInvoices();
@@ -145,11 +164,9 @@ const ResidentDashboard = () => {
             console.error("Chi tiết lỗi thanh toán:", error.response);
             let errorMsg = "Không thể gửi biên lai.";
             if (error.response?.data) {
-                if (error.response.data.message) {
-                    errorMsg = error.response.data.message;
-                } else if (error.response.data.title) {
-                    errorMsg = error.response.data.title;
-                } else if (error.response.data.errors) {
+                if (error.response.data.message) errorMsg = error.response.data.message;
+                else if (error.response.data.title) errorMsg = error.response.data.title;
+                else if (error.response.data.errors) {
                     const firstErrorKey = Object.keys(error.response.data.errors)[0];
                     errorMsg = error.response.data.errors[firstErrorKey][0];
                 }
@@ -161,7 +178,7 @@ const ResidentDashboard = () => {
     };
 
     // ==========================================
-    // RENDER HELPERS (Giữ y nguyên)
+    // RENDER HELPERS
     // ==========================================
     const getStatusBadge = (statusName) => {
         const s = String(statusName).toLowerCase();
@@ -178,7 +195,6 @@ const ResidentDashboard = () => {
         return 'border-success';
     };
 
-    // Tính tổng điện nước
     const totalElectric = utilities.reduce((sum, item) => sum + ((item.electricityNewIndex || 0) - (item.electricityOldIndex || 0)), 0);
     const totalWater = utilities.reduce((sum, item) => sum + ((item.waterNewIndex || 0) - (item.waterOldIndex || 0)), 0);
 
@@ -193,7 +209,6 @@ const ResidentDashboard = () => {
     return (
         <div className="container-fluid py-4 px-4 pb-5">
 
-            {/* HEADER TỔNG */}
             <div className="text-center mb-4 mt-2">
                 <h2 className="fw-bold text-white mb-2 shadow-text">Xin chào, Cư dân!</h2>
                 <p className="text-light text-shadow-sm">Quản lý hóa đơn và theo dõi chỉ số sử dụng điện nước</p>
@@ -216,18 +231,16 @@ const ResidentDashboard = () => {
                                 className={`nav-link w-100 rounded-pill fw-bold py-2 ${activeTab === 'utility' ? 'active bg-primary' : 'text-secondary'}`}
                                 onClick={() => setActiveTab('utility')}
                             >
-                                <i className="bi bi-droplet-half me-2"></i>Thông Tin Điện Nước
+                                <i className="bi bi-lightning-charge-fill me-2"></i>Thông Tin Điện Nước
                             </button>
                         </li>
                     </ul>
                 </div>
             </div>
 
-            {/* ==================================================== */}
-            {/* TAB 1: THÔNG TIN HÓA ĐƠN (Giữ y nguyên Card Hóa đơn) */}
-            {/* ==================================================== */}
+            {/* TAB 1: THÔNG TIN HÓA ĐƠN */}
             {activeTab === 'invoice' && (
-                <div className="mt-2">
+                <div className="mt-2 animate-fade-in">
                     <div className="row g-4">
                         {invoices.length === 0 ? (
                             <div className="col-12 text-center py-5 bg-white rounded-4 shadow-lg border-0 mx-auto" style={{ maxWidth: '800px' }}>
@@ -266,9 +279,18 @@ const ResidentDashboard = () => {
                                                 <button className="btn btn-light border text-dark fw-bold w-100 rounded-pill shadow-sm" onClick={() => handleOpenDetail(inv)}>
                                                     Chi tiết
                                                 </button>
+
                                                 {String(inv.statusName).toLowerCase() === 'unpaid' && inv.debt > 0 && (
                                                     <button className="btn btn-success w-100 fw-bold rounded-pill shadow-sm" onClick={() => handleOpenPay(inv)}>
                                                         Thanh toán
+                                                    </button>
+                                                )}
+
+                                                {(String(inv.statusName).toLowerCase() === 'pendingverification' || 
+                                                  String(inv.statusName).toLowerCase() === 'pending' || 
+                                                  String(inv.statusName).toLowerCase() === 'paid') && (
+                                                    <button className="btn btn-outline-success w-100 fw-bold rounded-pill shadow-sm" onClick={() => handleViewProof(inv)}>
+                                                        <i className="bi bi-image me-1"></i> Biên lai
                                                     </button>
                                                 )}
                                             </div>
@@ -281,12 +303,9 @@ const ResidentDashboard = () => {
                 </div>
             )}
 
-            {/* ==================================================== */}
-            {/* TAB 2: CHỈ SỐ ĐIỆN NƯỚC (Bổ sung mới)                */}
-            {/* ==================================================== */}
+            {/* TAB 2: CHỈ SỐ ĐIỆN NƯỚC */}
             {activeTab === 'utility' && (
-                <div className="mt-2">
-                    {/* Thẻ Tổng Kết */}
+                <div className="mt-2 animate-fade-in">
                     <div className="row g-4 mb-4">
                         <div className="col-md-6">
                             <div className="card border-0 shadow-lg rounded-4 overflow-hidden bg-white">
@@ -316,7 +335,6 @@ const ResidentDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Bảng Chi Tiết Điện Nước */}
                     <div className="card border-0 shadow-lg rounded-4 overflow-hidden bg-white">
                         <div className="card-header bg-transparent border-bottom pt-4 pb-3 px-4">
                             <h5 className="fw-bold mb-0 text-dark"><i className="bi bi-table text-primary me-2"></i> Chi Tiết Theo Từng Tháng</h5>
@@ -367,11 +385,11 @@ const ResidentDashboard = () => {
             )}
 
             {/* ========================================= */}
-            {/* CÁC MODAL HÓA ĐƠN (Giữ nguyên gốc)          */}
+            {/* MODALS HÓA ĐƠN                            */}
             {/* ========================================= */}
 
-            {/* Backdrop */}
-            {(showPayModal || showDetailModal) && <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.6)' }}></div>}
+            {/* Backdrop dùng chung cho Chi tiết & Thanh toán */}
+            {(showPayModal || showDetailModal) && <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={closeModal}></div>}
 
             {/* MODAL CHI TIẾT HÓA ĐƠN */}
             {showDetailModal && (
@@ -418,7 +436,7 @@ const ResidentDashboard = () => {
                 </div>
             )}
 
-            {/* MODAL THANH TOÁN */}
+            {/* MODAL THANH TOÁN (ẢNH QR TĨNH + THÔNG TIN CHI TIẾT) */}
             {showPayModal && (
                 <div className="modal fade show d-block" tabIndex="-1" style={{ zIndex: 1050 }}>
                     <div className="modal-dialog modal-dialog-centered">
@@ -429,9 +447,32 @@ const ResidentDashboard = () => {
                             </div>
                             <form onSubmit={handleSubmitPayment}>
                                 <div className="modal-body p-4">
-                                    <div className="alert bg-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 mb-4 text-center">
-                                        <span className="text-dark">Số tiền cần thanh toán:</span><br />
-                                        <span className="display-6 fw-bold text-danger">{formatCurrency(selectedInvoice?.debt)}</span>
+                                    
+                                    {/* MÃ QR CHUYỂN KHOẢN  */}
+                                    <div className="text-center mb-4 p-4 border border-success border-opacity-25 rounded-4 bg-success bg-opacity-10">
+                                        <p className="fw-bold text-dark mb-3 text-uppercase">Thông Tin Chuyển Khoản</p>
+                                        
+                                        <img 
+                                            // IMPORT ẢNH QR VÀO ĐÂY
+                                            src="https://res.cloudinary.com/dk4r6t9s8/image/upload/v1702050865/qr-code-sample.png" 
+                                            alt="Mã QR Chuyển Khoản" 
+                                            className="img-fluid rounded-3 shadow-sm border bg-white p-2 mb-3"
+                                            style={{ maxWidth: '200px' }}
+                                        />
+                                        
+                                        {/* THÔNG TIN CHI TIẾT ĐỂ CƯ DÂN COPY */}
+                                        <div className="bg-white p-3 rounded-3 shadow-sm text-start">
+                                            <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                                                <span className="text-muted small">Số tiền cần chuyển:</span>
+                                                <strong className="text-danger fs-5">{formatCurrency(selectedInvoice?.debt)}</strong>
+                                            </div>
+                                            <div className="d-flex justify-content-between align-items-center pt-1">
+                                                <span className="text-muted small">Nội dung chuyển khoản:</span>
+                                                <strong className="text-dark">Thanh toan P.{selectedInvoice?.apartmentCode || 'N/A'} Thang {selectedInvoice?.billingMonth}</strong>
+                                            </div>
+                                        </div>
+                                        
+                                        <small className="d-block text-danger mt-3 fw-medium fst-italic"><i className="bi bi-exclamation-circle me-1"></i> Vui lòng chuyển đúng số tiền và nội dung để được duyệt nhanh nhất.</small>
                                     </div>
 
                                     <div className="mb-4">
@@ -452,6 +493,34 @@ const ResidentDashboard = () => {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL MỚI: POPUP XEM ẢNH BIÊN LAI */}
+            {showProofModal && proofImageUrl && selectedInvoice && (
+                <div className="modal fade show d-block" tabIndex="-1" style={{ zIndex: 1050 }} onClick={closeModal}>
+                    <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>
+                        <div className="modal-content shadow-lg border-0">
+                            <div className="modal-header bg-dark text-white border-0 py-2">
+                                <h6 className="modal-title small fw-bold">Minh chứng: Phòng {selectedInvoice.apartmentCode || 'N/A'} - Tháng {selectedInvoice.billingMonth}</h6>
+                                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
+                            </div>
+                            <div className="modal-body p-1 bg-secondary bg-opacity-10 text-center">
+                                <img 
+                                    src={proofImageUrl} 
+                                    alt="Bill thanh toán" 
+                                    className="img-fluid rounded shadow-sm" 
+                                    style={{ maxHeight: '75vh', objectFit: 'contain' }}
+                                />
+                            </div>
+                            <div className="modal-footer py-2 border-0 bg-light">
+                                <button className="btn btn-sm btn-secondary" onClick={closeModal}>Đóng</button>
+                                <a href={proofImageUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-primary">
+                                    <i className="bi bi-box-arrow-up-right me-1"></i> Mở ảnh gốc
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -482,6 +551,11 @@ const ResidentDashboard = () => {
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+                .animate-fade-in { animation: fadeIn 0.4s ease-in-out; }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
             `}</style>
         </div>
     );
