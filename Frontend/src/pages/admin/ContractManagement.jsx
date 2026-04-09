@@ -143,6 +143,22 @@ const ContractManagement = () => {
     useEffect(() => { fetchData(); }, []);
     useEffect(() => { setCurrentPage(1); }, [searchTerm, filterStatus]);
 
+    // Update termination preview when additionalCost changes
+    useEffect(() => {
+        if (terminateResult && terminateResult.isPreview && additionalCost !== '') {
+            const deposit = terminateResult.Deposit || 0;
+            const unpaidInvoice = terminateResult.UnpaidInvoice || 0;
+            const additional = Number(additionalCost) || 0;
+            const refund = deposit - unpaidInvoice - additional;
+            
+            setTerminateResult({
+                ...terminateResult,
+                AdditionalCost: additional,
+                RefundAmount: refund
+            });
+        }
+    }, [additionalCost]);
+
     const fetchDeletedContracts = async () => {
         setLoadingDeleted(true);
         try {
@@ -193,6 +209,81 @@ const ContractManagement = () => {
         else if (actionType === 'TERMINATE' || actionType === 'CANCEL') {
             setSelectedTerminateId(contract.contractId || contract.ContractId);
             setActionDate(new Date().toISOString().substring(0, 10));
+            
+            // Fetch invoice data for termination preview
+            if (actionType === 'TERMINATE') {
+                try {
+                    const contractId = contract.contractId || contract.ContractId;
+                    // Use new endpoint to get ALL unpaid invoices for this contract
+                    const invoiceRes = await api.get(`/invoice/contract/${contractId}/unpaid`);
+                    const invoices = invoiceRes?.data?.data || invoiceRes?.data?.Data || invoiceRes?.data || [];
+                    
+                    console.log("🔍 All unpaid invoices from API:", invoices);
+                    console.log("🔍 Contract ID:", contractId);
+                    
+                    // Calculate unpaid invoice
+                    let totalInvoice = 0;
+                    let totalPaid = 0;
+                    const unpaidInvoiceList = [];
+                    
+                    for (const inv of invoices) {
+                        const invTotal = inv.totalMoney || inv.TotalMoney || 0;
+                        const invPaid = inv.paidAmount || inv.PaidAmount || 0;
+                        const invUnpaid = invTotal - invPaid;
+                        
+                        totalInvoice += invTotal;
+                        totalPaid += invPaid;
+                        
+                        // Track ALL unpaid invoices (even if partially paid)
+                        if (invUnpaid > 0) {
+                            unpaidInvoiceList.push({
+                                month: inv.billingMonth || inv.BillingMonth,
+                                year: inv.billingYear || inv.BillingYear,
+                                amount: invUnpaid,
+                                total: invTotal,
+                                paid: invPaid
+                            });
+                        }
+                    }
+                    
+                    // Sort by year and month ascending
+                    unpaidInvoiceList.sort((a, b) => {
+                        if (a.year !== b.year) return a.year - b.year;
+                        return a.month - b.month;
+                    });
+                    
+                    const unpaidInvoice = totalInvoice - totalPaid;
+                    
+                    console.log("📊 Unpaid Invoice Details:", {
+                        totalInvoice,
+                        totalPaid,
+                        unpaidInvoice,
+                        unpaidInvoiceList
+                    });
+                    
+                    // Set preview data with detailed unpaid invoice list
+                    setTerminateResult({
+                        Deposit: contract.deposit || contract.Deposit || 0,
+                        UnpaidInvoice: unpaidInvoice,
+                        UnpaidInvoiceList: unpaidInvoiceList,
+                        AdditionalCost: 0,
+                        RefundAmount: (contract.deposit || contract.Deposit || 0) - unpaidInvoice - 0,
+                        isPreview: true
+                    });
+                } catch (error) {
+                    console.error("Error fetching invoice data:", error);
+                    // Set default preview with deposit only
+                    setTerminateResult({
+                        Deposit: contract.deposit || contract.Deposit || 0,
+                        UnpaidInvoice: 0,
+                        UnpaidInvoiceList: [],
+                        AdditionalCost: 0,
+                        RefundAmount: contract.deposit || contract.Deposit || 0,
+                        isPreview: true
+                    });
+                }
+            }
+            
             setActiveDrawer(actionType);
         }
         else if (actionType === 'SETTLE') {
@@ -341,7 +432,10 @@ const ContractManagement = () => {
                     additionalCost: Number(additionalCost || 0),
                     terminationReason: terminationReason
                 });
-            setTerminateResult(res?.data?.data || res?.data?.Data || res?.data);
+            const result = res?.data?.data || res?.data?.Data || res?.data;
+            console.log("🔍 Termination API Response:", result);
+            // Remove isPreview flag to show success message
+            setTerminateResult({ ...result, isPreview: false });
             toast.success("Đã chốt thanh lý!"); fetchData();
         } catch (error) { 
             const backendMessage = parseBackendError(error);
@@ -882,47 +976,63 @@ const ContractManagement = () => {
                             <div className="bg-white p-4 rounded-4 border border-dark shadow-sm">
                                 <h6 className="fw-bold mb-3 text-primary text-uppercase" style={{ letterSpacing: '0.5px' }}>Bản Tính Nháp Trước Khi Chốt</h6>
                                 <div className="d-flex justify-content-between mb-2">
-                                    <span className="text-muted">Tổng hóa đơn (Total Invoice):</span> 
-                                    <strong className="fs-6 text-dark">{formatCurrency(terminateResult?.totalInvoice || 0)}</strong>
-                                </div>
-                                <div className="d-flex justify-content-between mb-2">
-                                    <span className="text-muted">Đã thanh toán (Total Paid):</span> 
-                                    <strong className="text-success fs-6">{formatCurrency(terminateResult?.totalPaid || 0)}</strong>
-                                </div>
-                                <div className="d-flex justify-content-between mb-3">
-                                    <span className="text-muted">
-                                        <i className="bi bi-exclamation-triangle-fill text-warning me-1"></i>
-                                        Hóa đơn chưa trả:
+                                    <span className="text-success">
+                                        <i className="bi bi-plus-circle-fill me-1"></i>
+                                        Tiền cọc (Deposit):
                                     </span> 
-                                    <strong className={`fs-6 ${(terminateResult?.totalInvoice || 0) - (terminateResult?.totalPaid || 0) > 0 ? 'text-danger' : 'text-success'}`}>
-                                        {formatCurrency(Math.max(0, (terminateResult?.totalInvoice || 0) - (terminateResult?.totalPaid || 0)))}
+                                    <strong className="fs-6 text-success">
+                                        {formatCurrency(terminateResult?.Deposit || terminateResult?.deposit || 0)}
                                     </strong>
                                 </div>
+                                <div className="mb-2">
+                                    <div className="d-flex justify-content-between">
+                                        <span className="text-danger">
+                                            <i className="bi bi-dash-circle-fill me-1"></i>
+                                            Hóa đơn chưa trả (Unpaid Invoice):
+                                        </span> 
+                                        <strong className="fs-6 text-danger">
+                                            {formatCurrency(terminateResult?.UnpaidInvoice || terminateResult?.unpaidInvoice || 0)}
+                                        </strong>
+                                    </div>
+                                    {terminateResult?.UnpaidInvoiceList && terminateResult.UnpaidInvoiceList.length > 0 && (
+                                        <div className="ms-4 mt-1 small text-muted">
+                                            {terminateResult.UnpaidInvoiceList.map((inv, idx) => (
+                                                <div key={idx} className="d-flex justify-content-between">
+                                                    <span>• Tháng {inv.month}/{inv.year}:</span>
+                                                    <span className="text-danger fw-semibold">{formatCurrency(inv.amount)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="d-flex justify-content-between mb-3">
-                                    <span className="text-muted">Phí phát sinh (Additional Cost):</span> 
+                                    <span className="text-danger">
+                                        <i className="bi bi-dash-circle-fill me-1"></i>
+                                        Chi phí phát sinh (Additional Cost):
+                                    </span> 
                                     <strong className="text-danger fs-6">{formatCurrency(additionalCost || 0)}</strong>
                                 </div>
                                 <hr className="my-2" />
                                 <div className="small text-muted mb-2 fst-italic">
                                     <i className="bi bi-calculator me-1"></i>
-                                    Công thức: Refund = Đã thanh toán - Tổng hóa đơn - Phí phát sinh
+                                    Công thức: Refund = Tiền cọc - Hóa đơn chưa trả - Chi phí phát sinh
                                 </div>
                                 {terminateResult ? (
-                                    terminateResult.refundAmount < 0 ? (
+                                    (terminateResult.RefundAmount || terminateResult.refundAmount || 0) < 0 ? (
                                         <div className="text-danger fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3">
                                             <span>
                                                 <i className="bi bi-exclamation-circle-fill me-2"></i>
-                                                Khách còn NỢ:
+                                                Bên thuê cần trả:
                                             </span> 
-                                            <span>{formatCurrency(Math.abs(terminateResult.refundAmount))}</span>
+                                            <span>{formatCurrency(Math.abs(terminateResult.RefundAmount || terminateResult.refundAmount || 0))}</span>
                                         </div>
-                                    ) : terminateResult.refundAmount > 0 ? (
+                                    ) : (terminateResult.RefundAmount || terminateResult.refundAmount || 0) > 0 ? (
                                         <div className="text-success fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3">
                                             <span>
                                                 <i className="bi bi-check-circle-fill me-2"></i>
-                                                BQL TRẢ LẠI:
+                                                BQL hoàn trả:
                                             </span> 
-                                            <span>{formatCurrency(terminateResult.refundAmount)}</span>
+                                            <span>{formatCurrency(terminateResult.RefundAmount || terminateResult.refundAmount || 0)}</span>
                                         </div>
                                     ) : (
                                         <div className="text-secondary fw-bolder fs-5 d-flex justify-content-between align-items-center mt-3">
@@ -935,19 +1045,19 @@ const ContractManagement = () => {
                                     )
                                 ) : (
                                     <div className="text-muted fw-bold fs-6 text-center mt-3">
-                                        <i className="bi bi-calculator me-2"></i>Nhấn "Tính toán" để xem kết quả
+                                        <i className="bi bi-hourglass-split me-2"></i>Đang tải thông tin...
                                     </div>
                                 )}
                             </div>
 
-                            {terminateResult && (
+                                {terminateResult && !terminateResult.isPreview && (
                                 <div className="alert alert-success mt-4 mb-0 fw-bold border-0 shadow-sm"><i className="bi bi-check-circle-fill me-2"></i>Đã chốt thanh lý và ghi nhận công nợ hệ thống!</div>
                             )}
                         </div>
                     )}
                 </div>
                 <div className="drawer-footer"><button className="btn btn-light border rounded-pill px-4 fw-bold" onClick={closeDrawer}>Đóng</button>
-                    {activeDrawer === 'CANCEL' ? <button className="btn btn-gradient-warning rounded-pill fw-bold px-5" onClick={handleExecuteCancel}>Xác Nhận Hủy</button> : <button className="btn btn-danger rounded-pill fw-bold px-5 shadow" onClick={handleExecuteTerminate} disabled={isSubmitting || !actionDate || terminateResult}>{isSubmitting ? <span className="spinner-border spinner-border-sm"></span> : "Chốt Thanh Lý & Thu Hồi"}</button>}
+                    {activeDrawer === 'CANCEL' ? <button className="btn btn-gradient-warning rounded-pill fw-bold px-5" onClick={handleExecuteCancel}>Xác Nhận Hủy</button> : <button className="btn btn-danger rounded-pill fw-bold px-5 shadow" onClick={handleExecuteTerminate} disabled={isSubmitting || !actionDate || (terminateResult && !terminateResult.isPreview)}>{isSubmitting ? <span className="spinner-border spinner-border-sm"></span> : "Chốt Thanh Lý & Thu Hồi"}</button>}
                 </div>
             </div>
 
