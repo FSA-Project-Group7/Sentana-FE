@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../utils/axiosConfig';
 import styles from '../styles/AdminLayout.module.css';
 
 const AdminLayout = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const handleLogout = async () => {
         if (isLoggingOut) return;
         setIsLoggingOut(true);
 
         try {
+            console.log("Gọi API logout...");
             await api.post('/Auth/Logout');
             console.log("Đã hủy Token Admin ở Backend thành công!");
         } catch (error) {
@@ -19,7 +22,19 @@ const AdminLayout = () => {
         } finally {
             localStorage.removeItem('token');
             localStorage.removeItem('role');
-            window.location.href = '/login';
+            setShowLogoutModal(false);
+            setIsLoggingOut(false);
+            navigate('/login');
+        }
+    };
+
+    const handleOpenLogoutModal = () => {
+        setShowLogoutModal(true);
+    };
+
+    const handleCloseLogoutModal = () => {
+        if (!isLoggingOut) {
+            setShowLogoutModal(false);
         }
     };
 
@@ -73,7 +88,7 @@ const AdminLayout = () => {
                 {/* Gắn sự kiện và hiệu ứng loading cho nút Đăng xuất (Luôn nằm dưới cùng nhờ flex-column và mt-auto) */}
                 <div
                     className={`${styles.logoutBtn} mt-auto`}
-                    onClick={handleLogout}
+                    onClick={handleOpenLogoutModal}
                     style={{
                         cursor: isLoggingOut ? 'not-allowed' : 'pointer',
                         opacity: isLoggingOut ? 0.6 : 1,
@@ -126,6 +141,63 @@ const AdminLayout = () => {
                     </div>
                 </main>
             </div>
+
+            {/* MODAL BACKDROP XÁC NHẬN LOGOUT */}
+            {showLogoutModal && <div className="modal-backdrop fade show"></div>}
+
+            {/* MODAL XÁC NHẬN LOGOUT */}
+            {showLogoutModal && (
+                <div className="modal fade show d-block" tabIndex="-1" style={{ zIndex: 1050 }}>
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-0 shadow-lg">
+                            <div className="modal-header bg-danger bg-opacity-10 border-0">
+                                <h5 className="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+                                    <i className="bi bi-exclamation-circle-fill"></i>
+                                    Xác nhận đăng xuất
+                                </h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={handleCloseLogoutModal}
+                                    disabled={isLoggingOut}
+                                ></button>
+                            </div>
+                            <div className="modal-body p-4 text-center">
+                                <p className="mb-2 text-dark fw-medium">Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?</p>
+                                <small className="text-muted">Bạn sẽ cần đăng nhập lại để truy cập các tính năng của ứng dụng.</small>
+                            </div>
+                            <div className="modal-footer bg-light border-0 d-flex justify-content-center gap-2">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary px-4" 
+                                    onClick={handleCloseLogoutModal}
+                                    disabled={isLoggingOut}
+                                >
+                                    Hủy bỏ
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-danger px-4" 
+                                    onClick={handleLogout}
+                                    disabled={isLoggingOut}
+                                >
+                                    {isLoggingOut ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2"></span>
+                                            Đang thoát...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-box-arrow-left me-2"></i>
+                                            Đăng xuất
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import logoImg from '../assets/logo.png';
+import api from '../utils/axiosConfig';
 
 // Nhận prop isResident (mặc định là false)
 const Navbar = ({ isResident = false }) => {
@@ -10,6 +12,8 @@ const Navbar = ({ isResident = false }) => {
     const [isVisible, setIsVisible] = useState(true);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [fullName, setFullName] = useState('');
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => {
         // --- LOGIC SCROLL ---
@@ -46,27 +50,54 @@ const Navbar = ({ isResident = false }) => {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const handleLogout = () => {
-        if (window.confirm('Xác nhận đăng xuất khỏi hệ thống?')) {
+    const handleLogout = async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+
+        try {
+            console.log("Gọi API logout...");
+            await api.post('/Auth/Logout');
+            console.log("Đã logout khỏi Backend thành công!");
+        } catch (error) {
+            console.error("Lỗi khi gọi API Đăng xuất:", error);
+        } finally {
+            // Xóa tất cả dữ liệu lưu trong localStorage
             localStorage.removeItem('token');
             localStorage.removeItem('role');
             localStorage.removeItem('refreshToken');
+            
+            // Đóng modal
+            setShowLogoutModal(false);
+            setIsLoggingOut(false);
+            
+            // Redirect tới login page
             navigate('/login');
+        }
+    };
+
+    const handleOpenLogoutModal = () => {
+        setShowLogoutModal(true);
+    };
+
+    const handleCloseLogoutModal = () => {
+        if (!isLoggingOut) {
+            setShowLogoutModal(false);
         }
     };
 
     const isActive = (path) => location.pathname === path ? 'fw-bold border-bottom border-2 border-white' : '';
 
     return (
-        <nav
-            className="navbar navbar-expand-lg navbar-dark fixed-top"
-            style={{
-                backgroundColor: 'rgba(33, 37, 41, 0.95)', // Tăng độ mờ một chút cho nền đậm hơn
-                transition: 'transform 0.3s ease-in-out',
-                transform: isVisible ? 'translateY(0)' : 'translateY(-100%)',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.05)' // Thêm viền dưới cực mỏng, tinh tế
-            }}
-        >
+        <>
+            <nav
+                className="navbar navbar-expand-lg navbar-dark fixed-top"
+                style={{
+                    backgroundColor: 'rgba(33, 37, 41, 0.95)', // Tăng độ mờ một chút cho nền đậm hơn
+                    transition: 'transform 0.3s ease-in-out',
+                    transform: isVisible ? 'translateY(0)' : 'translateY(-100%)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)' // Thêm viền dưới cực mỏng, tinh tế
+                }}
+            >
             <div className="container">
                 <Link className="navbar-brand d-flex align-items-center gap-2" to={isResident ? "/resident" : "#home"}>
                     <img
@@ -118,7 +149,7 @@ const Navbar = ({ isResident = false }) => {
 
                     <div className="d-flex gap-2">
                         {isResident ? (
-                            <button onClick={handleLogout} className="btn btn-outline-light btn-sm fw-normal">
+                            <button onClick={handleOpenLogoutModal} className="btn btn-outline-light btn-sm fw-normal">
                                 Đăng xuất
                             </button>
                         ) : isLoggedIn ? (
@@ -153,6 +184,75 @@ const Navbar = ({ isResident = false }) => {
                 </div>
             </div>
         </nav>
+
+        {/* MODAL PORTAL - RENDER VÀO BODY ĐỂ TRÁNH HẠN CHẾ Z-INDEX CỦA NAVBAR */}
+        {showLogoutModal && ReactDOM.createPortal(
+            <>
+                {/* MODAL BACKDROP XÁC NHẬN LOGOUT */}
+                <div 
+                    className="modal-backdrop fade show" 
+                    style={{ zIndex: 1040, position: 'fixed' }}
+                ></div>
+
+                {/* MODAL XÁC NHẬN LOGOUT */}
+                <div 
+                    className="modal fade show d-block" 
+                    tabIndex="-1" 
+                    style={{ zIndex: 1050, position: 'fixed' }}
+                >
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-0 shadow-lg">
+                            <div className="modal-header bg-danger bg-opacity-10 border-0">
+                                <h5 className="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+                                    <i className="bi bi-exclamation-circle-fill"></i>
+                                    Xác nhận đăng xuất
+                                </h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={handleCloseLogoutModal}
+                                    disabled={isLoggingOut}
+                                ></button>
+                            </div>
+                            <div className="modal-body p-4 text-center">
+                                <p className="mb-2 text-dark fw-medium">Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?</p>
+                                <small className="text-muted">Bạn sẽ cần đăng nhập lại để truy cập các tính năng của ứng dụng.</small>
+                            </div>
+                            <div className="modal-footer bg-light border-0 d-flex justify-content-center gap-2">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary px-4" 
+                                    onClick={handleCloseLogoutModal}
+                                    disabled={isLoggingOut}
+                                >
+                                    Hủy bỏ
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-danger px-4" 
+                                    onClick={handleLogout}
+                                    disabled={isLoggingOut}
+                                >
+                                    {isLoggingOut ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2"></span>
+                                            Đang thoát...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-box-arrow-right me-2"></i>
+                                            Đăng xuất
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </>,
+            document.body
+        )}
+    </>
     );
 };
 
