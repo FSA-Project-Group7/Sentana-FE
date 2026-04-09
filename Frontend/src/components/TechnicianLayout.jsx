@@ -1,10 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { notify } from '../utils/notificationAlert';
+import api from '../utils/axiosConfig';
 
 const TechnicianLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     // =========================================================
     // CHỐT CHẶN BẢO MẬT: BẮT ĐỔI MẬT KHẨU LẦN ĐẦU
@@ -18,9 +21,32 @@ const TechnicianLayout = () => {
         }
     }, [navigate]);
 
-    const handleLogout = () => {
-        localStorage.clear();
-        navigate('/login');
+    const handleLogout = async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+
+        try {
+            console.log("Gọi API logout...");
+            await api.post('/Auth/Logout');
+            console.log("Đã logout khỏi Backend thành công!");
+        } catch (error) {
+            console.error("Lỗi khi gọi API Đăng xuất:", error);
+        } finally {
+            localStorage.clear();
+            setShowLogoutModal(false);
+            setIsLoggingOut(false);
+            navigate('/login');
+        }
+    };
+
+    const handleOpenLogoutModal = () => {
+        setShowLogoutModal(true);
+    };
+
+    const handleCloseLogoutModal = () => {
+        if (!isLoggingOut) {
+            setShowLogoutModal(false);
+        }
     };
 
     const handleSwitchToResident = () => {
@@ -83,7 +109,7 @@ const TechnicianLayout = () => {
                 {/* Nút Đăng xuất */}
                 <div className="p-3 border-top border-secondary border-opacity-50 mt-auto">
                     <button
-                        onClick={handleLogout}
+                        onClick={handleOpenLogoutModal}
                         className="btn w-100 d-flex align-items-center px-3 py-2 text-white-50 hover-bg-light border-0"
                         style={{ borderRadius: '8px', transition: 'all 0.2s' }}
                     >
@@ -132,7 +158,7 @@ const TechnicianLayout = () => {
                                 </li>
                                 <li><hr className="dropdown-divider" /></li>
                                 <li>
-                                    <button className="dropdown-item text-danger fw-bold py-2" onClick={handleLogout}>
+                                    <button className="dropdown-item text-danger fw-bold py-2" onClick={handleOpenLogoutModal}>
                                         <i className="bi bi-box-arrow-right me-2"></i> Đăng xuất
                                     </button>
                                 </li>
@@ -160,6 +186,63 @@ const TechnicianLayout = () => {
                 main::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
                 main::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
             `}</style>
+
+            {/* MODAL BACKDROP XÁC NHẬN LOGOUT */}
+            {showLogoutModal && <div className="modal-backdrop fade show"></div>}
+
+            {/* MODAL XÁC NHẬN LOGOUT */}
+            {showLogoutModal && (
+                <div className="modal fade show d-block" tabIndex="-1" style={{ zIndex: 1050 }}>
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-0 shadow-lg">
+                            <div className="modal-header bg-danger bg-opacity-10 border-0">
+                                <h5 className="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+                                    <i className="bi bi-exclamation-circle-fill"></i>
+                                    Xác nhận đăng xuất
+                                </h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={handleCloseLogoutModal}
+                                    disabled={isLoggingOut}
+                                ></button>
+                            </div>
+                            <div className="modal-body p-4 text-center">
+                                <p className="mb-2 text-dark fw-medium">Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?</p>
+                                <small className="text-muted">Bạn sẽ cần đăng nhập lại để truy cập các tính năng của ứng dụng.</small>
+                            </div>
+                            <div className="modal-footer bg-light border-0 d-flex justify-content-center gap-2">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary px-4" 
+                                    onClick={handleCloseLogoutModal}
+                                    disabled={isLoggingOut}
+                                >
+                                    Hủy bỏ
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-danger px-4" 
+                                    onClick={handleLogout}
+                                    disabled={isLoggingOut}
+                                >
+                                    {isLoggingOut ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2"></span>
+                                            Đang thoát...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-box-arrow-right me-2"></i>
+                                            Đăng xuất
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
