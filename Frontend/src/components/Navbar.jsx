@@ -22,6 +22,7 @@ const Navbar = ({ isResident = false }) => {
     // ==========================================
     const [notifications, setNotifications] = useState([]);
     const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+    const [selectedNotif, setSelectedNotif] = useState(null);
     const notifDropdownRef = useRef(null);
 
     // Tính toán số lượng thông báo chưa đọc
@@ -95,23 +96,40 @@ const Navbar = ({ isResident = false }) => {
     // XỬ LÝ MARK AS READ KHI CLICK VÀO THÔNG BÁO
     // ==========================================
     const handleReadNotification = async (notif) => {
+        // Mở popup chi tiết và đóng dropdown
+        setSelectedNotif(notif);
+        setShowNotifDropdown(false);
+
         // Nếu đã đọc rồi thì không gọi API nữa
         if (notif.isRead) return;
 
         try {
-            const res = await api.put(`/notifications/${notif.notificationId}/read`);
-            if (res.data?.success) {
-                // Cập nhật lại UI ngay lập tức (Optimistic Update)
-                setNotifications(prevNotifs => 
-                    prevNotifs.map(n => 
-                        n.notificationId === notif.notificationId 
-                            ? { ...n, isRead: true } 
-                            : n
-                    )
-                );
-            }
+            await api.put(`/notifications/${notif.notificationId}/read`);
+            // Cập nhật lại UI ngay lập tức (Optimistic Update)
+            setNotifications(prevNotifs => 
+                prevNotifs.map(n => 
+                    n.notificationId === notif.notificationId 
+                        ? { ...n, isRead: true } 
+                        : n
+                )
+            );
         } catch (error) {
             console.error("Lỗi cập nhật trạng thái đã đọc:", error);
+        }
+    };
+
+    const handleMarkAllAsRead = async (e) => {
+        e.stopPropagation();
+        const unreadNotifs = notifications.filter(n => !n.isRead);
+        if (unreadNotifs.length === 0) return;
+
+        try {
+            await Promise.all(
+                unreadNotifs.map(notif => api.put(`/notifications/${notif.notificationId}/read`))
+            );
+            setNotifications(prevNotifs => prevNotifs.map(n => ({ ...n, isRead: true })));
+        } catch (error) {
+            console.error("Lỗi đánh dấu tất cả đã đọc:", error);
         }
     };
 
@@ -228,7 +246,17 @@ const Navbar = ({ isResident = false }) => {
                                     >
                                         <div className="bg-light border-bottom px-3 py-2 d-flex justify-content-between align-items-center">
                                             <h6 className="mb-0 fw-bold text-dark">Thông báo của bạn</h6>
-                                            {unreadCount > 0 && <span className="badge bg-primary rounded-pill small">{unreadCount} tin mới</span>}
+                                            <div className="d-flex align-items-center gap-2">
+                                                {unreadCount > 0 && (
+                                                    <button 
+                                                        className="btn btn-link text-decoration-none p-0 text-primary small" 
+                                                        style={{ fontSize: '0.8rem' }}
+                                                        onClick={handleMarkAllAsRead}
+                                                    >
+                                                        <i className="bi bi-check2-all me-1"></i>Đánh dấu đã đọc
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                         
                                         <div className="custom-notif-scroll" style={{ maxHeight: '380px', overflowY: 'auto' }}>
@@ -254,7 +282,7 @@ const Navbar = ({ isResident = false }) => {
                                                             {/* Chấm tròn xanh (Indicator) cho tin chưa đọc */}
                                                             {!notif.isRead && <span className="badge bg-primary rounded-circle p-1 ms-2 mt-1" style={{ width: '8px', height: '8px' }}></span>}
                                                         </div>
-                                                        <p className="mb-1 text-muted" style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
+                                                        <p className="mb-1 text-muted" style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                                                             {notif.message}
                                                         </p>
                                                         <small className="text-muted opacity-75" style={{ fontSize: '0.75rem' }}>
@@ -330,6 +358,39 @@ const Navbar = ({ isResident = false }) => {
                                 <button type="button" className="btn btn-danger px-4" onClick={handleLogout} disabled={isLoggingOut}>
                                     {isLoggingOut ? <><span className="spinner-border spinner-border-sm me-2"></span> Đang thoát...</> : <><i className="bi bi-box-arrow-right me-2"></i> Đăng xuất</>}
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </>,
+            document.body
+        )}
+
+        {/* MODAL CHI TIẾT THÔNG BÁO */}
+        {selectedNotif && ReactDOM.createPortal(
+            <>
+                <div className="modal-backdrop fade show" style={{ zIndex: 1040, position: 'fixed' }}></div>
+                <div className="modal fade show d-block" tabIndex="-1" style={{ zIndex: 1050, position: 'fixed' }}>
+                    <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                        <div className="modal-content border-0 shadow-lg rounded-4">
+                            <div className="modal-header bg-primary bg-opacity-10 border-0 px-4 py-3">
+                                <h5 className="modal-title fw-bold text-primary d-flex align-items-center gap-2">
+                                    <i className="bi bi-info-circle-fill"></i>
+                                    Chi tiết thông báo
+                                </h5>
+                                <button type="button" className="btn-close" onClick={() => setSelectedNotif(null)}></button>
+                            </div>
+                            <div className="modal-body p-4">
+                                <h6 className="fw-bold text-dark mb-2">{selectedNotif.title}</h6>
+                                <p className="text-muted small mb-3 border-bottom pb-2">
+                                    <i className="bi bi-clock me-1"></i>{selectedNotif.createdAt}
+                                </p>
+                                <div className="text-dark" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem' }}>
+                                    {selectedNotif.message}
+                                </div>
+                            </div>
+                            <div className="modal-footer bg-light border-0 px-4 py-3">
+                                <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={() => setSelectedNotif(null)}>Đóng</button>
                             </div>
                         </div>
                     </div>
