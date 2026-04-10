@@ -70,10 +70,10 @@ const TechnicianTasks = () => {
     const handleStartTask = async (taskId) => {
         try {
             await api.put(`/Maintenance/${taskId}/start`);
-            notify.info("Đã cập nhật trạng thái: Đang xử lý");
+            notify.success("Đã tiếp nhận công việc thành công!");
             setReloadTrigger(prev => prev + 1);
         } catch (error) {
-            notify.error(error.response?.data?.message || "Lỗi khi bắt đầu công việc.");
+            notify.error(error.response?.data?.message || "Lỗi khi nhận việc.");
         }
     };
 
@@ -125,29 +125,20 @@ const TechnicianTasks = () => {
         }
     };
 
-    // ==========================================
-    // RENDER HELPERS
-    // ==========================================
     const renderStatus = (status) => {
         const s = String(status).toLowerCase();
 
         if (s === '1' || s === 'pending')
-            return <span className="badge bg-danger text-white"><i className="bi bi-hourglass-split me-1"></i> Chờ phân công</span>;
+            return <span className="badge bg-warning text-dark"><i className="bi bi-hand-index-thumb me-1"></i> Chờ bạn nhận việc</span>;
 
-        if (s === '2' || s === 'accepted')
-            return <span className="badge bg-warning text-dark"><i className="bi bi-person-check me-1"></i> Chờ tiếp nhận</span>;
-
-        if (s === '3' || s === 'processing' || s === 'inprogress')
+        if (s === '2' || s === 'processing' || s === 'inprogress')
             return <span className="badge bg-primary text-white"><i className="bi bi-tools me-1"></i> Đang xử lý</span>;
 
-        if (s === '4' || s === 'fixed')
+        if (s === '3' || s === 'fixed')
             return <span className="badge bg-info text-dark"><i className="bi bi-card-checklist me-1"></i> Chờ nghiệm thu</span>;
 
-        if (s === '5' || s === 'resolved' || s === 'closed')
+        if (s === '4' || s === 'closed' || s === 'resolved')
             return <span className="badge bg-success text-white"><i className="bi bi-check2-all me-1"></i> Đã hoàn tất</span>;
-
-        if (s === '6' || s === 'reopened')
-            return <span className="badge bg-danger text-white"><i className="bi bi-exclamation-triangle me-1"></i> Yêu cầu làm lại</span>;
 
         return <span className="badge bg-secondary">Trạng thái: {status}</span>;
     };
@@ -179,7 +170,7 @@ const TechnicianTasks = () => {
                 <div className="row g-4">
                     {tasks.map(task => {
                         const taskStatus = String(task.status).toLowerCase();
-                        const isDone = taskStatus === '5' || taskStatus === 'resolved' || taskStatus === 'closed';
+                        const isDone = taskStatus === '4' || taskStatus === 'closed' || taskStatus === 'resolved';
 
                         return (
                             <div className="col-12 col-md-6 col-xl-4" key={task.requestId}>
@@ -208,18 +199,18 @@ const TechnicianTasks = () => {
 
                                         {/* Card Actions */}
                                         <div className="mt-auto">
-                                            {/* Trạng thái 2: Đã giao việc -> Cần Bấm NHẬN/BẮT ĐẦU */}
-                                            {(taskStatus === '2' || taskStatus === 'accepted') && (
+                                            {/* Trạng thái 1: Admin giao -> Thợ cần Bấm NHẬN VIỆC */}
+                                            {(taskStatus === '1' || taskStatus === 'pending') && (
                                                 <button
                                                     className="btn btn-primary text-white w-100 fw-bold shadow-sm rounded-3"
                                                     onClick={() => handleStartTask(task.requestId)}
                                                 >
-                                                    <i className="bi bi-play-circle me-2"></i> Bắt đầu xử lý
+                                                    <i className="bi bi-hand-index-thumb me-2"></i> Nhận việc
                                                 </button>
                                             )}
 
-                                            {/* Trạng thái 3 hoặc 6: Đang xử lý hoặc Bị bắt làm lại -> Cần Báo cáo hoàn tất */}
-                                            {(taskStatus === '3' || taskStatus === 'processing' || taskStatus === 'inprogress' || taskStatus === '6' || taskStatus === 'reopened') && (
+                                            {/* Trạng thái 2: Thợ đang làm -> Cần BÁO CÁO HOÀN TẤT */}
+                                            {(taskStatus === '2' || taskStatus === 'processing' || taskStatus === 'inprogress') && (
                                                 <button
                                                     className="btn btn-warning text-dark border w-100 fw-bold shadow-sm rounded-3"
                                                     onClick={() => openFixModal(task)}
@@ -230,15 +221,15 @@ const TechnicianTasks = () => {
                                                 </button>
                                             )}
 
-                                            {/* Trạng thái 4: Đã báo cáo xong -> Nằm chờ */}
-                                            {(taskStatus === '4' || taskStatus === 'fixed') && (
+                                            {/* Trạng thái 3: Đã báo cáo xong -> NẰM CHỜ NGHIỆM THU */}
+                                            {(taskStatus === '3' || taskStatus === 'fixed') && (
                                                 <button className="btn btn-info text-dark w-100 fw-bold rounded-3 opacity-75" disabled>
                                                     <i className="bi bi-hourglass-split me-2"></i> Chờ nghiệm thu
                                                 </button>
                                             )}
 
-                                            {/* Trạng thái 5: Đã đóng -> Nằm chơi */}
-                                            {(taskStatus === '5' || taskStatus === 'closed' || taskStatus === 'resolved') && (
+                                            {/* Trạng thái 4: Cư dân đã đóng -> ĐÃ HOÀN THÀNH */}
+                                            {(taskStatus === '4' || taskStatus === 'closed' || taskStatus === 'resolved') && (
                                                 <button className="btn btn-light border w-100 fw-bold text-success rounded-3" disabled>
                                                     <i className="bi bi-check2-all me-2"></i> Đã hoàn thành
                                                 </button>

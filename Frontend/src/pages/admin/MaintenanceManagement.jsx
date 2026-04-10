@@ -112,27 +112,28 @@ const MaintenanceManagement = () => {
         }
     };
 
-    const renderStatusBadge = (status) => {
+    // THAY THẾ HÀM CŨ BẰNG HÀM NÀY
+    const renderStatusBadge = (status, techName) => {
         const s = String(status).toLowerCase();
 
-        // 1. Vừa tạo
-        if (s === '1' || s === 'pending')
+        // MÃ 1: PENDING (BE dùng chung cho chưa giao và đã giao)
+        if (s === '1' || s === 'pending') {
+            if (techName) {
+                return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3"><i className="bi bi-person-check me-1"></i> Đã phân công</span>;
+            }
             return <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3"><i className="bi bi-hourglass-split me-1"></i> Chờ phân công</span>;
+        }
 
-        // 2. Admin giao việc (Nhưng thợ chưa bấm Bắt đầu)
-        if (s === '2' || s === 'accepted')
-            return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3"><i className="bi bi-person-check me-1"></i> Đã phân công, Chờ tiếp nhận</span>;
+        // MÃ 2: PROCESSING (Thợ đã bấm nhận việc)
+        if (s === '2' || s === 'processing' || s === 'inprogress')
+            return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3"><i className="bi bi-tools me-1"></i> Đang xử lý</span>;
 
-        // 3. Thợ bấm "Bắt đầu xử lý"
-        if (s === '3' || s === 'inprogress' || s === 'processing')
-            return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3"><i className="bi bi-tools me-1"></i> Đã tiếp nhận</span>;
+        // MÃ 3: FIXED (Thợ báo cáo hoàn tất)
+        if (s === '3' || s === 'fixed')
+            return <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 rounded-pill px-3"><i className="bi bi-card-checklist me-1"></i> Đã sửa xong, chờ nghiệm thu</span>;
 
-        // 4. Thợ bấm "Hoàn tất"
-        if (s === '4' || s === 'fixed')
-            return <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill px-3"><i className="bi bi-card-checklist me-1"></i> Đã sửa xong, Chờ nghiệm thu</span>;
-
-        // 5. Cư dân bấm "Nghiệm thu"
-        if (s === '5' || s === 'resolved' || s === 'closed')
+        // MÃ 4: CLOSED (Cư dân nghiệm thu)
+        if (s === '4' || s === 'closed' || s === 'resolved')
             return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3"><i className="bi bi-check2-all me-1"></i> Hoàn thành</span>;
 
         return <span className="badge bg-secondary rounded-pill px-3">{status}</span>;
@@ -192,7 +193,7 @@ const MaintenanceManagement = () => {
                                                 <div className="small text-muted">{req.residentName}</div>
                                             </td>
                                             <td className="fw-semibold text-dark text-truncate" style={{ maxWidth: '250px' }}>{req.title}</td>
-                                            <td>{renderStatusBadge(req.status)}</td>
+                                            <td>{renderStatusBadge(req.status, req.assignedTechnicianName)}</td>
                                             <td>
                                                 {req.assignedTechnicianName ? (
                                                     <span className="text-primary fw-medium"><i className="bi bi-person-check me-1"></i>{req.assignedTechnicianName}</span>
