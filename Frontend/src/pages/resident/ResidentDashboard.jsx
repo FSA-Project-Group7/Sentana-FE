@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../utils/axiosConfig';
 import { notify } from '../../utils/notificationAlert';
 
 const ResidentDashboard = () => {
-    const [roomInfo, setRoomInfo] = useState(null);
+    const navigate = useNavigate();
+
+    // States cho Hóa đơn
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // States cho Điện nước
+    const [utilities, setUtilities] = useState([]);
+    
+    // State Tab
+    const [activeTab, setActiveTab] = useState('invoice');
 
     // Modals
     const [showPayModal, setShowPayModal] = useState(false);
@@ -17,6 +26,10 @@ const ResidentDashboard = () => {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [detailData, setDetailData] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
+
+    // STATE CHO POPUP ẢNH BIÊN LAI
+    const [showProofModal, setShowProofModal] = useState(false);
+    const [proofImageUrl, setProofImageUrl] = useState(null);
 
     const fetchMyInvoices = async () => {
         try {
@@ -34,39 +47,35 @@ const ResidentDashboard = () => {
             navigate('/first-login-setup');
             return;
         }
+
         const fetchData = async () => {
             setLoading(true);
+            
             try {
-                // Gọi đồng thời 2 API: Một từ RoomsController, một từ InvoiceController
-                const [roomRes, invoiceRes] = await Promise.all([
-                    api.get('/rooms/my-room'),
-                    api.get('/Invoice/my-invoices') // Hãy thử thêm 's' thành /Invoices/ nếu vẫn 404
-                ]);
-
-                // Xử lý dữ liệu phòng (Cấu trúc MyRoomResponseDto)
-                if (roomRes.data?.isSuccess || roomRes.data?.IsSuccess) {
-                    setRoomInfo(roomRes.data.data);
-                }
-
-                // Xử lý dữ liệu hóa đơn
+                const invoiceRes = await api.get('/Invoice/my-invoices');
                 const invData = invoiceRes.data?.data || invoiceRes.data?.Data || [];
                 setInvoices(Array.isArray(invData) ? invData : []);
-
             } catch (error) {
-                console.error("Dashboard Error:", error);
-                // Nếu lỗi 404 ở Invoice, có thể do chưa có hóa đơn hoặc sai route
                 if (error.response?.status === 404) {
-                    setInvoices([]);
+                    setInvoices([]); 
                 } else {
-                    notify.error("Không thể tải thông tin dashboard.");
+                    notify.error("Không thể tải thông tin hóa đơn.");
                 }
-            } finally {
-                setLoading(false);
             }
+
+            try {
+                const utilRes = await api.get('/Utility/history/my');
+                const utilData = utilRes.data?.data || utilRes.data?.Data || [];
+                setUtilities(Array.isArray(utilData) ? utilData : []);
+            } catch (error) {
+                console.error("Lỗi khi tải điện nước:", error);
+            }
+
+            setLoading(false);
         };
 
         fetchData();
-    }, []);
+    }, [navigate]);
 
     const formatCurrency = (amount) => {
         if (amount === undefined || amount === null) return '0 đ';
@@ -74,23 +83,22 @@ const ResidentDashboard = () => {
     };
 
     // ==========================================
-    // XỬ LÝ MODAL AN TOÀN
+    // XỬ LÝ CÁC MODAL
     // ==========================================
     const handleOpenPay = (invoice) => {
         setSelectedInvoice(invoice);
         setFile(null);
         setNote('');
         setShowPayModal(true);
-        document.body.style.overflow = 'hidden'; // Khóa cuộn trang nền
+        document.body.style.overflow = 'hidden'; 
     };
 
     const handleOpenDetail = async (invoice) => {
         setSelectedInvoice(invoice);
         setShowDetailModal(true);
         setLoadingDetail(true);
-        document.body.style.overflow = 'hidden'; // Khóa cuộn trang nền
+        document.body.style.overflow = 'hidden'; 
         try {
-            // Lưu ý: Nếu API my-invoices có filter, gọi như thế này
             const res = await api.get(`/Invoice/my-invoices?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
             const dataList = res.data?.data || res.data;
             if (dataList && dataList.length > 0) {
@@ -103,12 +111,34 @@ const ResidentDashboard = () => {
         }
     };
 
+    const handleViewProof = async (invoice) => {
+        setSelectedInvoice(invoice); 
+        try {
+            const payRes = await api.get(`/Payment/invoice/${invoice.invoiceId}`);
+            const payData = payRes.data?.data || payRes.data?.Data || [];
+            
+            const proofs = payData.filter(p => p.proofUrl || p.paymentProofImage).map(p => p.proofUrl || p.paymentProofImage);
+
+            if (proofs.length > 0) {
+                setProofImageUrl(proofs[0]);
+                setShowProofModal(true);
+                document.body.style.overflow = 'hidden'; 
+            } else {
+                notify.warning("Chưa tìm thấy ảnh biên lai cho hóa đơn này.");
+            }
+        } catch (error) {
+            notify.error("Lỗi khi tải ảnh biên lai.");
+        }
+    };
+
     const closeModal = () => {
         setShowPayModal(false);
         setShowDetailModal(false);
+        setShowProofModal(false);
         setSelectedInvoice(null);
         setDetailData(null);
-        document.body.style.overflow = 'auto'; // Mở lại cuộn trang nền
+        setProofImageUrl(null);
+        document.body.style.overflow = 'auto'; 
     };
 
     // ==========================================
@@ -120,19 +150,28 @@ const ResidentDashboard = () => {
 
         setIsSubmitting(true);
         const formData = new FormData();
-        formData.append('InvoiceId', selectedInvoice.invoiceId);
-        formData.append('ImageFile', file);
+        formData.append('File', file); 
         if (note) formData.append('Note', note);
 
         try {
-            const res = await api.post('/Payment/submit-proof', formData, {
+            const res = await api.post(`/payment/${selectedInvoice.invoiceId}/upload-proof`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             notify.success(res.data?.message || "Đã gửi biên lai thành công!");
             closeModal();
             fetchMyInvoices();
         } catch (error) {
-            notify.error("LỖI: " + (error.response?.data?.message || "Không thể gửi biên lai."));
+            console.error("Chi tiết lỗi thanh toán:", error.response);
+            let errorMsg = "Không thể gửi biên lai.";
+            if (error.response?.data) {
+                if (error.response.data.message) errorMsg = error.response.data.message;
+                else if (error.response.data.title) errorMsg = error.response.data.title;
+                else if (error.response.data.errors) {
+                    const firstErrorKey = Object.keys(error.response.data.errors)[0];
+                    errorMsg = error.response.data.errors[firstErrorKey][0];
+                }
+            }
+            notify.error("LỖI: " + errorMsg);
         } finally {
             setIsSubmitting(false);
         }
@@ -156,187 +195,201 @@ const ResidentDashboard = () => {
         return 'border-success';
     };
 
+    const totalElectric = utilities.reduce((sum, item) => sum + ((item.electricityNewIndex || 0) - (item.electricityOldIndex || 0)), 0);
+    const totalWater = utilities.reduce((sum, item) => sum + ((item.waterNewIndex || 0) - (item.waterOldIndex || 0)), 0);
+
     if (loading) {
         return (
             <div className="container-fluid d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-                <div className="spinner-border text-success" style={{ width: '3rem', height: '3rem' }}></div>
-            </div>
-        );
-    }
-
-    if (!roomInfo) {
-        return (
-            <div className="container-fluid py-4">
-                <div className="card border-0 shadow-lg rounded-4 text-center p-5 bg-white">
-                    <i className="bi bi-house-x display-1 text-muted opacity-25 mb-3"></i>
-                    <h4 className="text-muted fw-bold">Chưa có dữ liệu căn hộ</h4>
-                    <p className="text-secondary">Vui lòng liên hệ Ban Quản Lý để được hỗ trợ.</p>
-                </div>
+                <div className="spinner-border text-white" style={{ width: '3rem', height: '3rem' }}></div>
             </div>
         );
     }
 
     return (
-        <div className="container-fluid py-4 px-4">
+        <div className="container-fluid py-4 px-4 pb-5">
 
-            {/* LỜI CHÀO MỪNG */}
-            <div className="d-flex align-items-center mb-4 p-4 bg-success bg-opacity-10 rounded-4 shadow-sm border border-success border-opacity-25">
-                <div className="bg-success text-white rounded-circle d-flex justify-content-center align-items-center me-4 shadow" style={{ width: '60px', height: '60px' }}>
-                    <i className="bi bi-person-fill fs-2"></i>
-                </div>
-                <div>
-                    <h3 className="fw-bold text-success mb-1">Xin chào Cư dân!</h3>
-                    <p className="text-dark opacity-75 mb-0 fw-medium">Chào mừng bạn về nhà. Dưới đây là thông tin tổng quan về căn hộ của bạn.</p>
+            <div className="text-center mb-4 mt-2">
+                <h2 className="fw-bold text-white mb-2 shadow-text">Xin chào, Cư dân!</h2>
+                <p className="text-light text-shadow-sm">Quản lý hóa đơn và theo dõi chỉ số sử dụng điện nước</p>
+            </div>
+
+            {/* THANH ĐIỀU HƯỚNG TABS */}
+            <div className="row justify-content-center mb-5">
+                <div className="col-lg-8">
+                    <ul className="nav nav-pills justify-content-center bg-white p-2 rounded-pill shadow-sm">
+                        <li className="nav-item w-50 text-center">
+                            <button 
+                                className={`nav-link w-100 rounded-pill fw-bold py-2 ${activeTab === 'invoice' ? 'active bg-success' : 'text-secondary'}`}
+                                onClick={() => setActiveTab('invoice')}
+                            >
+                                <i className="bi bi-receipt-cutoff me-2"></i>Thông Tin Hóa Đơn
+                            </button>
+                        </li>
+                        <li className="nav-item w-50 text-center">
+                            <button 
+                                className={`nav-link w-100 rounded-pill fw-bold py-2 ${activeTab === 'utility' ? 'active bg-primary' : 'text-secondary'}`}
+                                onClick={() => setActiveTab('utility')}
+                            >
+                                <i className="bi bi-lightning-charge-fill me-2"></i>Thông Tin Điện Nước
+                            </button>
+                        </li>
+                    </ul>
                 </div>
             </div>
 
-            <div className="row g-4 align-items-stretch">
-                {/* --- CỘT TRÁI: THÔNG TIN CĂN HỘ --- */}
-                <div className="col-lg-5">
-                    <div className="card border-0 shadow-lg rounded-4 h-100 overflow-hidden bg-white">
-                        <div className="card-header bg-transparent border-bottom pt-4 pb-3 px-4">
-                            <h5 className="fw-bold mb-0 text-dark"><i className="bi bi-info-square-fill text-success me-2"></i> Thông Tin Căn Hộ</h5>
-                        </div>
-                        <div className="card-body p-4 d-flex flex-column">
-                            <div className="text-center mb-4 p-4 bg-light rounded-4">
-                                <div className="display-4 fw-bold text-success mb-2 text-shadow-sm">P.{roomInfo.apartmentCode}</div>
-                                <span className="badge bg-success px-3 py-2 fs-6 rounded-pill shadow-sm">Đang cư trú</span>
+            {/* TAB 1: THÔNG TIN HÓA ĐƠN */}
+            {activeTab === 'invoice' && (
+                <div className="mt-2 animate-fade-in">
+                    <div className="row g-4">
+                        {invoices.length === 0 ? (
+                            <div className="col-12 text-center py-5 bg-white rounded-4 shadow-lg border-0 mx-auto" style={{ maxWidth: '800px' }}>
+                                <i className="bi bi-check2-circle display-1 text-success opacity-25 d-block mb-3"></i>
+                                <h5 className="text-muted fw-bold">Tuyệt vời! Bạn không có hóa đơn nào cần thanh toán.</h5>
                             </div>
-                            <ul className="list-group list-group-flush flex-grow-1">
-                                <li className="list-group-item d-flex justify-content-between align-items-center px-2 py-3 bg-transparent border-light">
-                                    <span className="text-muted fw-medium"><i className="bi bi-building text-success me-2"></i>Tòa nhà</span>
-                                    <span className="fw-bold text-dark">{roomInfo.buildingName || 'N/A'}</span>
-                                </li>
-                                <li className="list-group-item d-flex justify-content-between align-items-center px-2 py-3 bg-transparent border-light">
-                                    <span className="text-muted fw-medium"><i className="bi bi-layers text-success me-2"></i>Tầng</span>
-                                    <span className="fw-bold text-dark">Tầng {roomInfo.floor || 'N/A'}</span>
-                                </li>
-                                <li className="list-group-item d-flex justify-content-between align-items-center px-2 py-3 bg-transparent border-0">
-                                    <span className="text-muted fw-medium"><i className="bi bi-rulers text-success me-2"></i>Diện tích</span>
-                                    <span className="fw-bold text-dark">{roomInfo.area || 0} m²</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- CỘT PHẢI: THÀNH VIÊN & DỊCH VỤ --- */}
-                <div className="col-lg-7">
-                    <div className="row g-4 h-100 flex-column m-0">
-
-                        <div className="col-12 p-0 flex-grow-1">
-                            <div className="card border-0 shadow-lg rounded-4 h-100 overflow-hidden bg-white d-flex flex-column">
-                                <div className="card-header bg-transparent border-bottom pt-4 pb-3 px-4 d-flex justify-content-between align-items-center flex-shrink-0">
-                                    <h5 className="fw-bold mb-0 text-dark"><i className="bi bi-people-fill text-primary me-2"></i>Thành Viên</h5>
-                                    <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">{roomInfo.roommates?.length || 0} người</span>
-                                </div>
-                                {/* Cuộn nội bộ nếu quá nhiều thành viên */}
-                                <div className="card-body p-0 custom-scrollbar" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                                    {roomInfo.roommates?.map((member, index) => (
-                                        <div key={index} className="d-flex justify-content-between align-items-center px-4 py-3 border-bottom hover-bg-light transition-all">
-                                            <div className="fw-bold text-dark">{member.fullName}</div>
-                                            <span className={`badge ${member.isOwner ? 'bg-danger' : 'bg-info'} bg-opacity-10 text-${member.isOwner ? 'danger' : 'info'} border border-${member.isOwner ? 'danger' : 'info'} border-opacity-25 rounded-pill px-3`}>
-                                                {member.isOwner ? 'Chủ hộ' : 'Thành viên'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="col-12 p-0 flex-grow-1 mt-4">
-                            <div className="card border-0 shadow-lg rounded-4 h-100 overflow-hidden bg-white d-flex flex-column">
-                                <div className="card-header bg-transparent border-bottom pt-4 pb-3 px-4 flex-shrink-0">
-                                    <h5 className="fw-bold mb-0 text-dark"><i className="bi bi-box-seam-fill text-warning me-2"></i>Dịch Vụ Đang Sử Dụng</h5>
-                                </div>
-                                {/* Cuộn nội bộ nếu quá nhiều dịch vụ */}
-                                <div className="card-body p-0 custom-scrollbar" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                                    <table className="table table-hover mb-0 align-middle">
-                                        <tbody>
-                                            {roomInfo.services?.map((svc, index) => (
-                                                <tr key={index}>
-                                                    <td className="ps-4 py-3 text-dark fw-medium border-light">{svc.serviceName}</td>
-                                                    <td className="text-end pe-4 fw-bold text-danger py-3 border-light">{formatCurrency(svc.price || svc.serviceFee)}</td>
-                                                </tr>
-                                            ))}
-                                            {(!roomInfo.services || roomInfo.services.length === 0) && (
-                                                <tr><td colSpan="2" className="text-center py-4 text-muted">Chưa đăng ký dịch vụ nào.</td></tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-
-            {/* --- PHẦN HÓA ĐƠN ĐƯỢC THIẾT KẾ LẠI --- */}
-            <div className="mt-5">
-                <div className="d-flex align-items-center mb-4">
-                    <h4 className="fw-bold mb-0 text-dark"><i className="bi bi-receipt-cutoff text-success me-2"></i> Hóa Đơn Của Bạn</h4>
-                </div>
-
-                <div className="row g-4">
-                    {invoices.length === 0 ? (
-                        <div className="col-12 text-center py-5">
-                            <i className="bi bi-check2-circle display-1 text-success opacity-25 d-block mb-3"></i>
-                            <h5 className="text-muted fw-bold">Tuyệt vời! Bạn không có hóa đơn nào tồn đọng.</h5>
-                        </div>
-                    ) : (
-                        invoices.map((inv) => (
-                            <div className="col-md-6 col-xl-4" key={inv.invoiceId}>
-                                {/* Sửa dứt điểm lỗi màu viền thẻ dựa trên getCardBorderColor */}
-                                <div className={`card h-100 shadow-sm border-0 border-top border-4 ${getCardBorderColor(inv.statusName)} rounded-4 bg-white hover-shadow-lg transition-all`}>
-                                    <div className="card-body p-4 d-flex flex-column">
-                                        <div className="d-flex justify-content-between align-items-start mb-4">
-                                            <div>
-                                                <h5 className="fw-bold text-dark mb-1">{inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}</h5>
-                                                <small className="text-muted">Mã HĐ: #{inv.invoiceId}</small>
+                        ) : (
+                            invoices.map((inv) => (
+                                <div className="col-md-6 col-xl-4" key={inv.invoiceId}>
+                                    <div className={`card h-100 shadow-sm border-0 border-top border-4 ${getCardBorderColor(inv.statusName)} rounded-4 bg-white hover-shadow-lg transition-all`}>
+                                        <div className="card-body p-4 d-flex flex-column">
+                                            <div className="d-flex justify-content-between align-items-start mb-4">
+                                                <div>
+                                                    <h5 className="fw-bold text-dark mb-1">{inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}</h5>
+                                                    <small className="text-muted">Mã HĐ: #{inv.invoiceId}</small>
+                                                </div>
+                                                {getStatusBadge(inv.statusName)}
                                             </div>
-                                            {getStatusBadge(inv.statusName)}
-                                        </div>
 
-                                        <div className="bg-light rounded-4 p-3 mb-4 flex-grow-1">
-                                            <div className="d-flex justify-content-between small mb-2">
-                                                <span className="text-muted fw-medium">Tổng phải trả:</span>
-                                                <span className="fw-bold text-dark">{formatCurrency(inv.totalMoney)}</span>
+                                            <div className="bg-light rounded-4 p-3 mb-4 flex-grow-1">
+                                                <div className="d-flex justify-content-between small mb-2">
+                                                    <span className="text-muted fw-medium">Tổng phải trả:</span>
+                                                    <span className="fw-bold text-dark">{formatCurrency(inv.totalMoney)}</span>
+                                                </div>
+                                                <div className="d-flex justify-content-between pt-2 border-top border-secondary border-opacity-10 mt-2">
+                                                    <span className="text-muted fw-medium">Đã thanh toán:</span>
+                                                    <span className="fw-bold text-success">{formatCurrency((inv.totalMoney || 0) - (inv.debt || 0))}</span>
+                                                </div>
+                                                <div className="d-flex justify-content-between text-danger fw-bold pt-2 border-top border-secondary border-opacity-10 mt-2">
+                                                    <span>Còn nợ:</span>
+                                                    <span className="fs-5">{formatCurrency(inv.debt)}</span>
+                                                </div>
                                             </div>
-                                            <div className="d-flex justify-content-between pt-2 border-top border-secondary border-opacity-10 mt-2">
-                                                <span className="text-muted fw-medium">Đã thanh toán:</span>
-                                                <span className="fw-bold text-success">{formatCurrency((inv.totalMoney || 0) - (inv.debt || 0))}</span>
-                                            </div>
-                                            <div className="d-flex justify-content-between text-danger fw-bold pt-2 border-top border-secondary border-opacity-10 mt-2">
-                                                <span>Còn nợ:</span>
-                                                <span className="fs-5">{formatCurrency(inv.debt)}</span>
-                                            </div>
-                                        </div>
 
-                                        <div className="d-flex gap-2 mt-auto">
-                                            <button className="btn btn-light border text-dark fw-bold w-100 rounded-pill shadow-sm" onClick={() => handleOpenDetail(inv)}>
-                                                Chi tiết
-                                            </button>
-                                            {String(inv.statusName).toLowerCase() === 'unpaid' && inv.debt > 0 && (
-                                                <button className="btn btn-success w-100 fw-bold rounded-pill shadow-sm" onClick={() => handleOpenPay(inv)}>
-                                                    Thanh toán
+                                            <div className="d-flex gap-2 mt-auto">
+                                                <button className="btn btn-light border text-dark fw-bold w-100 rounded-pill shadow-sm" onClick={() => handleOpenDetail(inv)}>
+                                                    Chi tiết
                                                 </button>
-                                            )}
+
+                                                {String(inv.statusName).toLowerCase() === 'unpaid' && inv.debt > 0 && (
+                                                    <button className="btn btn-success w-100 fw-bold rounded-pill shadow-sm" onClick={() => handleOpenPay(inv)}>
+                                                        Thanh toán
+                                                    </button>
+                                                )}
+
+                                                {(String(inv.statusName).toLowerCase() === 'pendingverification' || 
+                                                  String(inv.statusName).toLowerCase() === 'pending' || 
+                                                  String(inv.statusName).toLowerCase() === 'paid') && (
+                                                    <button className="btn btn-outline-success w-100 fw-bold rounded-pill shadow-sm" onClick={() => handleViewProof(inv)}>
+                                                        <i className="bi bi-image me-1"></i> Biên lai
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
-                    )}
+                            ))
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* TAB 2: CHỈ SỐ ĐIỆN NƯỚC */}
+            {activeTab === 'utility' && (
+                <div className="mt-2 animate-fade-in">
+                    <div className="row g-4 mb-4">
+                        <div className="col-md-6">
+                            <div className="card border-0 shadow-lg rounded-4 overflow-hidden bg-white">
+                                <div className="card-body p-4 d-flex align-items-center">
+                                    <div className="bg-warning bg-opacity-25 p-3 rounded-circle me-4">
+                                        <i className="bi bi-lightning-charge-fill text-warning fs-1"></i>
+                                    </div>
+                                    <div>
+                                        <p className="text-muted mb-1 fw-semibold text-uppercase small">Tổng Điện Tiêu Thụ</p>
+                                        <h3 className="fw-bold text-dark mb-0">{totalElectric.toLocaleString('vi-VN')} <span className="fs-6 text-muted fw-normal">kWh</span></h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="col-md-6">
+                            <div className="card border-0 shadow-lg rounded-4 overflow-hidden bg-white">
+                                <div className="card-body p-4 d-flex align-items-center">
+                                    <div className="bg-info bg-opacity-25 p-3 rounded-circle me-4">
+                                        <i className="bi bi-droplet-fill text-info fs-1"></i>
+                                    </div>
+                                    <div>
+                                        <p className="text-muted mb-1 fw-semibold text-uppercase small">Tổng Nước Tiêu Thụ</p>
+                                        <h3 className="fw-bold text-dark mb-0">{totalWater.toLocaleString('vi-VN')} <span className="fs-6 text-muted fw-normal">m³</span></h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="card border-0 shadow-lg rounded-4 overflow-hidden bg-white">
+                        <div className="card-header bg-transparent border-bottom pt-4 pb-3 px-4">
+                            <h5 className="fw-bold mb-0 text-dark"><i className="bi bi-table text-primary me-2"></i> Chi Tiết Theo Từng Tháng</h5>
+                        </div>
+                        <div className="card-body p-0">
+                            {utilities.length === 0 ? (
+                                <div className="text-center p-5 text-muted">
+                                    <i className="bi bi-clipboard-data display-4 opacity-25 d-block mb-3"></i>
+                                    Chưa có dữ liệu ghi nhận chỉ số điện nước.
+                                </div>
+                            ) : (
+                                <div className="table-responsive">
+                                    <table className="table table-hover align-middle text-center mb-0">
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th className="py-3 text-muted small text-uppercase">Kỳ (Tháng/Năm)</th>
+                                                <th className="py-3 text-muted small text-uppercase border-start">Điện cũ</th>
+                                                <th className="py-3 text-muted small text-uppercase">Điện mới</th>
+                                                <th className="py-3 text-warning small text-uppercase fw-bold"><i className="bi bi-lightning-charge-fill"></i> Tiêu thụ (kWh)</th>
+                                                <th className="py-3 text-muted small text-uppercase border-start">Nước cũ</th>
+                                                <th className="py-3 text-muted small text-uppercase">Nước mới</th>
+                                                <th className="py-3 text-info small text-uppercase fw-bold"><i className="bi bi-droplet-fill"></i> Tiêu thụ (m³)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {utilities.map((u, idx) => {
+                                                const elecUsage = (u.electricityNewIndex || 0) - (u.electricityOldIndex || 0);
+                                                const waterUsage = (u.waterNewIndex || 0) - (u.waterOldIndex || 0);
+                                                return (
+                                                    <tr key={idx}>
+                                                        <td className="py-3 fw-bold text-dark">Tháng {u.month}/{u.year}</td>
+                                                        <td className="py-3 border-start">{u.electricityOldIndex}</td>
+                                                        <td className="py-3 fw-medium">{u.electricityNewIndex}</td>
+                                                        <td className="py-3 fw-bold text-warning bg-warning bg-opacity-10">{elecUsage}</td>
+                                                        <td className="py-3 border-start">{u.waterOldIndex}</td>
+                                                        <td className="py-3 fw-medium">{u.waterNewIndex}</td>
+                                                        <td className="py-3 fw-bold text-info bg-info bg-opacity-10">{waterUsage}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ========================================= */}
-            {/* CÁC MODAL ĐÃ ĐƯỢC TÚT LẠI UI               */}
+            {/* MODALS HÓA ĐƠN                            */}
             {/* ========================================= */}
 
-            {/* Backdrop làm mờ chuyên nghiệp */}
-            {(showPayModal || showDetailModal) && <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.6)' }}></div>}
+            {/* Backdrop dùng chung cho Chi tiết & Thanh toán */}
+            {(showPayModal || showDetailModal) && <div className="modal-backdrop fade show" style={{ zIndex: 1040, backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={closeModal}></div>}
 
             {/* MODAL CHI TIẾT HÓA ĐƠN */}
             {showDetailModal && (
@@ -376,14 +429,14 @@ const ResidentDashboard = () => {
                                 )}
                             </div>
                             <div className="modal-footer bg-light border-top px-4 py-3">
-                                <button type="button" className="btn btn-white border rounded-pill px-4 fw-medium shadow-sm" onClick={closeModal}>Đóng</button>
+                                <button type="button" className="btn btn-white border rounded-pill px-4 fw-bold shadow-sm" onClick={closeModal}>Đóng</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* MODAL THANH TOÁN (NỘP BIÊN LAI) */}
+            {/* MODAL THANH TOÁN (ẢNH QR TĨNH + THÔNG TIN CHI TIẾT) */}
             {showPayModal && (
                 <div className="modal fade show d-block" tabIndex="-1" style={{ zIndex: 1050 }}>
                     <div className="modal-dialog modal-dialog-centered">
@@ -394,9 +447,32 @@ const ResidentDashboard = () => {
                             </div>
                             <form onSubmit={handleSubmitPayment}>
                                 <div className="modal-body p-4">
-                                    <div className="alert bg-danger bg-opacity-10 border border-danger border-opacity-25 rounded-3 p-3 mb-4 text-center">
-                                        <span className="text-dark">Số tiền cần thanh toán:</span><br />
-                                        <span className="display-6 fw-bold text-danger">{formatCurrency(selectedInvoice?.debt)}</span>
+                                    
+                                    {/* MÃ QR CHUYỂN KHOẢN  */}
+                                    <div className="text-center mb-4 p-4 border border-success border-opacity-25 rounded-4 bg-success bg-opacity-10">
+                                        <p className="fw-bold text-dark mb-3 text-uppercase">Thông Tin Chuyển Khoản</p>
+                                        
+                                        <img 
+                                            // IMPORT ẢNH QR VÀO ĐÂY
+                                            src="https://res.cloudinary.com/dk4r6t9s8/image/upload/v1702050865/qr-code-sample.png" 
+                                            alt="Mã QR Chuyển Khoản" 
+                                            className="img-fluid rounded-3 shadow-sm border bg-white p-2 mb-3"
+                                            style={{ maxWidth: '200px' }}
+                                        />
+                                        
+                                        {/* THÔNG TIN CHI TIẾT ĐỂ CƯ DÂN COPY */}
+                                        <div className="bg-white p-3 rounded-3 shadow-sm text-start">
+                                            <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                                                <span className="text-muted small">Số tiền cần chuyển:</span>
+                                                <strong className="text-danger fs-5">{formatCurrency(selectedInvoice?.debt)}</strong>
+                                            </div>
+                                            <div className="d-flex justify-content-between align-items-center pt-1">
+                                                <span className="text-muted small">Nội dung chuyển khoản:</span>
+                                                <strong className="text-dark">Thanh toan P.{selectedInvoice?.apartmentCode || 'N/A'} Thang {selectedInvoice?.billingMonth}</strong>
+                                            </div>
+                                        </div>
+                                        
+                                        <small className="d-block text-danger mt-3 fw-medium fst-italic"><i className="bi bi-exclamation-circle me-1"></i> Vui lòng chuyển đúng số tiền và nội dung để được duyệt nhanh nhất.</small>
                                     </div>
 
                                     <div className="mb-4">
@@ -409,8 +485,8 @@ const ResidentDashboard = () => {
                                         <textarea className="form-control bg-light border-0 rounded-3" rows="3" placeholder="Ghi chú giao dịch..." value={note} onChange={(e) => setNote(e.target.value)}></textarea>
                                     </div>
                                 </div>
-                                <div className="modal-footer bg-light border-top px-4 py-3">
-                                    <button type="button" className="btn btn-white border rounded-pill px-4 fw-medium shadow-sm" onClick={closeModal}>Hủy</button>
+                                <div className="modal-footer bg-light border-top px-4 py-3 d-flex gap-2">
+                                    <button type="button" className="btn btn-white border rounded-pill px-4 fw-bold shadow-sm" onClick={closeModal}>Hủy</button>
                                     <button type="submit" className="btn btn-success rounded-pill px-4 fw-bold shadow-sm" disabled={isSubmitting}>
                                         {isSubmitting ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-send-fill me-2"></i>}
                                         Gửi biên lai
@@ -422,13 +498,41 @@ const ResidentDashboard = () => {
                 </div>
             )}
 
+            {/* MODAL MỚI: POPUP XEM ẢNH BIÊN LAI */}
+            {showProofModal && proofImageUrl && selectedInvoice && (
+                <div className="modal fade show d-block" tabIndex="-1" style={{ zIndex: 1050 }} onClick={closeModal}>
+                    <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>
+                        <div className="modal-content shadow-lg border-0">
+                            <div className="modal-header bg-dark text-white border-0 py-2">
+                                <h6 className="modal-title small fw-bold">Minh chứng: Phòng {selectedInvoice.apartmentCode || 'N/A'} - Tháng {selectedInvoice.billingMonth}</h6>
+                                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
+                            </div>
+                            <div className="modal-body p-1 bg-secondary bg-opacity-10 text-center">
+                                <img 
+                                    src={proofImageUrl} 
+                                    alt="Bill thanh toán" 
+                                    className="img-fluid rounded shadow-sm" 
+                                    style={{ maxHeight: '75vh', objectFit: 'contain' }}
+                                />
+                            </div>
+                            <div className="modal-footer py-2 border-0 bg-light">
+                                <button className="btn btn-sm btn-secondary" onClick={closeModal}>Đóng</button>
+                                <a href={proofImageUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-primary">
+                                    <i className="bi bi-box-arrow-up-right me-1"></i> Mở ảnh gốc
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style>{`
+                .shadow-text { text-shadow: 1px 1px 4px rgba(0,0,0,0.8); }
                 .text-shadow-sm { text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
                 .transition-all { transition: all 0.2s ease-in-out; }
                 .hover-bg-light:hover { background-color: #f8f9fa !important; }
                 .hover-shadow-lg:hover { transform: translateY(-4px); box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important; }
                 
-                /* Nút Upload chuẩn UI hiện đại */
                 .modern-file-input::file-selector-button {
                     background-color: #6c757d !important;
                     color: white !important;
@@ -443,11 +547,15 @@ const ResidentDashboard = () => {
                 }
                 .modern-file-input::file-selector-button:hover { background-color: #5c636a !important; }
                 
-                /* THANH CUỘN (SCROLLBAR) TUỲ CHỈNH */
                 .custom-scrollbar::-webkit-scrollbar { width: 5px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+                .animate-fade-in { animation: fadeIn 0.4s ease-in-out; }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
             `}</style>
         </div>
     );
