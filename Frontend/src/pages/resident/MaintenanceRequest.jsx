@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
+import Pagination from '../../components/common/Pagination'; // Dùng Pagination chung
 import { notify, confirmAction } from '../../utils/notificationAlert';
 import { useSignalR } from '../../hooks/useSignalR';
 
@@ -11,6 +12,9 @@ const MaintenanceRequest = () => {
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // FIX 1: THÊM STATE RELOAD TRIGGER ĐỂ NHẬN TÍN HIỆU SIGNALR
+    const [reloadTrigger, setReloadTrigger] = useState(0);
+
     // Form State
     const [formData, setFormData] = useState({ apartmentId: '', categoryId: '', title: '', description: '', file: null });
 
@@ -19,30 +23,36 @@ const MaintenanceRequest = () => {
     const [selectedRejectId, setSelectedRejectId] = useState(null);
     const [detailTask, setDetailTask] = useState(null);
 
-    // Phân trang
+    // Phân trang Client-side
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 3;
 
     const connection = useSignalR();
 
+    // ==========================================
+    // 1. SIGNALR: LẮNG NGHE THÔNG BÁO TỪ ADMIN & THỢ
+    // ==========================================
     useEffect(() => {
         if (!connection) return;
 
-        // BẮT SỰ KIỆN: THỢ ĐÃ SỬA XONG
-        const handleFixedReq = (payload) => {
-            notify.success(`✅ Sự cố "${payload.title}" của bạn đã được thợ xử lý xong! Vui lòng vào nghiệm thu.`);
-            if (typeof setReloadTrigger === 'function') {
-                setReloadTrigger(prev => prev + 1);
-            }
-        };
+        const handleAssigned = () => { notify.info(`👨‍🔧 Yêu cầu của bạn đã được phân công cho kỹ thuật viên!`); setReloadTrigger(prev => prev + 1); };
+        const handleProcessing = () => { notify.info(`🛠️ Kỹ thuật viên đã tiếp nhận và đang tiến hành xử lý!`); setReloadTrigger(prev => prev + 1); };
+        const handleFixedReq = () => { notify.success(`✅ Sự cố đã được thợ xử lý xong! Vui lòng vào kiểm tra và nghiệm thu.`); setReloadTrigger(prev => prev + 1); };
+
+        connection.on("ReceiveAssignedTask", handleAssigned);
+        connection.on("TaskProcessing", handleProcessing);
         connection.on("ReceiveFixedTask", handleFixedReq);
 
         return () => {
-            // Hủy đăng ký khi rời trang
+            connection.off("ReceiveAssignedTask", handleAssigned);
+            connection.off("TaskProcessing", handleProcessing);
             connection.off("ReceiveFixedTask", handleFixedReq);
         };
     }, [connection]);
 
+    // ==========================================
+    // 2. FETCH DATA
+    // ==========================================
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -51,7 +61,9 @@ const MaintenanceRequest = () => {
                 api.get('/Maintenance/my-apartments')
             ]);
             setRequests(reqRes.data?.data || reqRes.data?.Data || []);
-            setCurrentPage(1);
+
+            // Chỉ reset trang về 1 nếu là lần đầu load (không phải do SignalR gọi)
+            if (reloadTrigger === 0) setCurrentPage(1);
 
             setApartments(aptRes.data?.data || aptRes.data?.Data || []);
             setCategories([
@@ -64,7 +76,10 @@ const MaintenanceRequest = () => {
         setLoading(false);
     };
 
-    useEffect(() => { fetchData(); }, []);
+    // FIX 2: BẮT BUỘC FETCH LẠI DATA KHI RELOAD TRIGGER THAY ĐỔI
+    useEffect(() => {
+        fetchData();
+    }, [reloadTrigger]);
 
     // ==========================================
     // LOGIC PHÂN TRANG
@@ -75,7 +90,7 @@ const MaintenanceRequest = () => {
     const totalPages = Math.ceil(requests.length / itemsPerPage);
 
     // ==========================================
-    // 2. HANDLERS
+    // 3. HANDLERS
     // ==========================================
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -104,7 +119,9 @@ const MaintenanceRequest = () => {
             notify.success("Đã gửi yêu cầu thành công!");
             setFormData({ apartmentId: '', categoryId: '', title: '', description: '', file: null });
             if (document.getElementById('photoUpload')) document.getElementById('photoUpload').value = '';
-            fetchData();
+
+            // Kích hoạt reload để update danh sách ngay lập tức
+            setReloadTrigger(prev => prev + 1);
         } catch (error) { notify.error("Lỗi gửi yêu cầu."); }
         setIsSubmitting(false);
     };
@@ -119,8 +136,8 @@ const MaintenanceRequest = () => {
             try {
                 await api.put(`/Maintenance/${taskId}/resident-accept`);
                 notify.success("Đã đóng yêu cầu.");
-                fetchData();
                 document.getElementById('closeDetailModal')?.click();
+                setReloadTrigger(prev => prev + 1);
             } catch (error) { notify.error("Lỗi xử lý."); }
         }
     };
@@ -132,31 +149,31 @@ const MaintenanceRequest = () => {
             notify.success("Đã yêu cầu thợ làm lại.");
             document.getElementById('closeRejectModal').click();
             setRejectReason('');
-            fetchData();
             document.getElementById('closeDetailModal')?.click();
+            setReloadTrigger(prev => prev + 1);
         } catch (error) { notify.error("Lỗi xử lý."); }
     };
 
-    // ==========================================
-    // RENDER HELPERS
-    // ==========================================
+    // FIX 3: ĐỒNG BỘ TRẠNG THÁI VỚI ADMIN & KỸ THUẬT VIÊN
     const renderStatusBadge = (status) => {
         const s = String(status).toLowerCase();
         if (s === '1' || s === 'pending') return <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1 rounded-pill">Chờ phân công</span>;
-        if (s === '2' || s === 'processing') return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 px-2 py-1 rounded-pill text-dark">Đang sửa chữa</span>;
-        if (s === '3' || s === 'fixed') return <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 px-2 py-1 rounded-pill text-dark">Chờ nghiệm thu</span>;
-        if (s === '4' || s === 'closed' || s === 'resolved') return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill">Đã hoàn tất</span>;
+        if (s === '2' || s === 'accepted') return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 px-2 py-1 rounded-pill">Đã phân công</span>;
+        if (s === '3' || s === 'processing' || s === 'inprogress') return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1 rounded-pill">Đang xử lý</span>;
+        if (s === '4' || s === 'fixed') return <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 px-2 py-1 rounded-pill">Chờ nghiệm thu</span>;
+        if (s === '5' || s === 'closed' || s === 'resolved') return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill">Hoàn thành</span>;
         if (s === '6' || s === 'reopened') return <span className="badge bg-danger text-white px-2 py-1 rounded-pill">Yêu cầu làm lại</span>;
-        return <span className="badge bg-secondary rounded-pill">Đã hủy</span>;
+        return <span className="badge bg-secondary rounded-pill">Trạng thái: {status}</span>;
     };
 
     const renderTimeline = (status) => {
         const s = String(status).toLowerCase();
-        const isCanceled = s === '5' || s === 'canceled';
+        const isCanceled = s === 'canceled';
 
-        const step2Active = ['2', '3', '4', '6', 'processing', 'fixed', 'closed', 'resolved', 'reopened'].includes(s);
-        const step3Active = ['3', '4', 'fixed', 'closed', 'resolved'].includes(s);
-        const step4Active = ['4', 'closed', 'resolved'].includes(s);
+        // Tính toán các mốc dựa trên trạng thái đồng bộ
+        const step2Active = ['2', '3', '4', '5', '6', 'accepted', 'processing', 'fixed', 'closed', 'resolved', 'reopened'].includes(s);
+        const step3Active = ['4', '5', 'fixed', 'closed', 'resolved'].includes(s);
+        const step4Active = ['5', 'closed', 'resolved'].includes(s);
 
         if (isCanceled) {
             return (
@@ -196,7 +213,7 @@ const MaintenanceRequest = () => {
                         {step3Active ? <i className="bi bi-check text-white"></i> : <i className="bi bi-circle text-white"></i>}
                     </span>
                     <div className={`fw-bold small ${step3Active ? 'text-dark' : 'text-muted'}`}>Thợ báo cáo hoàn tất</div>
-                    {detailTask.fixDay && <small className="text-muted">{new Date(detailTask.fixDay).toLocaleString('vi-VN')}</small>}
+                    {detailTask.fixDay && step3Active && <small className="text-muted">{new Date(detailTask.fixDay).toLocaleString('vi-VN')}</small>}
                 </div>
 
                 <div className="ps-4 position-relative">
@@ -211,9 +228,7 @@ const MaintenanceRequest = () => {
     };
 
     return (
-        // Đổi p-4 thành py-3 px-4 để tiết kiệm chiều dọc, tránh sinh scrollbar
         <div className="container-fluid py-3 px-4">
-            {/* Header: Đưa về bên trái, giảm margin-bottom để tối ưu không gian */}
             <div className="mb-3">
                 <h3 className="fw-bold mb-1 text-white shadow-text">
                     <i className="bi bi-wrench-adjustable-circle text-success me-2"></i> Hỗ Trợ & Bảo Trì
@@ -222,7 +237,6 @@ const MaintenanceRequest = () => {
             </div>
 
             <div className="row g-4 align-items-stretch">
-
                 {/* FORM TẠO MỚI (CỘT TRÁI) */}
                 <div className="col-xl-4 col-lg-5">
                     <div className="card border-0 shadow-lg rounded-4 bg-white h-100 flex-column d-flex overflow-hidden">
@@ -271,7 +285,7 @@ const MaintenanceRequest = () => {
                     <div className="card border-0 shadow-lg rounded-4 bg-white flex-grow-1 d-flex flex-column overflow-hidden">
                         <div className="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
                             <h5 className="fw-bold mb-0 text-dark">Lịch sử của bạn</h5>
-                            <button className="btn btn-sm btn-light border rounded-pill px-3" onClick={fetchData}><i className="bi bi-arrow-clockwise"></i></button>
+                            <button className="btn btn-sm btn-light border rounded-pill px-3" onClick={() => setReloadTrigger(prev => prev + 1)}><i className="bi bi-arrow-clockwise"></i></button>
                         </div>
                         <div className="card-body p-4 d-flex flex-column pt-2">
                             {loading ? (
@@ -285,7 +299,6 @@ const MaintenanceRequest = () => {
                                 </div>
                             ) : (
                                 <div className="d-flex flex-column flex-grow-1 justify-content-between">
-                                    {/* Giảm gap xuống một chút để khít hơn */}
                                     <div className="d-flex flex-column gap-2 mb-3">
                                         {currentRequests.map((req, idx) => (
                                             <div className="card border shadow-none rounded-4 hover-shadow-sm transition-all overflow-hidden" key={req.requestId || idx}>
@@ -306,25 +319,14 @@ const MaintenanceRequest = () => {
                                         ))}
                                     </div>
 
+                                    {/* FIX 4: SỬ DỤNG COMPONENT PAGINATION CHUNG */}
                                     {totalPages > 1 && (
                                         <div className="d-flex justify-content-center mt-auto">
-                                            <nav>
-                                                <ul className="pagination pagination-sm mb-0 shadow-sm rounded-pill overflow-hidden">
-                                                    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                                                        <button className="page-link text-success border-0 px-3" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>Trước</button>
-                                                    </li>
-                                                    {[...Array(totalPages)].map((_, i) => (
-                                                        <li key={i} className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}>
-                                                            <button className={`page-link border-0 ${currentPage === i + 1 ? 'bg-success text-white' : 'text-dark'}`} onClick={() => setCurrentPage(i + 1)}>
-                                                                {i + 1}
-                                                            </button>
-                                                        </li>
-                                                    ))}
-                                                    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                                                        <button className="page-link text-success border-0 px-3" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>Sau</button>
-                                                    </li>
-                                                </ul>
-                                            </nav>
+                                            <Pagination
+                                                currentPage={currentPage}
+                                                totalPages={totalPages}
+                                                onPageChange={setCurrentPage}
+                                            />
                                         </div>
                                     )}
                                 </div>
@@ -388,7 +390,7 @@ const MaintenanceRequest = () => {
                                 </div>
                             )}
                         </div>
-                        {detailTask && (String(detailTask.status).toLowerCase() === '3' || String(detailTask.status).toLowerCase() === 'fixed') && (
+                        {detailTask && (String(detailTask.status || detailTask.Status).toLowerCase() === '4' || String(detailTask.status || detailTask.Status).toLowerCase() === 'fixed') && (
                             <div className="modal-footer bg-white border-top px-4 py-3 d-flex justify-content-end gap-2">
                                 <button className="btn btn-outline-danger rounded-pill fw-bold px-4" data-bs-toggle="modal" data-bs-target="#rejectModalResident" onClick={() => setSelectedRejectId(detailTask.requestId || detailTask.RequestId)}>Chưa đạt</button>
                                 <button className="btn btn-success rounded-pill fw-bold px-4" onClick={() => handleAccept(detailTask.requestId || detailTask.RequestId)}>Xác nhận & Đóng thẻ</button>
