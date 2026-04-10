@@ -6,9 +6,8 @@ export const useSignalR = () => {
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-
         if (!token) {
-            console.warn("SignalR: Không tìm thấy token xác thực, dừng kết nối.");
+            console.warn("SignalR: Không tìm thấy token, dừng kết nối.");
             return;
         }
 
@@ -21,11 +20,17 @@ export const useSignalR = () => {
             .withAutomaticReconnect()
             .build();
 
-        setConnection(newConnection);
+        newConnection.start()
+            .then(() => {
+                setConnection(newConnection);
+            })
+            .catch(err => {
+                console.error("🔴 [SignalR] Lỗi kết nối: ", err);
+            });
 
         return () => {
             if (newConnection) {
-                newConnection.stop().then(() => console.log("SignalR Disconnected"));
+                newConnection.stop();
             }
         };
     }, []);

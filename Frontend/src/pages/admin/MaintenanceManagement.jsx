@@ -22,49 +22,23 @@ const MaintenanceManagement = () => {
     useEffect(() => {
         if (!connection) return;
 
-        // 1. Hàm xử lý: Có yêu cầu mới
-        const handleNewReq = (newReq) => {
-            notify.info(`🚨 Yêu cầu mới: ${newReq.title} tại P.${newReq.apartmentCode || newReq.apartmentName}`);
-            setReloadTrigger(prev => prev + 1); // Load lại bảng
-        };
+        const handleNewReq = (newReq) => { notify.info(`🚨 Yêu cầu mới: P.${newReq.apartmentCode || newReq.apartmentName}`); setReloadTrigger(prev => prev + 1); };
+        const handleProcessing = () => { notify.info(`🛠️ Kỹ thuật viên đã tiếp nhận và đang xử lý`); setReloadTrigger(prev => prev + 1); };
+        const handleFixedReq = () => { notify.success(`✅ Thợ báo cáo đã xử lý xong, chờ cư dân nghiệm thu`); setReloadTrigger(prev => prev + 1); };
+        const handleClosedReq = () => { notify.success(`🎉 Cư dân đã nghiệm thu hoàn tất sự cố`); setReloadTrigger(prev => prev + 1); };
 
-        // 2. Hàm xử lý: Thợ đã sửa xong
-        const handleFixedReq = (fixedReq) => {
-            notify.success(`✅ Thợ báo cáo đã xử lý xong sự cố #${fixedReq.requestId}`);
-            setReloadTrigger(prev => prev + 1);
-        };
 
-        // 3. Hàm xử lý: Thợ bắt đầu làm (Tùy chọn cho Admin)
-        const handleProcessing = (procReq) => {
-            setReloadTrigger(prev => prev + 1); // Cập nhật trạng thái bảng sang "Đang sửa"
-        };
-
-        // Dọn dẹp event cũ để không bị lặp
-        connection.off("ReceiveNewMaintenanceRequest", handleNewReq);
-        connection.off("ReceiveFixedTask", handleFixedReq); // Đã sửa tên đúng
-        connection.off("TaskProcessing", handleProcessing); // Thêm event mới
-
-        // Đăng ký event mới
         connection.on("ReceiveNewMaintenanceRequest", handleNewReq);
-        connection.on("ReceiveFixedTask", handleFixedReq); // Đã sửa tên đúng
-        connection.on("TaskProcessing", handleProcessing); // Thêm event mới
+        connection.on("TaskProcessing", handleProcessing);
+        connection.on("ReceiveFixedTask", handleFixedReq);
+        connection.on("TaskClosed", handleClosedReq);
 
-        const startConnection = async () => {
-            try {
-                if (connection.state === "Disconnected") {
-                    await connection.start();
-                }
-            } catch (err) {
-                console.warn('Lỗi kết nối SignalR ngầm:', err);
-            }
-        };
-
-        startConnection();
 
         return () => {
             connection.off("ReceiveNewMaintenanceRequest", handleNewReq);
-            connection.off("ReceiveFixedTask", handleFixedReq);
             connection.off("TaskProcessing", handleProcessing);
+            connection.off("ReceiveFixedTask", handleFixedReq);
+            connection.off("TaskClosed", handleClosedReq);
         };
     }, [connection]);
 
@@ -140,10 +114,27 @@ const MaintenanceManagement = () => {
 
     const renderStatusBadge = (status) => {
         const s = String(status).toLowerCase();
-        if (s === '1' || s === 'pending') return <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3">Chờ phân công</span>;
-        if (s === '2' || s === 'accepted') return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3">Đã phân công</span>;
-        if (s === '3' || s === 'inprogress') return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3">Đang xử lý</span>;
-        if (s === '4' || s === 'resolved' || s === 'fixed' || s === 'closed') return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">Hoàn tất</span>;
+
+        // 1. Vừa tạo
+        if (s === '1' || s === 'pending')
+            return <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3"><i className="bi bi-hourglass-split me-1"></i> Chờ phân công</span>;
+
+        // 2. Admin giao việc (Nhưng thợ chưa bấm Bắt đầu)
+        if (s === '2' || s === 'accepted')
+            return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3"><i className="bi bi-person-check me-1"></i> Đã phân công, Chờ tiếp nhận</span>;
+
+        // 3. Thợ bấm "Bắt đầu xử lý"
+        if (s === '3' || s === 'inprogress' || s === 'processing')
+            return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3"><i className="bi bi-tools me-1"></i> Đã tiếp nhận</span>;
+
+        // 4. Thợ bấm "Hoàn tất"
+        if (s === '4' || s === 'fixed')
+            return <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill px-3"><i className="bi bi-card-checklist me-1"></i> Đã sửa xong, Chờ nghiệm thu</span>;
+
+        // 5. Cư dân bấm "Nghiệm thu"
+        if (s === '5' || s === 'resolved' || s === 'closed')
+            return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3"><i className="bi bi-check2-all me-1"></i> Hoàn thành</span>;
+
         return <span className="badge bg-secondary rounded-pill px-3">{status}</span>;
     };
 
