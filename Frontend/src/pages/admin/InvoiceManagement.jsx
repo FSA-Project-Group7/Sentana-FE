@@ -13,7 +13,6 @@ const InvoiceManagement = () => {
     const currentYear = new Date().getFullYear();
     const availableYears = Array.from(new Array(6), (_, index) => currentYear - 3 + index);
 
-    // Mặc định rỗng để hiển thị toàn bộ (Clear default filter)
     const [filters, setFilters] = useState({ month: '', year: '', status: '' });
     const [pagination, setPagination] = useState({ pageNumber: 1, pageSize: 10, totalCount: 0 });
 
@@ -21,9 +20,11 @@ const InvoiceManagement = () => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [detailData, setDetailData] = useState(null);
 
+    // ĐÃ BỔ SUNG: State lưu newStatus và statusNote cho chức năng Đổi trạng thái
     const [formData, setFormData] = useState({
         genMonth: currentMonth, genYear: currentYear, genApartmentId: '',
-        additionalFee: 0, note: ''
+        additionalFee: 0, note: '',
+        newStatus: '', statusNote: ''
     });
 
     const fetchInvoices = async (page = pagination.pageNumber) => {
@@ -89,6 +90,9 @@ const InvoiceManagement = () => {
             setFormData(prev => ({ ...prev, genMonth: currentMonth, genYear: currentYear, genApartmentId: '' }));
         } else if (type === 'edit') {
             setFormData(prev => ({ ...prev, additionalFee: 0, note: '' }));
+        } else if (type === 'change_status') {
+            // ĐÃ BỔ SUNG: Reset form đổi trạng thái
+            setFormData(prev => ({ ...prev, newStatus: '', statusNote: '' }));
         } else if (type === 'detail') {
             try {
                 const res = await api.get(`/Invoice/apartment/${invoice.apartmentId}?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
@@ -149,6 +153,33 @@ const InvoiceManagement = () => {
         }
     };
 
+    // ĐÃ BỔ SUNG: Hàm xử lý Đổi Trạng Thái gọi API Backend
+    const handleChangeStatus = async (e) => {
+        e.preventDefault();
+
+        // Chặn ở Frontend: Bắt buộc nhập Ghi chú nếu chuyển về Unpaid
+        if (formData.newStatus === '1' && !formData.statusNote.trim()) {
+            return notify.warning("Vui lòng nhập lý do/ghi chú khi chuyển hóa đơn về trạng thái Chưa thanh toán!");
+        }
+
+        setIsSubmitting(true);
+        try {
+            const payload = {
+                status: Number(formData.newStatus),
+                note: formData.statusNote
+            };
+            const res = await api.put(`/Invoice/${selectedInvoice.invoiceId}/status`, payload);
+
+            notify.success(res.data?.message || "Đã thay đổi trạng thái hóa đơn thành công!");
+            fetchInvoices();
+            closeModal();
+        } catch (error) {
+            notify.error(error.response?.data?.message || "Không thể thay đổi trạng thái.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleNotify = async (invoiceId) => {
         const { isConfirmed } = await confirmAction.fire({
             title: 'Gửi Email Nhắc Nợ?',
@@ -167,8 +198,10 @@ const InvoiceManagement = () => {
     };
 
     const getStatusBadge = (statusName) => {
-        if (statusName === 'Paid') return <span className="badge bg-success">Đã thanh toán</span>;
-        if (statusName === 'Unpaid') return <span className="badge bg-danger">Chưa thanh toán</span>;
+        const s = String(statusName).toLowerCase();
+        if (s === 'paid') return <span className="badge bg-success">Đã thanh toán</span>;
+        if (s === 'unpaid') return <span className="badge bg-danger">Chưa thanh toán</span>;
+        if (s === 'pendingverification' || s === 'pending') return <span className="badge bg-warning text-dark">Chờ duyệt</span>;
         return <span className="badge bg-secondary">{statusName || 'Không rõ'}</span>;
     };
 
@@ -226,17 +259,17 @@ const InvoiceManagement = () => {
                         <div className="text-center p-5 text-muted">Chưa có dữ liệu hóa đơn nào trong hệ thống.</div>
                     ) : (
                         <>
-                            <div className="table-responsive">
+                            <div className="table-responsive custom-scrollbar">
                                 <table className="table table-hover table-bordered mb-0 align-middle text-center">
                                     <thead className="table-light text-muted small">
                                         <tr>
-                                            <th>Mã Phòng</th>
-                                            <th>Kỳ HĐ</th>
-                                            <th>Ngày Lập</th>
-                                            <th>Tổng Cần Thu</th>
-                                            <th>Dư Nợ</th>
-                                            <th>Trạng Thái</th>
-                                            <th>Thao Tác</th>
+                                            <th className="py-3">Mã Phòng</th>
+                                            <th className="py-3">Kỳ HĐ</th>
+                                            <th className="py-3">Ngày Lập</th>
+                                            <th className="py-3">Tổng Cần Thu</th>
+                                            <th className="py-3">Dư Nợ</th>
+                                            <th className="py-3">Trạng Thái</th>
+                                            <th className="py-3" style={{ minWidth: '220px' }}>Thao Tác</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -251,26 +284,37 @@ const InvoiceManagement = () => {
                                                 <td className="fw-bold text-danger">{inv.debt?.toLocaleString()} đ</td>
                                                 <td>{getStatusBadge(inv.statusName)}</td>
                                                 <td>
-                                                    <button className="btn btn-sm btn-outline-info me-1 mb-1" onClick={() => openModal('detail', inv)}>
-                                                        <i className="bi bi-eye me-1"></i> Chi tiết
-                                                    </button>
-                                                    {inv.statusName === 'Unpaid' && (
-                                                        <>
-                                                            <button className="btn btn-sm btn-outline-warning me-1 mb-1" onClick={() => openModal('edit', inv)}>
-                                                                <i className="bi bi-plus-slash-minus me-1"></i> Phụ phí
+                                                    {/* Nhóm nút thao tác */}
+                                                    <div className="d-flex flex-wrap gap-1 justify-content-center">
+                                                        <button className="btn btn-sm btn-outline-info" onClick={() => openModal('detail', inv)}>
+                                                            <i className="bi bi-eye me-1"></i> Chi tiết
+                                                        </button>
+
+                                                        {/* ĐÃ BỔ SUNG: Nút Đổi Trạng Thái (Ẩn đi nếu hóa đơn đã thanh toán hoàn tất) */}
+                                                        {String(inv.statusName).toLowerCase() !== 'paid' && (
+                                                            <button className="btn btn-sm btn-outline-secondary" onClick={() => openModal('change_status', inv)} title="Đổi trạng thái hóa đơn">
+                                                                <i className="bi bi-arrow-left-right me-1"></i> Trạng thái
                                                             </button>
-                                                            <button className="btn btn-sm btn-outline-danger mb-1" onClick={() => handleNotify(inv.invoiceId)}>
-                                                                <i className="bi bi-envelope-exclamation me-1"></i> Nhắc nợ
-                                                            </button>
-                                                        </>
-                                                    )}
+                                                        )}
+                                                        
+                                                        {String(inv.statusName).toLowerCase() === 'unpaid' && (
+                                                            <>
+                                                                <button className="btn btn-sm btn-outline-warning" onClick={() => openModal('edit', inv)}>
+                                                                    <i className="bi bi-plus-slash-minus me-1"></i> Phụ phí
+                                                                </button>
+                                                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleNotify(inv.invoiceId)}>
+                                                                    <i className="bi bi-envelope-exclamation me-1"></i> Nhắc nợ
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="mt-3">
+                            <div className="mt-3 p-3 pt-0 border-top">
                                 <Pagination totalItems={pagination.totalCount} itemsPerPage={pagination.pageSize} currentPage={pagination.pageNumber} onPageChange={fetchInvoices} />
                             </div>
                         </>
@@ -298,7 +342,6 @@ const InvoiceManagement = () => {
                                     <div className="row g-3">
                                         <div className="col-6">
                                             <label className="form-label fw-semibold">Tháng (*)</label>
-                                            {/* Áp dụng Dropdown List (Danh sách thả xuống) cho Tháng */}
                                             <select className="form-select" name="genMonth" value={formData.genMonth} onChange={handleInputChange} required>
                                                 {[...Array(12).keys()].map(m => (
                                                     <option key={m + 1} value={m + 1}>Tháng {m + 1}</option>
@@ -307,7 +350,6 @@ const InvoiceManagement = () => {
                                         </div>
                                         <div className="col-6">
                                             <label className="form-label fw-semibold">Năm (*)</label>
-                                            {/* Áp dụng Dropdown List (Danh sách thả xuống) cho Năm */}
                                             <select className="form-select" name="genYear" value={formData.genYear} onChange={handleInputChange} required>
                                                 {availableYears.map(y => (
                                                     <option key={y} value={y}>Năm {y}</option>
@@ -359,7 +401,7 @@ const InvoiceManagement = () => {
                                         <textarea className="form-control" name="note" rows="2" value={formData.note} onChange={handleInputChange} placeholder="VD: Phạt nộp muộn, đền bù đồ đạc..."></textarea>
                                     </div>
                                 </div>
-                                <div className="modal-footer">
+                                <div className="modal-footer bg-light">
                                     <button type="button" className="btn btn-secondary" onClick={closeModal}>Hủy</button>
                                     <button type="submit" className="btn btn-warning" disabled={isSubmitting}>
                                         {isSubmitting ? 'Đang xử lý...' : 'Cập nhật Hóa Đơn'}
@@ -380,29 +422,29 @@ const InvoiceManagement = () => {
                                 <h5 className="modal-title fw-bold">Chi Tiết Hóa Đơn</h5>
                                 <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
                             </div>
-                            <div className="modal-body">
+                            <div className="modal-body p-0">
                                 {!detailData ? (
-                                    <div className="text-center p-4"><div className="spinner-border text-info"></div></div>
+                                    <div className="text-center p-5"><div className="spinner-border text-info"></div></div>
                                 ) : (
-                                    <div>
-                                        <div className="row mb-3 bg-light p-3 rounded">
-                                            <div className="col-md-6">
-                                                <p className="mb-1 text-muted">Mã Phòng:</p> 
-                                                <h6 className="fw-bold">{detailData.apartmentCode}</h6>
+                                    <div className="p-4">
+                                        <div className="row mb-4 bg-light p-3 rounded border">
+                                            <div className="col-md-6 mb-2 mb-md-0">
+                                                <p className="mb-1 text-muted small">Mã Phòng:</p> 
+                                                <h6 className="fw-bold mb-0">{detailData.apartmentCode}</h6>
                                             </div>
-                                            <div className="col-md-6">
-                                                <p className="mb-1 text-muted">Kỳ thanh toán:</p> 
-                                                <h6 className="fw-bold text-primary">
+                                            <div className="col-md-6 mb-2 mb-md-0">
+                                                <p className="mb-1 text-muted small">Kỳ thanh toán:</p> 
+                                                <h6 className="fw-bold text-primary mb-0">
                                                     {detailData.billingPeriod || `Tháng ${detailData.billingMonth}/${detailData.billingYear}`}
                                                 </h6>
                                             </div>
-                                            <div className="col-md-6 mt-2">
-                                                <p className="mb-1 text-muted">Trạng thái:</p> 
-                                                <h6>{getStatusBadge(detailData.statusName)}</h6>
+                                            <div className="col-md-6 mt-md-3">
+                                                <p className="mb-1 text-muted small">Trạng thái:</p> 
+                                                <div className="mb-0">{getStatusBadge(detailData.statusName)}</div>
                                             </div>
-                                            <div className="col-md-6 mt-2">
-                                                <p className="mb-1 text-muted">Ngày lập:</p> 
-                                                <h6>{detailData.dayCreat || "Đang cập nhật"}</h6>
+                                            <div className="col-md-6 mt-md-3">
+                                                <p className="mb-1 text-muted small">Ngày lập:</p> 
+                                                <h6 className="mb-0">{detailData.dayCreat || "Đang cập nhật"}</h6>
                                             </div>
                                         </div>
 
@@ -412,43 +454,42 @@ const InvoiceManagement = () => {
                                                     <i className="bi bi-speedometer2 me-2"></i>Chỉ Số Tiêu Thụ Điện / Nước
                                                 </h6>
                                                 <div className="row mb-4">
-                                                    <div className="col-md-6">
-                                                        <div className="card border-info h-100">
+                                                    <div className="col-md-6 mb-3 mb-md-0">
+                                                        <div className="card border-info h-100 shadow-sm">
                                                             <div className="card-header bg-info text-dark fw-bold py-2">
                                                                 <i className="bi bi-lightning-charge-fill me-1"></i> Điện năng (kWh)
                                                             </div>
-                                                            <div className="card-body py-2 small">
-                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                            <div className="card-body py-3 small">
+                                                                <div className="d-flex justify-content-between border-bottom border-light pb-2 mb-2">
                                                                     <span className="text-muted">Chỉ số cũ:</span>
                                                                     <strong>{detailData.utilityHistory.oldElectricIndex}</strong>
                                                                 </div>
-                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                                <div className="d-flex justify-content-between border-bottom border-light pb-2 mb-2">
                                                                     <span className="text-muted">Chỉ số mới:</span>
                                                                     <strong>{detailData.utilityHistory.newElectricIndex}</strong>
                                                                 </div>
-                                                                <div className="d-flex justify-content-between">
+                                                                <div className="d-flex justify-content-between pt-1">
                                                                     <span className="fw-semibold text-danger">Tiêu thụ:</span>
                                                                     <strong className="text-danger fs-6">{detailData.utilityHistory.electricUsage}</strong>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
-
                                                     <div className="col-md-6">
-                                                        <div className="card border-primary h-100">
+                                                        <div className="card border-primary h-100 shadow-sm">
                                                             <div className="card-header bg-primary text-white fw-bold py-2">
                                                                 <i className="bi bi-droplet-fill me-1"></i> Nước sinh hoạt (m³)
                                                             </div>
-                                                            <div className="card-body py-2 small">
-                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                            <div className="card-body py-3 small">
+                                                                <div className="d-flex justify-content-between border-bottom border-light pb-2 mb-2">
                                                                     <span className="text-muted">Chỉ số cũ:</span>
                                                                     <strong>{detailData.utilityHistory.oldWaterIndex}</strong>
                                                                 </div>
-                                                                <div className="d-flex justify-content-between border-bottom pb-1 mb-1">
+                                                                <div className="d-flex justify-content-between border-bottom border-light pb-2 mb-2">
                                                                     <span className="text-muted">Chỉ số mới:</span>
                                                                     <strong>{detailData.utilityHistory.newWaterIndex}</strong>
                                                                 </div>
-                                                                <div className="d-flex justify-content-between">
+                                                                <div className="d-flex justify-content-between pt-1">
                                                                     <span className="fw-semibold text-primary">Tiêu thụ:</span>
                                                                     <strong className="text-primary fs-6">{detailData.utilityHistory.waterUsage}</strong>
                                                                 </div>
@@ -462,48 +503,60 @@ const InvoiceManagement = () => {
                                         <h6 className="fw-bold text-primary border-bottom pb-2 mb-3 mt-4">
                                             <i className="bi bi-receipt me-2"></i>Bảng Kê Chi Tiết
                                         </h6>
-                                        <table className="table table-sm table-bordered text-center">
-                                            <thead className="table-light">
-                                                <tr><th>Khoản thu</th><th>Thành tiền (VNĐ)</th></tr>
-                                            </thead>
-                                            <tbody>
-                                                {detailData.details && detailData.details.map((d, idx) => (
-                                                    <tr key={idx}>
-                                                        <td className="text-start ps-3">{d.feeName}</td>
-                                                        <td className="fw-semibold">{d.amount?.toLocaleString()}</td>
+                                        <div className="table-responsive border rounded mb-4">
+                                            <table className="table table-hover table-borderless align-middle text-center mb-0">
+                                                <thead className="table-light border-bottom">
+                                                    <tr>
+                                                        <th className="py-2 text-start ps-4">Khoản thu</th>
+                                                        <th className="py-2 text-end pe-4">Thành tiền (VNĐ)</th>
                                                     </tr>
-                                                ))}
-                                                <tr className="table-secondary">
-                                                    <td className="text-end pe-3 fw-bold">TỔNG CỘNG:</td>
-                                                    <td className="fw-bold text-danger fs-5">{detailData.totalMoney?.toLocaleString()} đ</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    {detailData.details && detailData.details.map((d, idx) => (
+                                                        <tr key={idx} className="border-bottom border-light">
+                                                            <td className="text-start ps-4 py-2">{d.feeName}</td>
+                                                            <td className="text-end pe-4 py-2 fw-semibold">{d.amount?.toLocaleString()}</td>
+                                                        </tr>
+                                                    ))}
+                                                    <tr className="bg-light">
+                                                        <td className="text-end pe-3 fw-bold py-3">TỔNG CỘNG:</td>
+                                                        <td className="text-end pe-4 fw-bold text-danger fs-5 py-3">{detailData.totalMoney?.toLocaleString()} đ</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
 
-                                        <div className="row mt-3 text-center">
+                                        <div className="row text-center g-3">
                                             <div className="col-6">
-                                                <div className="p-2 border rounded border-success">
-                                                    <span className="text-muted d-block small">Đã nộp</span>
-                                                    <strong className="text-success">{detailData.pay?.toLocaleString()} đ</strong>
+                                                <div className="p-3 border rounded-3 bg-success bg-opacity-10 border-success border-opacity-25">
+                                                    <span className="text-dark fw-medium d-block small mb-1">Đã nộp</span>
+                                                    <strong className="text-success fs-5">{(detailData.pay || 0).toLocaleString()} đ</strong>
                                                 </div>
                                             </div>
                                             <div className="col-6">
-                                                <div className="p-2 border rounded border-danger">
-                                                    <span className="text-muted d-block small">Còn nợ</span>
-                                                    <strong className="text-danger">{detailData.debt?.toLocaleString()} đ</strong>
+                                                <div className="p-3 border rounded-3 bg-danger bg-opacity-10 border-danger border-opacity-25">
+                                                    <span className="text-dark fw-medium d-block small mb-1">Còn nợ</span>
+                                                    <strong className="text-danger fs-5">{(detailData.debt || 0).toLocaleString()} đ</strong>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
-                            <div className="modal-footer bg-light">
-                                <button type="button" className="btn btn-secondary" onClick={closeModal}>Đóng</button>
+                            <div className="modal-footer bg-light border-top">
+                                <button type="button" className="btn btn-secondary shadow-sm px-4" onClick={closeModal}>Đóng</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+            `}</style>
         </div>
     );
 };
