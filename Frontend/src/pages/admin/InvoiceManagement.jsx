@@ -289,14 +289,6 @@ const InvoiceManagement = () => {
                                                         <button className="btn btn-sm btn-outline-info" onClick={() => openModal('detail', inv)}>
                                                             <i className="bi bi-eye me-1"></i> Chi tiết
                                                         </button>
-
-                                                        {/* ĐÃ BỔ SUNG: Nút Đổi Trạng Thái (Ẩn đi nếu hóa đơn đã thanh toán hoàn tất) */}
-                                                        {String(inv.statusName).toLowerCase() !== 'paid' && (
-                                                            <button className="btn btn-sm btn-outline-secondary" onClick={() => openModal('change_status', inv)} title="Đổi trạng thái hóa đơn">
-                                                                <i className="bi bi-arrow-left-right me-1"></i> Trạng thái
-                                                            </button>
-                                                        )}
-                                                        
                                                         {String(inv.statusName).toLowerCase() === 'unpaid' && (
                                                             <>
                                                                 <button className="btn btn-sm btn-outline-warning" onClick={() => openModal('edit', inv)}>
