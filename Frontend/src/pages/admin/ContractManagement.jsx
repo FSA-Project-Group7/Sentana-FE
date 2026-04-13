@@ -522,7 +522,6 @@ const ContractManagement = () => {
             const type = analyzeStateMachine(c).type;
             if (filterStatus === '1') matchStatus = type === 'ACTIVE' || type === 'PENDING';
             else if (filterStatus === 'expiring') matchStatus = type === 'EXPIRING_SOON';
-            else if (filterStatus === 'overdue') matchStatus = type === 'OVERDUE';
             else if (filterStatus === 'pending_inspection') matchStatus = type === 'PENDING_INSPECTION';
             else if (filterStatus === 'pending_settlement') matchStatus = type === 'PENDING_SETTLEMENT';
             else if (filterStatus === '0') matchStatus = type === 'TERMINATED' || type === 'CANCELLED';
@@ -574,8 +573,12 @@ const ContractManagement = () => {
                 </div>
 
                 <div className="row g-4 mb-4">
-                    {[{ title: "Tổng Hợp Đồng", val: dashboardStats.total, color: "primary", icon: "bi-layers" }, { title: "Đang Hiệu Lực", val: dashboardStats.active, color: "success", icon: "bi-check-circle" }, { title: "Sắp Hết Hạn", val: dashboardStats.expiring, color: "warning", icon: "bi-hourglass-bottom", alert: dashboardStats.expiring > 0 ? "Cần gia hạn ngay!" : null }, { title: "QUÁ HẠN / VI PHẠM", val: dashboardStats.overdue, color: "danger", icon: "bi-exclamation-octagon", alert: dashboardStats.overdue > 0 ? "🚨 Thanh lý khẩn cấp!" : null }].map((s, i) => (
-                        <div className="col-md-3" key={i}>
+                    {[
+                        { title: "Tổng Hợp Đồng", val: dashboardStats.total, color: "primary", icon: "bi-layers" }, 
+                        { title: "Đang Hiệu Lực", val: dashboardStats.active, color: "success", icon: "bi-check-circle" }, 
+                        { title: "Sắp Hết Hạn", val: dashboardStats.expiring, color: "warning", icon: "bi-hourglass-bottom", alert: dashboardStats.expiring > 0 ? "Cần gia hạn ngay!" : null }
+                    ].map((s, i) => (
+                        <div className="col-md-4" key={i}>
                             <div className={`modern-card h-100 border-start border-${s.color} border-4`}>
                                 <div className="card-body p-4 d-flex justify-content-between align-items-center">
                                     <div>
@@ -602,7 +605,6 @@ const ContractManagement = () => {
                             <option value="all">Hiển thị: Tất cả</option>
                             <option value="1">🟢 Đang hiệu lực / Chờ</option>
                             <option value="expiring">🟡 Sắp hết hạn</option>
-                            <option value="overdue">🔴 Quá hạn (Vi phạm)</option>
                             <option value="pending_inspection">🟠 Chờ kiểm tra phòng</option>
                             <option value="pending_settlement">🔴 Chờ khách thanh toán</option>
                             <option value="0">⚫ Đã tất toán hoàn toàn</option>
