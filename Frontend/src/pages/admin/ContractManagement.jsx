@@ -976,7 +976,10 @@ const ContractManagement = () => {
                                 onChange={(e) => setTerminationReason(e.target.value)}
                             ></textarea>
                             <div className="bg-white p-4 rounded-4 border border-dark shadow-sm">
-                                <h6 className="fw-bold mb-3 text-primary text-uppercase" style={{ letterSpacing: '0.5px' }}>Bản Tính Nháp Trước Khi Chốt</h6>
+                                <h6 className="fw-bold mb-3 text-primary text-uppercase" style={{ letterSpacing: '0.5px' }}>Bảng Tính Toán Trước Khi <strong>
+                                    <i>Chốt</i>
+                                    </strong>
+                                    </h6>
                                 <div className="d-flex justify-content-between mb-2">
                                     <span className="text-success">
                                         <i className="bi bi-plus-circle-fill me-1"></i>
