@@ -151,43 +151,43 @@ const MyContractDetail = () => {
 
             {/* Contract Info Card */}
             <div className="card border-0 shadow-lg rounded-4 mb-4">
-                <div className="card-header text-white p-4 rounded-top-4" style={{ background: 'linear-gradient(135deg, #6c757d 0%, #495057 100%)' }}>
+                <div className="card-header bg-white p-4 rounded-top-4 border-bottom">
                     <div className="d-flex justify-content-between align-items-center">
                         <div>
-                            <h5 className="fw-bold mb-1">{contract.contractCode}</h5>
-                            <p className="mb-0 opacity-75">Căn hộ: {contract.apartmentName}</p>
+                            <h5 className="fw-bold mb-1 text-dark">{contract.contractCode}</h5>
+                            <p className="mb-0 text-muted">Căn hộ: {contract.apartmentName}</p>
                         </div>
                         <div className="d-flex gap-2 align-items-center">
                             {getStatusBadge(contract.status)}
                             {contract.file && (
-                                <a href={contract.file} target="_blank" rel="noreferrer" className="btn btn-light btn-sm">
+                                <a href={contract.file} target="_blank" rel="noreferrer" className="btn btn-outline-primary btn-sm">
                                     <i className="bi bi-download me-1"></i>Tải PDF
                                 </a>
                             )}
                         </div>
                     </div>
                 </div>
-                <div className="card-body p-4">
+                <div className="card-body p-4 bg-white">
                     <div className="row g-3">
                         <div className="col-md-4">
                             <div className="info-item">
-                                <i className="bi bi-person-badge text-secondary me-2"></i>
+                                <i className="bi bi-person-badge text-muted me-2"></i>
                                 <span className="text-muted">Chủ hộ:</span>
-                                <strong className="ms-2">{contract.tenantName}</strong>
+                                <strong className="ms-2 text-dark">{contract.tenantName}</strong>
                             </div>
                         </div>
                         <div className="col-md-4">
                             <div className="info-item">
-                                <i className="bi bi-calendar-range text-secondary me-2"></i>
+                                <i className="bi bi-calendar-range text-muted me-2"></i>
                                 <span className="text-muted">Thời hạn:</span>
-                                <strong className="ms-2">{formatDate(contract.startDay)} - {formatDate(contract.endDay)}</strong>
+                                <strong className="ms-2 text-dark">{formatDate(contract.startDay)} - {formatDate(contract.endDay)}</strong>
                             </div>
                         </div>
                         <div className="col-md-4">
                             <div className="info-item">
-                                <i className="bi bi-calendar-check text-secondary me-2"></i>
+                                <i className="bi bi-calendar-check text-muted me-2"></i>
                                 <span className="text-muted">Ngày tạo:</span>
-                                <strong className="ms-2">{formatDate(contract.createdAt)}</strong>
+                                <strong className="ms-2 text-dark">{formatDate(contract.createdAt)}</strong>
                             </div>
                         </div>
                         <div className="col-md-6">
@@ -211,21 +211,21 @@ const MyContractDetail = () => {
             {/* Deposit Settlement (Only for terminated contracts) */}
             {contract.status === 0 && depositSettlement && (
                 <div className="card border-0 shadow-lg rounded-4 mb-4">
-                    <div className="card-header text-white p-4 border-bottom-0 rounded-top-4" style={{ background: 'linear-gradient(135deg, #8b6f47 0%, #6b5638 100%)' }}>
+                    <div className="card-header bg-white p-4 border-bottom rounded-top-4">
                         <div className="d-flex justify-content-between align-items-center">
-                            <h5 className="fw-bold mb-0">
+                            <h5 className="fw-bold mb-0 text-dark">
                                 <i className="bi bi-calculator me-2"></i>
                                 Quyết Toán Hợp Đồng
                             </h5>
                             {getSettlementStatusBadge(depositSettlement.settlementStatus)}
                         </div>
                     </div>
-                    <div className="card-body p-4">
+                    <div className="card-body p-4 bg-white">
                         <div className="row g-3">
                             <div className="col-md-6">
                                 <div className="settlement-item">
                                     <span className="text-muted">Tiền cọc gốc:</span>
-                                    <strong className="text-primary">{formatMoney(depositSettlement.deposit)}</strong>
+                                    <strong className="text-success">{formatMoney(depositSettlement.deposit)}</strong>
                                 </div>
                             </div>
                             <div className="col-md-6">
@@ -248,8 +248,8 @@ const MyContractDetail = () => {
                             {depositSettlement.terminationReason && (
                                 <div className="col-12">
                                     <div className="alert alert-warning border-0 mb-0">
-                                        <strong>Lý do thanh lý:</strong>
-                                        <p className="mb-0 mt-2">{depositSettlement.terminationReason}</p>
+                                        <strong className="text-dark">Lý do thanh lý:</strong>
+                                        <p className="mb-0 mt-2 text-dark">{depositSettlement.terminationReason}</p>
                                     </div>
                                 </div>
                             )}
@@ -263,25 +263,25 @@ const MyContractDetail = () => {
                 {/* Roommates Section */}
                 <div className="col-md-6">
                     <div className="card border-0 shadow-lg rounded-4 h-100">
-                        <div className="card-header text-white p-4 border-bottom-0 rounded-top-4" style={{ background: 'linear-gradient(135deg, #6c757d 0%, #495057 100%)' }}>
-                            <h5 className="fw-bold mb-0">
+                        <div className="card-header bg-white p-4 border-bottom rounded-top-4">
+                            <h5 className="fw-bold mb-0 text-dark">
                                 <i className="bi bi-people me-2"></i>
                                 Thành Viên Cùng Ở ({roommates.length})
                             </h5>
                         </div>
-                        <div className="card-body p-4">
+                        <div className="card-body p-4 bg-white">
                             {roommates.length > 0 ? (
                                 roommates.map((roommate, index) => (
-                                    <div key={index} className="roommate-item border-start border-secondary border-3 bg-light p-3 rounded mb-3">
+                                    <div key={index} className="roommate-item border-start border-primary border-3 bg-light p-3 rounded mb-3">
                                         <div className="d-flex align-items-center">
-                                            <div className="avatar-circle bg-secondary text-white me-3" style={{ width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div className="avatar-circle bg-primary text-white me-3" style={{ width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <i className="bi bi-person"></i>
                                             </div>
                                             <div className="flex-grow-1">
-                                                <h6 className="fw-bold mb-1">
+                                                <h6 className="fw-bold mb-1 text-dark">
                                                     {roommate.fullName || `Thành viên ${index + 1}`}
                                                 </h6>
-                                                <span className="badge bg-secondary">
+                                                <span className="badge bg-primary">
                                                     {getRelationshipName(roommate.relationshipId)}
                                                 </span>
                                             </div>
@@ -301,13 +301,13 @@ const MyContractDetail = () => {
                 {/* Services Section */}
                 <div className="col-md-6">
                     <div className="card border-0 shadow-lg rounded-4 h-100">
-                        <div className="card-header text-white p-4 border-bottom-0 rounded-top-4" style={{ background: 'linear-gradient(135deg, #6c757d 0%, #495057 100%)' }}>
-                            <h5 className="fw-bold mb-0">
+                        <div className="card-header bg-white p-4 border-bottom rounded-top-4">
+                            <h5 className="fw-bold mb-0 text-dark">
                                 <i className="bi bi-gear me-2"></i>
                                 Dịch Vụ Đăng Ký ({services.length})
                             </h5>
                         </div>
-                        <div className="card-body p-4">
+                        <div className="card-body p-4 bg-white">
                             {services.length > 0 ? (
                                 <div className="table-responsive">
                                     <table className="table table-hover align-middle mb-0">
