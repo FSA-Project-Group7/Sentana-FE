@@ -13,7 +13,7 @@ const InvoiceManagement = () => {
     const currentYear = new Date().getFullYear();
     const availableYears = Array.from(new Array(6), (_, index) => currentYear - 3 + index);
 
-    const [filters, setFilters] = useState({ month: '', year: '', status: '' });
+    const [filters, setFilters] = useState({ month: '', year: '', status: '', category: '' });
     const [pagination, setPagination] = useState({ pageNumber: 1, pageSize: 10, totalCount: 0 });
 
     const [activeModal, setActiveModal] = useState(null); 
@@ -35,9 +35,12 @@ const InvoiceManagement = () => {
                 PageSize: pagination.pageSize,
             };
 
-            if (filters.month) params.Month = Number(filters.month);
-            if (filters.year) params.Year = Number(filters.year);
-            if (filters.status !== '') params.Status = Number(filters.status);
+            if (filters.month) params.Month = parseInt(filters.month);
+            if (filters.year) params.Year = parseInt(filters.year);
+            if (filters.status !== '') params.Status = parseInt(filters.status);
+            if (filters.category !== '') params.Category = parseInt(filters.category);
+
+            console.log('Fetching invoices with params:', params); // Debug log
 
             const res = await api.get('/Invoice/list', { params });
             const data = res.data?.data;
@@ -47,7 +50,8 @@ const InvoiceManagement = () => {
                 setPagination(prev => ({ ...prev, pageNumber: data.pageNumber, totalCount: data.totalCount }));
             }
         } catch (error) {
-            notify.error("Không thể tải danh sách hóa đơn.");
+            console.error('Error fetching invoices:', error.response || error); // Debug log
+            notify.error(error.response?.data?.message || "Không thể tải danh sách hóa đơn.");
             setInvoices([]);
         } finally {
             setLoading(false);
@@ -70,7 +74,7 @@ const InvoiceManagement = () => {
 
     useEffect(() => {
         fetchInvoices(1);
-    }, [filters.month, filters.year, filters.status]);
+    }, [filters.month, filters.year, filters.status, filters.category]);
 
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
@@ -190,11 +194,18 @@ const InvoiceManagement = () => {
         if (!isConfirmed) return;
 
         try {
-            const res = await api.post(`/Invoice/${invoiceId}/notify`);
+            const res = await api.post(`/Invoice/${invoiceId}/send-reminder`);
             notify.success(res.data?.message || "Đã gửi Email nhắc nợ thành công!");
         } catch (error) {
             notify.error(error.response?.data?.message || "Gửi Email thất bại.");
         }
+    };
+
+    const getCategoryBadge = (category) => {
+        if (category === 1) {
+            return <span className="badge bg-warning text-dark">Hóa đơn trả thêm</span>;
+        }
+        return <span className="badge bg-info">Hóa đơn tiền tháng</span>;
     };
 
     const getStatusBadge = (statusName) => {
@@ -229,7 +240,7 @@ const InvoiceManagement = () => {
                                 ))}
                             </select>
                         </div>
-                        <div className="col-md-3">
+                        <div className="col-md-2">
                             <label className="form-label small fw-bold text-muted mb-1">Năm</label>
                             <select className="form-select form-select-sm" name="year" value={filters.year} onChange={handleFilterChange}>
                                 <option value="">Tất cả các năm</option>
@@ -245,6 +256,14 @@ const InvoiceManagement = () => {
                                 <option value="1">Chưa thanh toán (Unpaid)</option>
                                 <option value="2">Chờ xác duyệt (Pending)</option>
                                 <option value="3">Đã thanh toán (Paid)</option>
+                            </select>
+                        </div>
+                        <div className="col-md-4">
+                            <label className="form-label small fw-bold text-muted mb-1">Danh mục hóa đơn</label>
+                            <select className="form-select form-select-sm" name="category" value={filters.category} onChange={handleFilterChange}>
+                                <option value="">Tất cả</option>
+                                <option value="2">Hóa đơn tiền tháng</option>
+                                <option value="1">Hóa đơn trả thêm</option>
                             </select>
                         </div>
                     </div>
@@ -269,6 +288,7 @@ const InvoiceManagement = () => {
                                             <th className="py-3">Tổng Cần Thu</th>
                                             <th className="py-3">Dư Nợ</th>
                                             <th className="py-3">Trạng Thái</th>
+                                            <th className="py-3">Danh Mục</th>
                                             <th className="py-3" style={{ minWidth: '220px' }}>Thao Tác</th>
                                         </tr>
                                     </thead>
@@ -283,6 +303,7 @@ const InvoiceManagement = () => {
                                                 <td className="fw-bold text-success">{inv.totalMoney?.toLocaleString()} đ</td>
                                                 <td className="fw-bold text-danger">{inv.debt?.toLocaleString()} đ</td>
                                                 <td>{getStatusBadge(inv.statusName)}</td>
+                                                <td>{getCategoryBadge(inv.category)}</td>
                                                 <td>
                                                     {/* Nhóm nút thao tác */}
                                                     <div className="d-flex flex-wrap gap-1 justify-content-center">
