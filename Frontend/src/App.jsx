@@ -18,6 +18,8 @@ import ResidentPage from './pages/resident/ResidentPage';
 import ResidentDashboard from './pages/resident/ResidentDashboard';
 import ResidentProfile from './pages/resident/ResidentProfile';
 import MaintenanceRequest from './pages/resident/MaintenanceRequest';
+import MyContract from './pages/resident/MyContract';
+import MyContractDetail from './pages/resident/MyContractDetail';
 
 // Technician
 import TechnicianLayout from './components/TechnicianLayout';
@@ -28,6 +30,7 @@ import TechnicianProfile from './pages/technician/TechnicianProfile';
 // Admin / Manager
 import AdminLayout from './components/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminProfile from './pages/admin/AdminProfile'; 
 import BuildingManagement from './pages/admin/BuildingManagement';
 import ApartmentManagement from './pages/admin/ApartmentManagement';
 import ServiceManagement from './pages/admin/ServiceManagement';
@@ -39,8 +42,7 @@ import ContractManagement from './pages/admin/ContractManagement';
 import InvoiceManagement from './pages/admin/InvoiceManagement';
 import PaymentManagement from './pages/admin/PaymentManagement';
 import MaintenanceManagement from './pages/admin/MaintenanceManagement';
-import MyContract from './pages/resident/MyContract';
-import MyContractDetail from './pages/resident/MyContractDetail';
+
 
 function App() {
   useEffect(() => {
@@ -104,6 +106,8 @@ function App() {
         <Route element={<ProtectedRoute allowedRole="Manager" />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
+            
+            <Route path="profile" element={<AdminProfile />} />
             <Route path="buildings" element={<BuildingManagement />} />
             <Route path="apartments" element={<ApartmentManagement />} />
             <Route path="services" element={<ServiceManagement />} />

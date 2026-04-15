@@ -486,17 +486,16 @@ const ResidentDashboard = () => {
                             <form onSubmit={handleSubmitPayment}>
                                 <div className="modal-body p-4">
                                     
-                                    {/* MÃ QR CHUYỂN KHOẢN TĨNH */}
-                                    <div className="text-center mb-4 p-4 border border-success border-opacity-25 rounded-4 bg-success bg-opacity-10">
-                                        <p className="fw-bold text-dark mb-3 text-uppercase">Thông Tin Chuyển Khoản</p>
-                                        
-                                        <img 
-                                            // THAY LINK NÀY BẰNG ẢNH QR MẶC ĐỊNH CỦA DỰ ÁN BẠN
-                                            src="https://img.freepik.com/premium-vector/qr-code-sample-for-smartphone-scanning-on-white-background_736051-96.jpg" 
-                                            alt="Mã QR Chuyển Khoản" 
-                                            className="img-fluid rounded-3 shadow-sm border bg-white p-2 mb-3"
-                                            style={{ maxWidth: '200px' }}
-                                        />
+                                    {/* MÃ QR CHUYỂN KHOẢN */}
+                            <div className="text-center mb-4 p-4 border border-success border-opacity-25 rounded-4 bg-success bg-opacity-10">
+                                <p className="fw-bold text-dark mb-3 text-uppercase">Thông Tin Chuyển Khoản</p>
+                                
+                                <img 
+                                    src={selectedInvoice?.qrCodeUrl || "https://img.freepik.com/premium-vector/qr-code-sample-for-smartphone-scanning-on-white-background_736051-96.jpg"} 
+                                    alt="Mã QR Chuyển Khoản" 
+                                    className="img-fluid rounded-3 shadow-sm border bg-white p-2 mb-3"
+                                    style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'contain' }}
+                                />
                                         
                                         <div className="bg-white p-3 rounded-3 shadow-sm text-start">
                                             <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
