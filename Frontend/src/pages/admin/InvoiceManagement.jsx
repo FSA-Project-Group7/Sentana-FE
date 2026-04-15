@@ -297,7 +297,25 @@ const InvoiceManagement = () => {
                                             <tr key={inv.invoiceId}>
                                                 <td className="fw-bold text-primary">{inv.apartmentCode}</td>
                                                 <td className="fw-semibold text-primary">
-                                                    {inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}
+                                                    {inv.category === 1 
+                                                        ? (() => {
+                                                            // Parse createdAt - format có thể là "15/04/2025 14:05"
+                                                            const dateStr = inv.createdAt;
+                                                            if (!dateStr) return <span className="badge bg-warning text-dark">Thanh lý hợp đồng</span>;
+                                                            
+                                                            // Thử parse format DD/MM/YYYY
+                                                            const parts = dateStr.split(' ')[0].split('/');
+                                                            if (parts.length === 3) {
+                                                                const month = parts[1];
+                                                                const year = parts[2];
+                                                                return <span className="badge bg-warning text-dark">Thanh lý {month}/{year}</span>;
+                                                            }
+                                                            
+                                                            // Fallback
+                                                            return <span className="badge bg-warning text-dark">Thanh lý hợp đồng</span>;
+                                                          })()
+                                                        : (inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`)
+                                                    }
                                                 </td>
                                                 <td className="small text-muted">{inv.createdAt}</td>
                                                 <td className="fw-bold text-success">{inv.totalMoney?.toLocaleString()} đ</td>
