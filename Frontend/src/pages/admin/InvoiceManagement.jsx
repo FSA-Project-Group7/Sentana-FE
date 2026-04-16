@@ -99,10 +99,27 @@ const InvoiceManagement = () => {
             setFormData(prev => ({ ...prev, newStatus: '', statusNote: '' }));
         } else if (type === 'detail') {
             try {
-                const res = await api.get(`/Invoice/apartment/${invoice.apartmentId}?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
-                const dataList = res.data?.data;
-                if (dataList && dataList.length > 0) {
-                    setDetailData(dataList[0]);
+                // Kiểm tra loại hóa đơn
+                if (invoice.category === 1) {
+                    // Hóa đơn trả thêm - Hiển thị thông tin đơn giản từ invoice
+                    // Không cần gọi API vì không có utilityHistory
+                    setDetailData({
+                        apartmentCode: invoice.apartmentCode,
+                        statusName: invoice.statusName,
+                        createdAt: invoice.createdAt,
+                        dayCreat: invoice.createdAt,
+                        totalMoney: invoice.totalMoney,
+                        pay: invoice.pay || 0,
+                        debt: invoice.debt || 0,
+                        details: invoice.note ? [{ feeName: 'Ghi chú', amount: invoice.note }] : []
+                    });
+                } else {
+                    // Hóa đơn tiền tháng - gọi API theo apartment + month/year
+                    const res = await api.get(`/Invoice/apartment/${invoice.apartmentId}?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
+                    const dataList = res.data?.data;
+                    if (dataList && dataList.length > 0) {
+                        setDetailData(dataList[0]);
+                    }
                 }
             } catch (error) {
                 notify.error("Không thể tải chi tiết hóa đơn.");
@@ -314,7 +331,7 @@ const InvoiceManagement = () => {
                                                             // Fallback
                                                             return <span className="badge bg-warning text-dark">Thanh lý hợp đồng</span>;
                                                           })()
-                                                        : (inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`)
+                                                        : <span className="badge bg-info text-white">{inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}</span>
                                                     }
                                                 </td>
                                                 <td className="small text-muted">{inv.createdAt}</td>
@@ -449,9 +466,9 @@ const InvoiceManagement = () => {
                 <div className="modal fade show d-block" tabIndex="-1">
                     <div className="modal-dialog modal-lg">
                         <div className="modal-content">
-                            <div className="modal-header bg-info text-white">
+                            <div className={`modal-header ${selectedInvoice?.category === 1 ? 'bg-warning text-dark' : 'bg-info text-white'}`}>
                                 <h5 className="modal-title fw-bold">Chi Tiết Hóa Đơn</h5>
-                                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
+                                <button type="button" className={`btn-close ${selectedInvoice?.category === 1 ? '' : 'btn-close-white'}`} onClick={closeModal}></button>
                             </div>
                             <div className="modal-body p-0">
                                 {!detailData ? (
@@ -466,7 +483,18 @@ const InvoiceManagement = () => {
                                             <div className="col-md-6 mb-2 mb-md-0">
                                                 <p className="mb-1 text-muted small">Kỳ thanh toán:</p> 
                                                 <h6 className="fw-bold text-primary mb-0">
-                                                    {detailData.billingPeriod || `Tháng ${detailData.billingMonth}/${detailData.billingYear}`}
+                                                    {selectedInvoice.category === 1 
+                                                        ? (() => {
+                                                            const dateStr = selectedInvoice.createdAt;
+                                                            if (!dateStr) return "Thanh lý hợp đồng";
+                                                            const parts = dateStr.split(' ')[0].split('/');
+                                                            if (parts.length === 3) {
+                                                                return `Thanh lý ${parts[1]}/${parts[2]}`;
+                                                            }
+                                                            return "Thanh lý hợp đồng";
+                                                          })()
+                                                        : (detailData.billingPeriod || `Tháng ${detailData.billingMonth}/${detailData.billingYear}`)
+                                                    }
                                                 </h6>
                                             </div>
                                             <div className="col-md-6 mt-md-3">
@@ -475,11 +503,12 @@ const InvoiceManagement = () => {
                                             </div>
                                             <div className="col-md-6 mt-md-3">
                                                 <p className="mb-1 text-muted small">Ngày lập:</p> 
-                                                <h6 className="mb-0">{detailData.dayCreat || "Đang cập nhật"}</h6>
+                                                <h6 className="mb-0">{detailData.dayCreat || detailData.createdAt || "Đang cập nhật"}</h6>
                                             </div>
                                         </div>
 
-                                        {detailData.utilityHistory && (
+                                        {/* Chỉ hiển thị Chỉ số Điện/Nước cho Hóa đơn tiền tháng */}
+                                        {selectedInvoice.category === 0 && detailData.utilityHistory && (
                                             <>
                                                 <h6 className="fw-bold text-warning border-bottom pb-2 mb-3 mt-4">
                                                     <i className="bi bi-speedometer2 me-2"></i>Chỉ Số Tiêu Thụ Điện / Nước
@@ -543,12 +572,31 @@ const InvoiceManagement = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {detailData.details && detailData.details.map((d, idx) => (
-                                                        <tr key={idx} className="border-bottom border-light">
-                                                            <td className="text-start ps-4 py-2">{d.feeName}</td>
-                                                            <td className="text-end pe-4 py-2 fw-semibold">{d.amount?.toLocaleString()}</td>
-                                                        </tr>
-                                                    ))}
+                                                    {selectedInvoice.category === 1 ? (
+                                                        // Hóa đơn trả thêm - Hiển thị đơn giản
+                                                        <>
+                                                            <tr className="border-bottom border-light">
+                                                                <td className="text-start ps-4 py-2">Tiền thanh lý hợp đồng</td>
+                                                                <td className="text-end pe-4 py-2 fw-semibold">{detailData.totalMoney?.toLocaleString()}</td>
+                                                            </tr>
+                                                            {selectedInvoice.note && (
+                                                                <tr className="border-bottom border-light bg-light">
+                                                                    <td colSpan="2" className="text-start ps-4 py-2 small text-muted">
+                                                                        <i className="bi bi-info-circle me-1"></i>
+                                                                        <strong>Ghi chú:</strong> {selectedInvoice.note}
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        // Hóa đơn tiền tháng - Hiển thị chi tiết
+                                                        detailData.details && detailData.details.map((d, idx) => (
+                                                            <tr key={idx} className="border-bottom border-light">
+                                                                <td className="text-start ps-4 py-2">{d.feeName}</td>
+                                                                <td className="text-end pe-4 py-2 fw-semibold">{d.amount?.toLocaleString()}</td>
+                                                            </tr>
+                                                        ))
+                                                    )}
                                                     <tr className="bg-light">
                                                         <td className="text-end pe-3 fw-bold py-3">TỔNG CỘNG:</td>
                                                         <td className="text-end pe-4 fw-bold text-danger fs-5 py-3">{detailData.totalMoney?.toLocaleString()} đ</td>
