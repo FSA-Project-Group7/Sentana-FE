@@ -147,8 +147,14 @@ const AdminLayout = () => {
         }
     };
 
+    const handleOpenLogoutModal = () => setShowLogoutModal(true);
+    const handleCloseLogoutModal = () => {
+        if (!isLoggingOut) setShowLogoutModal(false);
+    };
+
     const navItems = [
         { path: '/admin', label: 'Trang chủ', icon: 'bi-speedometer2 me-2' },
+        { path: '/admin/profile', label: 'Thông tin cá nhân', icon: 'bi-person-lines-fill me-2' },
         { path: '/admin/buildings', label: 'Tòa nhà', icon: 'bi-building me-2' },
         { path: '/admin/apartments', label: 'Quản lý Căn hộ', icon: 'bi-door-open me-2' },
         { path: '/admin/residents', label: 'Quản lý Cư dân', icon: 'bi-people-fill me-2' },
@@ -172,6 +178,7 @@ const AdminLayout = () => {
                     <h4 className={styles.logoText}>SENTANA</h4>
                     <small style={{ color: '#00c292', fontSize: '10px' }}>MANAGEMENT SYSTEM</small>
                 </div>
+
                 <div className={`${styles.sidebarMenu} flex-grow-1 overflow-y-auto overflow-x-hidden`} style={{ scrollbarWidth: 'thin' }}>
                     <div className={styles.menuLabel}>Chức năng chính</div>
                     <nav>
@@ -182,7 +189,8 @@ const AdminLayout = () => {
                         ))}
                     </nav>
                 </div>
-                <div className={`${styles.logoutBtn} mt-auto`} onClick={() => setShowLogoutModal(true)} style={{ cursor: isLoggingOut ? 'not-allowed' : 'pointer', opacity: isLoggingOut ? 0.6 : 1, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+
+                <div className={`${styles.logoutBtn} mt-auto`} onClick={handleOpenLogoutModal} style={{ cursor: isLoggingOut ? 'not-allowed' : 'pointer', opacity: isLoggingOut ? 0.6 : 1, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                     <i className="bi bi-box-arrow-left me-3"></i>
                     <span className="fw-bold">{isLoggingOut ? 'Đang thoát...' : 'Đăng xuất'}</span>
                 </div>
@@ -308,14 +316,16 @@ const AdminLayout = () => {
                     <div className="modal-dialog modal-dialog-centered">
                         <div className="modal-content border-0 shadow-lg rounded-4">
                             <div className="modal-header bg-danger bg-opacity-10 border-0 rounded-top-4 p-4">
-                                <h5 className="modal-title fw-bold text-danger d-flex align-items-center gap-2"><i className="bi bi-exclamation-triangle-fill fs-4"></i> Xác nhận đăng xuất</h5>
-                                <button type="button" className="btn-close" onClick={() => setShowLogoutModal(false)} disabled={isLoggingOut}></button>
+                                <h5 className="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+                                    <i className="bi bi-exclamation-triangle-fill fs-4"></i> Xác nhận đăng xuất
+                                </h5>
+                                <button type="button" className="btn-close" onClick={handleCloseLogoutModal} disabled={isLoggingOut}></button>
                             </div>
                             <div className="modal-body p-4 text-center">
                                 <p className="mb-2 text-dark fw-medium fs-5">Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?</p>
                             </div>
                             <div className="modal-footer bg-light border-0 d-flex justify-content-center gap-3 p-4 rounded-bottom-4">
-                                <button type="button" className="btn btn-light border px-4 rounded-pill fw-bold" onClick={() => setShowLogoutModal(false)} disabled={isLoggingOut}>Hủy bỏ</button>
+                                <button type="button" className="btn btn-light border px-4 rounded-pill fw-bold" onClick={handleCloseLogoutModal} disabled={isLoggingOut}>Hủy bỏ</button>
                                 <button type="button" className="btn btn-danger px-5 rounded-pill fw-bold shadow-sm" onClick={handleLogout} disabled={isLoggingOut}>
                                     {isLoggingOut ? <><span className="spinner-border spinner-border-sm me-2"></span> Đang thoát...</> : "Đăng xuất"}
                                 </button>

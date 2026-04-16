@@ -432,12 +432,28 @@ const ContractManagement = () => {
                     additionalCost: Number(additionalCost || 0),
                     terminationReason: terminationReason
                 });
-            const result = res?.data?.data || res?.data?.Data || res?.data;
-            console.log("🔍 Termination API Response:", result);
+            
+            console.log("🔍 Full Response:", res);
+            console.log("🔍 Response Status:", res.status);
+            console.log("🔍 Response Data:", res.data);
+            
+            // Kiểm tra statusCode trong response data
+            const responseData = res?.data;
+            if (responseData?.statusCode && responseData.statusCode !== 200) {
+                // Backend trả về lỗi nhưng HTTP status vẫn là 200
+                throw new Error(responseData.message || "Thanh lý thất bại");
+            }
+            
+            const result = responseData?.data || responseData?.Data || responseData;
+            console.log("🔍 Termination Result:", result);
+            
             // Remove isPreview flag to show success message
             setTerminateResult({ ...result, isPreview: false });
-            toast.success("Đã chốt thanh lý!"); fetchData();
+            toast.success("Đã chốt thanh lý!"); 
+            fetchData();
         } catch (error) { 
+            console.error("❌ Termination Error:", error);
+            console.error("❌ Error Response:", error.response);
             const backendMessage = parseBackendError(error);
             toast.error("Thanh lý thất bại: " + backendMessage); 
         } 
