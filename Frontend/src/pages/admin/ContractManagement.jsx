@@ -368,6 +368,12 @@ const ContractManagement = () => {
             }
         }
 
+        // Debug logging for update mode
+        if (isEditMode) {
+            console.log('[DEBUG] Updating contract with AdditionalResidents:', formData.additionalResidents);
+            console.log('[DEBUG] AdditionalResidents AccountIds:', formData.additionalResidents?.map(r => r.accountId));
+        }
+
         setIsSubmitting(true);
         const payload = new FormData();
         payload.append("ApartmentId", formData.apartmentId); 
