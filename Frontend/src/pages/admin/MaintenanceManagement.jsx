@@ -3,6 +3,7 @@ import api from '../../utils/axiosConfig';
 import Pagination from '../../components/common/Pagination';
 import { notify } from '../../utils/notificationAlert';
 import { useSignalR } from '../../hooks/useSignalR';
+import { confirmAction } from '../../utils/notificationAlert';
 
 const MaintenanceManagement = () => {
     const [requests, setRequests] = useState([]);
@@ -22,23 +23,20 @@ const MaintenanceManagement = () => {
     useEffect(() => {
         if (!connection) return;
 
-        const handleNewReq = (newReq) => { notify.info(`🚨 Yêu cầu mới: P.${newReq.apartmentCode || newReq.apartmentName}`); setReloadTrigger(prev => prev + 1); };
-        const handleProcessing = () => { notify.info(`🛠️ Kỹ thuật viên đã tiếp nhận và đang xử lý`); setReloadTrigger(prev => prev + 1); };
-        const handleFixedReq = () => { notify.success(`✅ Thợ báo cáo đã xử lý xong, chờ cư dân nghiệm thu`); setReloadTrigger(prev => prev + 1); };
-        const handleClosedReq = () => { notify.success(`🎉 Cư dân đã nghiệm thu hoàn tất sự cố`); setReloadTrigger(prev => prev + 1); };
+        const refreshData = () => setReloadTrigger(prev => prev + 1);
 
-
-        connection.on("ReceiveNewMaintenanceRequest", handleNewReq);
-        connection.on("TaskProcessing", handleProcessing);
-        connection.on("ReceiveFixedTask", handleFixedReq);
-        connection.on("TaskClosed", handleClosedReq);
-
+        connection.on("ReceiveNewMaintenanceRequest", refreshData);
+        connection.on("TaskProcessing", refreshData);
+        connection.on("ReceiveFixedTask", refreshData);
+        connection.on("TaskClosed", refreshData);
+        connection.on("TaskRejectedByManager", refreshData);
 
         return () => {
-            connection.off("ReceiveNewMaintenanceRequest", handleNewReq);
-            connection.off("TaskProcessing", handleProcessing);
-            connection.off("ReceiveFixedTask", handleFixedReq);
-            connection.off("TaskClosed", handleClosedReq);
+            connection.off("ReceiveNewMaintenanceRequest", refreshData);
+            connection.off("TaskProcessing", refreshData);
+            connection.off("ReceiveFixedTask", refreshData);
+            connection.off("TaskClosed", refreshData);
+            connection.off("TaskRejectedByManager", refreshData);
         };
     }, [connection]);
 
@@ -46,6 +44,7 @@ const MaintenanceManagement = () => {
         fetchRequests(currentPage);
     }, [currentPage, reloadTrigger]);
 
+    // Lấy danh sách phiếu bảo trì
     const fetchRequests = async (page) => {
         try {
             setLoading(true);
@@ -55,14 +54,12 @@ const MaintenanceManagement = () => {
 
             const data = res.data?.data || res.data;
             const itemsList = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+
             setRequests(itemsList);
+
             const totalCount = Number(data?.totalCount || 0);
             const calcPages = Math.ceil(totalCount / pageSize);
-            if (Number.isInteger(calcPages) && calcPages >= 1) {
-                setTotalPages(calcPages);
-            } else {
-                setTotalPages(1);
-            }
+            setTotalPages(Number.isInteger(calcPages) && calcPages >= 1 ? calcPages : 1);
 
         } catch (error) {
             console.error("Lỗi fetch API:", error);
@@ -73,6 +70,7 @@ const MaintenanceManagement = () => {
         }
     };
 
+    // Lấy danh sách thợ rảnh
     const fetchAvailableTechnicians = async () => {
         try {
             const res = await api.get('/Technicians/available');
@@ -89,6 +87,7 @@ const MaintenanceManagement = () => {
         fetchAvailableTechnicians();
     };
 
+    // Giao việc cho thợ
     const submitAssignTechnician = async (e) => {
         e.preventDefault();
         const techId = parseInt(assignForm.technicianId);
@@ -112,30 +111,42 @@ const MaintenanceManagement = () => {
         }
     };
 
-    // THAY THẾ HÀM CŨ BẰNG HÀM NÀY
+    const handleAdminAccept = async (requestId) => {
+        const { isConfirmed } = await confirmAction.fire({
+            title: 'Xác nhận nghiệm thu hộ?',
+            text: "Hệ thống sẽ đóng phiếu và thông báo cho Cư dân & Thợ. Trạng thái sẽ được ghi chú là do Admin nghiệm thu.",
+            icon: 'question',
+            confirmButtonText: 'Đồng ý',
+            cancelButtonText: 'Hủy'
+        });
+
+        if (isConfirmed) {
+            try {
+                await api.put(`/Maintenance/${requestId}/close`);
+                notify.success("Đã nghiệm thu và đóng phiếu bảo trì.");
+
+                document.getElementById('closeDetailModal')?.click();
+                fetchRequests(currentPage); // Tải lại bảng của Admin
+            } catch (error) {
+                notify.error(error.response?.data?.message || "Lỗi khi nghiệm thu.");
+            }
+        }
+    };
+
     const renderStatusBadge = (status, techName) => {
         const s = String(status).toLowerCase();
-
-        // MÃ 1: PENDING (BE dùng chung cho chưa giao và đã giao)
         if (s === '1' || s === 'pending') {
-            if (techName) {
-                return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3"><i className="bi bi-person-check me-1"></i> Đã phân công</span>;
-            }
+            if (techName) return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 rounded-pill px-3"><i className="bi bi-person-check me-1"></i> Đã phân công</span>;
             return <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3"><i className="bi bi-hourglass-split me-1"></i> Chờ phân công</span>;
         }
-
-        // MÃ 2: PROCESSING (Thợ đã bấm nhận việc)
         if (s === '2' || s === 'processing' || s === 'inprogress')
             return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3"><i className="bi bi-tools me-1"></i> Đang xử lý</span>;
-
-        // MÃ 3: FIXED (Thợ báo cáo hoàn tất)
         if (s === '3' || s === 'fixed')
             return <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 rounded-pill px-3"><i className="bi bi-card-checklist me-1"></i> Đã sửa xong, chờ nghiệm thu</span>;
-
-        // MÃ 4: CLOSED (Cư dân nghiệm thu)
         if (s === '4' || s === 'closed' || s === 'resolved')
             return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3"><i className="bi bi-check2-all me-1"></i> Hoàn thành</span>;
-
+        if (s === '5' || s === '6' || s === 'reopened' || s === 'rejected')
+            return <span className="badge bg-danger text-white rounded-pill px-3 shadow-sm"><i className="bi bi-arrow-repeat me-1"></i> Yêu cầu làm lại</span>;
         return <span className="badge bg-secondary rounded-pill px-3">{status}</span>;
     };
 
@@ -221,16 +232,13 @@ const MaintenanceManagement = () => {
                 </div>
             </div>
 
-            {/* CHỐT CHẶN BẢO VỆ GIAO DIỆN KHỎI RANGE_ERROR */}
             {!loading && requests.length > 0 && totalPages > 1 && !isNaN(totalPages) && (
                 <div className="d-flex justify-content-center">
                     <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                 </div>
             )}
 
-            {/* ======================================================= */}
-            {/* === MODAL: CHI TIẾT SỰ CỐ (ĐỒNG BỘ RESIDENT STYLE) === */}
-            {/* ======================================================= */}
+            {/* MODAL: CHI TIẾT SỰ CỐ */}
             <div className="modal fade" id="maintenanceDetailModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
                     <div className="modal-content border-0 shadow-lg rounded-4 bg-light">
@@ -245,7 +253,6 @@ const MaintenanceManagement = () => {
                         <div className="modal-body p-4">
                             {selectedRequest && (
                                 <div className="row g-4">
-                                    {/* CỘT TRÁI: THÔNG TIN CHI TIẾT */}
                                     <div className="col-lg-7">
                                         <div className="card border-0 shadow-sm rounded-4 h-100">
                                             <div className="card-body p-4">
@@ -294,7 +301,6 @@ const MaintenanceManagement = () => {
                                         </div>
                                     </div>
 
-                                    {/* CỘT PHẢI: HÌNH ẢNH VÀ QUẢN LÝ */}
                                     <div className="col-lg-5">
                                         <div className="card border-0 shadow-sm rounded-4 mb-4">
                                             <div className="card-body p-3">
@@ -336,13 +342,23 @@ const MaintenanceManagement = () => {
                             )}
                         </div>
                         <div className="modal-footer border-top bg-white rounded-bottom-4 px-4 py-3">
-                            <button type="button" className="btn btn-secondary rounded-pill px-4 fw-medium" data-bs-dismiss="modal">Đóng</button>
+                            <button type="button" className="btn btn-secondary rounded-pill px-4 fw-medium" data-bs-dismiss="modal" id="closeDetailModal">Đóng</button>
+                            {/* Nút Nghiệm thu hộ nằm bên trong Modal */}
+                            {selectedRequest && (String(selectedRequest.status).toLowerCase() === '3' || String(selectedRequest.status).toLowerCase() === 'fixed') && (
+                                <button
+                                    type="button"
+                                    className="btn btn-success fw-bold rounded-pill px-4 shadow-sm"
+                                    onClick={() => handleAdminAccept(selectedRequest.requestId)}
+                                >
+                                    <i className="bi bi-check-all me-1"></i> Nghiệm thu hộ Cư dân
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* === MODAL: ASSIGN TECHNICIAN === */}
+            {/* MODAL: ASSIGN TECHNICIAN */}
             <div className="modal fade" id="assignTechnicianModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg rounded-4">

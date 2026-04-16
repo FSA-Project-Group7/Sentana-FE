@@ -1,58 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/axiosConfig';
-import Pagination from '../../components/common/Pagination'; // Dùng Pagination chung
+import Pagination from '../../components/common/Pagination';
 import { notify, confirmAction } from '../../utils/notificationAlert';
 import { useSignalR } from '../../hooks/useSignalR';
 
 const MaintenanceRequest = () => {
-    // --- STATES ---
     const [requests, setRequests] = useState([]);
     const [apartments, setApartments] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // FIX 1: THÊM STATE RELOAD TRIGGER ĐỂ NHẬN TÍN HIỆU SIGNALR
     const [reloadTrigger, setReloadTrigger] = useState(0);
 
-    // Form State
     const [formData, setFormData] = useState({ apartmentId: '', categoryId: '', title: '', description: '', file: null });
-
-    // Modals State
     const [rejectReason, setRejectReason] = useState('');
     const [selectedRejectId, setSelectedRejectId] = useState(null);
     const [detailTask, setDetailTask] = useState(null);
 
-    // Phân trang Client-side
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 3;
 
     const connection = useSignalR();
 
-    // ==========================================
-    // 1. SIGNALR: LẮNG NGHE THÔNG BÁO TỪ ADMIN & THỢ
-    // ==========================================
+    // 1. Lắng nghe SignalR - Chỉ kích hoạt reload, không gọi notify để tránh double popup
     useEffect(() => {
         if (!connection) return;
 
-        const handleAssigned = () => { notify.info(`👨‍🔧 Yêu cầu của bạn đã được phân công cho kỹ thuật viên!`); setReloadTrigger(prev => prev + 1); };
-        const handleProcessing = () => { notify.info(`🛠️ Kỹ thuật viên đã tiếp nhận và đang tiến hành xử lý!`); setReloadTrigger(prev => prev + 1); };
-        const handleFixedReq = () => { notify.success(`✅ Sự cố đã được thợ xử lý xong! Vui lòng vào kiểm tra và nghiệm thu.`); setReloadTrigger(prev => prev + 1); };
+        const refreshData = () => setReloadTrigger(prev => prev + 1);
 
-        connection.on("ReceiveAssignedTask", handleAssigned);
-        connection.on("TaskProcessing", handleProcessing);
-        connection.on("ReceiveFixedTask", handleFixedReq);
+        connection.on("ReceiveAssignedTask", refreshData);
+        connection.on("TaskProcessing", refreshData);
+        connection.on("ReceiveFixedTask", refreshData);
+        connection.on("TaskClosed", refreshData);
 
         return () => {
-            connection.off("ReceiveAssignedTask", handleAssigned);
-            connection.off("TaskProcessing", handleProcessing);
-            connection.off("ReceiveFixedTask", handleFixedReq);
+            connection.off("ReceiveAssignedTask", refreshData);
+            connection.off("TaskProcessing", refreshData);
+            connection.off("ReceiveFixedTask", refreshData);
+            connection.off("TaskClosed", refreshData);
         };
     }, [connection]);
 
-    // ==========================================
-    // 2. FETCH DATA
-    // ==========================================
+    // 2. Fetch Data
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -60,9 +49,8 @@ const MaintenanceRequest = () => {
                 api.get('/Maintenance/my-requests'),
                 api.get('/Maintenance/my-apartments')
             ]);
-            setRequests(reqRes.data?.data || reqRes.data?.Data || []);
 
-            // Chỉ reset trang về 1 nếu là lần đầu load (không phải do SignalR gọi)
+            setRequests(reqRes.data?.data || reqRes.data?.Data || []);
             if (reloadTrigger === 0) setCurrentPage(1);
 
             setApartments(aptRes.data?.data || aptRes.data?.Data || []);
@@ -72,26 +60,24 @@ const MaintenanceRequest = () => {
                 { categoryId: 3, categoryName: 'Hư hỏng Nội thất' },
                 { categoryId: 4, categoryName: 'Sự cố Khác' }
             ]);
-        } catch (error) { notify.error("Không thể tải dữ liệu."); }
-        setLoading(false);
+        } catch (error) {
+            notify.error("Không thể tải dữ liệu.");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    // FIX 2: BẮT BUỘC FETCH LẠI DATA KHI RELOAD TRIGGER THAY ĐỔI
     useEffect(() => {
         fetchData();
     }, [reloadTrigger]);
 
-    // ==========================================
-    // LOGIC PHÂN TRANG
-    // ==========================================
+    // Tính toán phân trang
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentRequests = requests.slice(indexOfFirstItem, indexOfLastItem);
     const totalPages = Math.ceil(requests.length / itemsPerPage);
 
-    // ==========================================
-    // 3. HANDLERS
-    // ==========================================
+    // 3. Handlers
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file && file.size > 5 * 1024 * 1024) {
@@ -104,7 +90,9 @@ const MaintenanceRequest = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.apartmentId || !formData.categoryId || !formData.title.trim()) return notify.warning("Vui lòng điền đủ thông tin!");
+        if (!formData.apartmentId || !formData.categoryId || !formData.title.trim()) {
+            return notify.warning("Vui lòng điền đủ thông tin!");
+        }
 
         setIsSubmitting(true);
         const payload = new FormData();
@@ -120,25 +108,31 @@ const MaintenanceRequest = () => {
             setFormData({ apartmentId: '', categoryId: '', title: '', description: '', file: null });
             if (document.getElementById('photoUpload')) document.getElementById('photoUpload').value = '';
 
-            // Kích hoạt reload để update danh sách ngay lập tức
             setReloadTrigger(prev => prev + 1);
-        } catch (error) { notify.error("Lỗi gửi yêu cầu."); }
-        setIsSubmitting(false);
+        } catch (error) {
+            notify.error("Lỗi gửi yêu cầu.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleAccept = async (taskId) => {
         const { isConfirmed } = await confirmAction.fire({
             title: 'Nghiệm thu sự cố?',
             text: "Xác nhận thợ đã hoàn thành tốt công việc.",
-            confirmButtonText: 'Đồng ý & Đóng thẻ'
+            confirmButtonText: 'Đồng ý & Đóng thẻ',
+            cancelButtonText: 'Hủy'
         });
+
         if (isConfirmed) {
             try {
                 await api.put(`/Maintenance/${taskId}/resident-accept`);
-                notify.success("Đã đóng yêu cầu.");
+                notify.success("Đã đóng yêu cầu thành công.");
                 document.getElementById('closeDetailModal')?.click();
                 setReloadTrigger(prev => prev + 1);
-            } catch (error) { notify.error("Lỗi xử lý."); }
+            } catch (error) {
+                notify.error("Lỗi xử lý nghiệm thu.");
+            }
         }
     };
 
@@ -147,33 +141,44 @@ const MaintenanceRequest = () => {
         try {
             await api.put(`/Maintenance/${selectedRejectId}/resident-reject`, { rejectReason });
             notify.success("Đã yêu cầu thợ làm lại.");
-            document.getElementById('closeRejectModal').click();
-            setRejectReason('');
+
+            document.getElementById('closeRejectModal')?.click();
             document.getElementById('closeDetailModal')?.click();
+            setRejectReason('');
             setReloadTrigger(prev => prev + 1);
-        } catch (error) { notify.error("Lỗi xử lý."); }
+        } catch (error) {
+            notify.error("Lỗi xử lý yêu cầu làm lại.");
+        }
     };
 
-    // FIX 3: ĐỒNG BỘ TRẠNG THÁI VỚI ADMIN & KỸ THUẬT VIÊN
-    const renderStatusBadge = (status) => {
+    // Chuẩn hóa Enum Status thành số
+    const getStatusNumber = (status) => {
         const s = String(status).toLowerCase();
-        if (s === '1' || s === 'pending') return <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1 rounded-pill">Chờ phân công</span>;
-        if (s === '2' || s === 'accepted') return <span className="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-25 px-2 py-1 rounded-pill">Đã phân công</span>;
-        if (s === '3' || s === 'processing' || s === 'inprogress') return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1 rounded-pill">Đang xử lý</span>;
-        if (s === '4' || s === 'fixed') return <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 px-2 py-1 rounded-pill">Chờ nghiệm thu</span>;
-        if (s === '5' || s === 'closed' || s === 'resolved') return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill">Hoàn thành</span>;
-        if (s === '6' || s === 'reopened') return <span className="badge bg-danger text-white px-2 py-1 rounded-pill">Yêu cầu làm lại</span>;
-        return <span className="badge bg-secondary rounded-pill">Trạng thái: {status}</span>;
+        if (s === '1' || s === 'pending') return 1;
+        if (s === '2' || s === 'processing' || s === 'accepted') return 2;
+        if (s === '3' || s === 'fixed' || s === 'inprogress') return 3;
+        if (s === '4' || s === 'closed' || s === 'resolved') return 4;
+        if (s === '5' || s === 'reopened') return 5;
+        return 99;
+    };
+
+    const renderStatusBadge = (status) => {
+        const s = getStatusNumber(status);
+        if (s === 1) return <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1 rounded-pill">Chờ xử lý</span>;
+        if (s === 2) return <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1 rounded-pill">Đang xử lý</span>;
+        if (s === 3) return <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 px-2 py-1 rounded-pill">Chờ nghiệm thu</span>;
+        if (s === 4) return <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill">Hoàn thành</span>;
+        if (s === 5) return <span className="badge bg-warning text-dark px-2 py-1 rounded-pill">Đang làm lại</span>;
+        return <span className="badge bg-secondary rounded-pill">Khác</span>;
     };
 
     const renderTimeline = (status) => {
-        const s = String(status).toLowerCase();
-        const isCanceled = s === 'canceled';
+        const s = getStatusNumber(status);
+        const isCanceled = String(status).toLowerCase() === 'canceled';
 
-        // Tính toán các mốc dựa trên trạng thái đồng bộ
-        const step2Active = ['2', '3', '4', '5', '6', 'accepted', 'processing', 'fixed', 'closed', 'resolved', 'reopened'].includes(s);
-        const step3Active = ['4', '5', 'fixed', 'closed', 'resolved'].includes(s);
-        const step4Active = ['5', 'closed', 'resolved'].includes(s);
+        const step2Active = s >= 2 && s !== 99;
+        const step3Active = s >= 3 && s !== 99;
+        const step4Active = s === 4;
 
         if (isCanceled) {
             return (
@@ -195,7 +200,9 @@ const MaintenanceRequest = () => {
             <div className="ps-2 timeline-wrapper">
                 <div className={`border-start border-2 ps-4 pb-4 position-relative ${step2Active ? 'border-success' : ''}`}>
                     <span className="position-absolute top-0 start-0 translate-middle badge rounded-circle bg-success p-1"><i className="bi bi-check text-white"></i></span>
-                    <div className="fw-bold small text-dark">Gửi yêu cầu <span className="text-muted fw-normal ms-1">({new Date(detailTask.createDay || detailTask.CreateDay).toLocaleString('vi-VN')})</span></div>
+                    <div className="fw-bold small text-dark">Gửi yêu cầu
+                        {detailTask && <span className="text-muted fw-normal ms-1">({new Date(detailTask.createDay || detailTask.CreateDay || detailTask.createdAt).toLocaleString('vi-VN')})</span>}
+                    </div>
                 </div>
 
                 <div className={`border-start border-2 ps-4 pb-4 position-relative ${step3Active ? 'border-success' : ''}`}>
@@ -204,7 +211,7 @@ const MaintenanceRequest = () => {
                     </span>
                     <div className={`fw-bold small ${step2Active ? 'text-dark' : 'text-muted'}`}>
                         Tiếp nhận & Sửa chữa
-                        {(s === '6' || s === 'reopened') && <span className="text-danger ms-2">(Đang làm lại)</span>}
+                        {s === 5 && <span className="text-warning ms-2">(Đang làm lại)</span>}
                     </div>
                 </div>
 
@@ -213,7 +220,7 @@ const MaintenanceRequest = () => {
                         {step3Active ? <i className="bi bi-check text-white"></i> : <i className="bi bi-circle text-white"></i>}
                     </span>
                     <div className={`fw-bold small ${step3Active ? 'text-dark' : 'text-muted'}`}>Thợ báo cáo hoàn tất</div>
-                    {detailTask.fixDay && step3Active && <small className="text-muted">{new Date(detailTask.fixDay).toLocaleString('vi-VN')}</small>}
+                    {detailTask?.fixDay && step3Active && <small className="text-muted">{new Date(detailTask.fixDay).toLocaleString('vi-VN')}</small>}
                 </div>
 
                 <div className="ps-4 position-relative">
@@ -237,7 +244,7 @@ const MaintenanceRequest = () => {
             </div>
 
             <div className="row g-4 align-items-stretch">
-                {/* FORM TẠO MỚI (CỘT TRÁI) */}
+                {/* FORM TẠO MỚI */}
                 <div className="col-xl-4 col-lg-5">
                     <div className="card border-0 shadow-lg rounded-4 bg-white h-100 flex-column d-flex overflow-hidden">
                         <div className="card-header bg-transparent border-0 pt-4 px-4 pb-2">
@@ -268,7 +275,7 @@ const MaintenanceRequest = () => {
                                     <textarea className="form-control bg-light border-0 rounded-3" rows="3" placeholder="Mô tả hiện trạng..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} required></textarea>
                                 </div>
                                 <div className="mb-4">
-                                    <label className="form-label fw-bold small text-muted">Hình ảnh đính kèm</label>
+                                    <label className="form-label fw-bold small text-muted">Hình ảnh đính kèm (Tùy chọn)</label>
                                     <input id="photoUpload" type="file" className="form-control bg-light border-0 rounded-3 p-2 modern-file-input" accept="image/*" onChange={handleFileChange} />
                                 </div>
                                 <button type="submit" className="btn btn-success w-100 fw-bold rounded-pill py-2 shadow-sm mt-auto" disabled={isSubmitting}>
@@ -280,12 +287,12 @@ const MaintenanceRequest = () => {
                     </div>
                 </div>
 
-                {/* LỊCH SỬ YÊU CẦU (CỘT PHẢI) */}
+                {/* LỊCH SỬ YÊU CẦU */}
                 <div className="col-xl-8 col-lg-7 d-flex">
                     <div className="card border-0 shadow-lg rounded-4 bg-white flex-grow-1 d-flex flex-column overflow-hidden">
                         <div className="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
                             <h5 className="fw-bold mb-0 text-dark">Lịch sử của bạn</h5>
-                            <button className="btn btn-sm btn-light border rounded-pill px-3" onClick={() => setReloadTrigger(prev => prev + 1)}><i className="bi bi-arrow-clockwise"></i></button>
+                            <button className="btn btn-sm btn-light border rounded-pill px-3" onClick={() => setReloadTrigger(prev => prev + 1)}><i className="bi bi-arrow-clockwise"></i> Làm mới</button>
                         </div>
                         <div className="card-body p-4 d-flex flex-column pt-2">
                             {loading ? (
@@ -308,7 +315,7 @@ const MaintenanceRequest = () => {
                                                             <span className="badge bg-light text-dark border me-2 rounded-pill">P.{req.apartmentCode || req.ApartmentCode}</span>
                                                             {renderStatusBadge(req.status || req.Status)}
                                                             <h6 className="fw-bold text-dark mt-2 mb-1">{req.title || req.Title}</h6>
-                                                            <small className="text-muted"><i className="bi bi-calendar3 me-1"></i>{new Date(req.createDay || req.CreateDay).toLocaleDateString('vi-VN')}</small>
+                                                            <small className="text-muted"><i className="bi bi-calendar3 me-1"></i>{new Date(req.createDay || req.CreateDay || req.createdAt).toLocaleDateString('vi-VN')}</small>
                                                         </div>
                                                         <button className="btn btn-link text-success fw-bold text-decoration-none p-0 flex-shrink-0" onClick={() => setDetailTask(req)} data-bs-toggle="modal" data-bs-target="#detailModal">
                                                             Chi tiết <i className="bi bi-chevron-right"></i>
@@ -319,14 +326,9 @@ const MaintenanceRequest = () => {
                                         ))}
                                     </div>
 
-                                    {/* FIX 4: SỬ DỤNG COMPONENT PAGINATION CHUNG */}
                                     {totalPages > 1 && (
                                         <div className="d-flex justify-content-center mt-auto">
-                                            <Pagination
-                                                currentPage={currentPage}
-                                                totalPages={totalPages}
-                                                onPageChange={setCurrentPage}
-                                            />
+                                            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                                         </div>
                                     )}
                                 </div>
@@ -365,8 +367,8 @@ const MaintenanceRequest = () => {
 
                                                 {(detailTask.resolutionNote || detailTask.ResolutionNote) && (
                                                     <div className="mt-4 pt-3 border-top border-success border-opacity-25">
-                                                        <h6 className="fw-bold text-success small text-uppercase mb-2">Báo cáo từ Thợ</h6>
-                                                        <p className="small mb-3 text-dark">{detailTask.resolutionNote || detailTask.ResolutionNote}</p>
+                                                        <h6 className="fw-bold text-success small text-uppercase mb-2">Báo cáo từ Kỹ thuật viên</h6>
+                                                        <p className="small mb-3 text-dark" style={{ whiteSpace: 'pre-wrap' }}>{detailTask.resolutionNote || detailTask.ResolutionNote}</p>
 
                                                         {(detailTask.fixedImageUrl || detailTask.FixedImageUrl) && (
                                                             <img src={detailTask.fixedImageUrl || detailTask.FixedImageUrl} alt="Đã sửa" className="img-fluid rounded-3 w-100 border shadow-sm" style={{ objectFit: 'contain', maxHeight: '250px' }} />
@@ -390,17 +392,23 @@ const MaintenanceRequest = () => {
                                 </div>
                             )}
                         </div>
-                        {detailTask && (String(detailTask.status || detailTask.Status).toLowerCase() === '4' || String(detailTask.status || detailTask.Status).toLowerCase() === 'fixed') && (
+
+                        {/* Khu vực nút Nghiệm thu (Chỉ hiện khi trạng thái = 3 / Fixed) */}
+                        {detailTask && getStatusNumber(detailTask.status || detailTask.Status) === 3 && (
                             <div className="modal-footer bg-white border-top px-4 py-3 d-flex justify-content-end gap-2">
-                                <button className="btn btn-outline-danger rounded-pill fw-bold px-4" data-bs-toggle="modal" data-bs-target="#rejectModalResident" onClick={() => setSelectedRejectId(detailTask.requestId || detailTask.RequestId)}>Chưa đạt</button>
-                                <button className="btn btn-success rounded-pill fw-bold px-4" onClick={() => handleAccept(detailTask.requestId || detailTask.RequestId)}>Xác nhận & Đóng thẻ</button>
+                                <button className="btn btn-outline-danger rounded-pill fw-bold px-4" data-bs-toggle="modal" data-bs-target="#rejectModalResident" onClick={() => setSelectedRejectId(detailTask.requestId || detailTask.RequestId)}>
+                                    Chưa đạt (Làm lại)
+                                </button>
+                                <button className="btn btn-success rounded-pill fw-bold px-4 shadow-sm" onClick={() => handleAccept(detailTask.requestId || detailTask.RequestId)}>
+                                    <i className="bi bi-check-all me-1"></i> Xác nhận & Đóng thẻ
+                                </button>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* MODAL TỪ CHỐI */}
+            {/* MODAL TỪ CHỐI / YÊU CẦU LÀM LẠI */}
             <div className="modal fade" id="rejectModalResident" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
@@ -414,8 +422,8 @@ const MaintenanceRequest = () => {
                                 <textarea className="form-control bg-light border-0 rounded-3" rows="4" placeholder="VD: Nước vẫn rỉ, bóng đèn vẫn chập chờn..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} required></textarea>
                             </div>
                             <div className="modal-footer bg-light border-0 px-4 py-3">
-                                <button type="button" className="btn btn-white border rounded-pill px-4" data-bs-dismiss="modal" onClick={() => document.getElementById('closeDetailModal')?.click()}>Hủy</button>
-                                <button type="submit" className="btn btn-danger rounded-pill px-4 fw-bold">Gửi yêu cầu</button>
+                                <button type="button" className="btn btn-white border rounded-pill px-4" data-bs-dismiss="modal">Hủy bỏ</button>
+                                <button type="submit" className="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">Gửi yêu cầu</button>
                             </div>
                         </form>
                     </div>
