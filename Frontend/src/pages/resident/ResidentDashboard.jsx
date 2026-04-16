@@ -38,6 +38,15 @@ const ResidentDashboard = () => {
             setInvoices(Array.isArray(dataList) ? dataList : []);
         } catch (error) {
             console.error("Lỗi khi tải hóa đơn:", error);
+            if (error.response?.status === 401) {
+                notify.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+                localStorage.clear();
+                navigate('/');
+            } else if (error.response?.status === 404) {
+                setInvoices([]); // Không có hóa đơn
+            } else {
+                notify.error(error.response?.data?.message || "Không thể tải thông tin hóa đơn.");
+            }
         }
     };
 
@@ -56,8 +65,18 @@ const ResidentDashboard = () => {
                 const invData = invoiceRes.data?.data || invoiceRes.data?.Data || [];
                 setInvoices(Array.isArray(invData) ? invData : []);
             } catch (error) {
-                if (error.response?.status === 404) setInvoices([]); 
-                else notify.error("Không thể tải thông tin hóa đơn.");
+                console.error("Lỗi khi tải hóa đơn:", error);
+                if (error.response?.status === 401) {
+                    notify.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+                    localStorage.clear();
+                    navigate('/');
+                    return;
+                } else if (error.response?.status === 404) {
+                    setInvoices([]); // Không có hóa đơn
+                } else {
+                    notify.error(error.response?.data?.message || "Không thể tải thông tin hóa đơn.");
+                    setInvoices([]);
+                }
             }
 
             try {
@@ -73,6 +92,19 @@ const ResidentDashboard = () => {
                 }
             } catch (error) {
                 console.error("Lỗi khi tải điện nước:", error);
+                if (error.response?.status === 401) {
+                    notify.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+                    localStorage.clear();
+                    navigate('/');
+                    return;
+                } else if (error.response?.status === 400) {
+                    // Lỗi 400 có thể do không có hợp đồng hoặc dữ liệu
+                    console.log("Không có dữ liệu điện nước hoặc chưa có hợp đồng");
+                    setUtilities([]);
+                } else {
+                    notify.error(error.response?.data?.message || "Không thể tải thông tin điện nước.");
+                    setUtilities([]);
+                }
             }
 
             setLoading(false);
@@ -102,12 +134,49 @@ const ResidentDashboard = () => {
         setShowDetailModal(true);
         setLoadingDetail(true);
         document.body.style.overflow = 'hidden'; 
+        
         try {
-            const res = await api.get(`/Invoice/my-invoices?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
-            const dataList = res.data?.data || res.data;
-            if (dataList && dataList.length > 0) setDetailData(dataList[0]);
+            // Kiểm tra xem có billingMonth và billingYear không
+            if (!invoice.billingMonth || !invoice.billingYear) {
+                // Nếu không có, tạo detail data từ thông tin hiện có
+                setDetailData({
+                    apartmentCode: invoice.apartmentCode,
+                    billingPeriod: invoice.billingPeriod || 'Hóa đơn',
+                    totalMoney: invoice.totalMoney,
+                    details: [
+                        { feeName: 'Tổng tiền hóa đơn', amount: invoice.totalMoney }
+                    ]
+                });
+            } else {
+                // Gọi API để lấy chi tiết
+                const res = await api.get(`/Invoice/my-invoices?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
+                const dataList = res.data?.data || res.data;
+                if (dataList && dataList.length > 0) {
+                    setDetailData(dataList[0]);
+                } else {
+                    // Fallback nếu không tìm thấy dữ liệu từ API
+                    setDetailData({
+                        apartmentCode: invoice.apartmentCode,
+                        billingPeriod: invoice.billingPeriod || `Tháng ${invoice.billingMonth}/${invoice.billingYear}`,
+                        totalMoney: invoice.totalMoney,
+                        details: [
+                            { feeName: 'Tổng tiền hóa đơn', amount: invoice.totalMoney }
+                        ]
+                    });
+                }
+            }
         } catch (error) {
-            notify.error("Không thể tải chi tiết hóa đơn.");
+            console.error("Lỗi khi tải chi tiết hóa đơn:", error);
+            // Tạo detail data từ thông tin cơ bản
+            setDetailData({
+                apartmentCode: invoice.apartmentCode,
+                billingPeriod: invoice.billingPeriod || (invoice.billingMonth && invoice.billingYear ? `Tháng ${invoice.billingMonth}/${invoice.billingYear}` : 'Hóa đơn'),
+                totalMoney: invoice.totalMoney,
+                details: [
+                    { feeName: 'Tổng tiền hóa đơn', amount: invoice.totalMoney }
+                ]
+            });
+            notify.warning("Hiển thị thông tin cơ bản do không thể tải chi tiết đầy đủ.");
         } finally {
             setLoadingDetail(false);
         }
@@ -255,7 +324,9 @@ const ResidentDashboard = () => {
                                         <div className="card-body p-4 d-flex flex-column">
                                             <div className="d-flex justify-content-between align-items-start mb-4">
                                                 <div>
-                                                    <h5 className="fw-bold text-dark mb-1">{inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}</h5>
+                                                    <h5 className="fw-bold text-dark mb-1">
+                                                        {inv.billingPeriod || 'Hóa đơn'}
+                                                    </h5>
                                                     
                                                     {/* ĐÃ CẬP NHẬT: Hiện tên phòng ngay cạnh Mã HĐ */}
                                                     <small className="text-muted">
@@ -505,7 +576,19 @@ const ResidentDashboard = () => {
                                             <div className="d-flex justify-content-between align-items-center pt-1">
                                                 <span className="text-muted small">Nội dung chuyển khoản:</span>
                                                 {/* IN RA NỘI DUNG TỰ ĐỘNG THEO PHÒNG VÀ THÁNG */}
-                                                <strong className="text-dark">Thanh toan P.{selectedInvoice?.apartmentCode || 'N/A'} Thang {selectedInvoice?.billingMonth}</strong>
+                                                <strong className="text-dark">
+                                                    Thanh toan P.{selectedInvoice?.apartmentCode || 'N/A'} {
+                                                        selectedInvoice?.billingMonth && selectedInvoice?.billingYear 
+                                                            ? `Thang ${selectedInvoice.billingMonth}/${selectedInvoice.billingYear}`
+                                                            : (selectedInvoice?.createdAt ? 
+                                                                (() => {
+                                                                    const parts = selectedInvoice.createdAt.split(' ')[0].split('/');
+                                                                    return parts.length === 3 ? `Thang ${parts[1]}/${parts[2]}` : '';
+                                                                })()
+                                                                : ''
+                                                            )
+                                                    }
+                                                </strong>
                                             </div>
                                         </div>
                                         
@@ -541,7 +624,9 @@ const ResidentDashboard = () => {
                     <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>
                         <div className="modal-content shadow-lg border-0">
                             <div className="modal-header bg-dark text-white border-0 py-2">
-                                <h6 className="modal-title small fw-bold">Minh chứng: P.{selectedInvoice.apartmentCode || 'N/A'} - Tháng {selectedInvoice.billingMonth}</h6>
+                                <h6 className="modal-title small fw-bold">
+                                    Minh chứng: P.{selectedInvoice.apartmentCode || 'N/A'} - {selectedInvoice.billingPeriod || 'Hóa đơn'}
+                                </h6>
                                 <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
                             </div>
                             <div className="modal-body p-1 bg-secondary bg-opacity-10 text-center">
