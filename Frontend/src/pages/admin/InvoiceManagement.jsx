@@ -8,6 +8,7 @@ const InvoiceManagement = () => {
     const [apartments, setApartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isExporting, setIsExporting] = useState(false); // Thêm state cho trạng thái xuất Excel
 
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
@@ -16,11 +17,10 @@ const InvoiceManagement = () => {
     const [filters, setFilters] = useState({ month: '', year: '', status: '', category: '' });
     const [pagination, setPagination] = useState({ pageNumber: 1, pageSize: 10, totalCount: 0 });
 
-    const [activeModal, setActiveModal] = useState(null); 
+    const [activeModal, setActiveModal] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [detailData, setDetailData] = useState(null);
 
-    // ĐÃ BỔ SUNG: State lưu newStatus và statusNote cho chức năng Đổi trạng thái
     const [formData, setFormData] = useState({
         genMonth: currentMonth, genYear: currentYear, genApartmentId: '',
         additionalFee: 0, note: '',
@@ -40,8 +40,6 @@ const InvoiceManagement = () => {
             if (filters.status !== '') params.Status = parseInt(filters.status);
             if (filters.category !== '') params.Category = parseInt(filters.category);
 
-            console.log('Fetching invoices with params:', params); // Debug log
-
             const res = await api.get('/Invoice/list', { params });
             const data = res.data?.data;
 
@@ -50,7 +48,6 @@ const InvoiceManagement = () => {
                 setPagination(prev => ({ ...prev, pageNumber: data.pageNumber, totalCount: data.totalCount }));
             }
         } catch (error) {
-            console.error('Error fetching invoices:', error.response || error); // Debug log
             notify.error(error.response?.data?.message || "Không thể tải danh sách hóa đơn.");
             setInvoices([]);
         } finally {
@@ -95,14 +92,10 @@ const InvoiceManagement = () => {
         } else if (type === 'edit') {
             setFormData(prev => ({ ...prev, additionalFee: 0, note: '' }));
         } else if (type === 'change_status') {
-            // ĐÃ BỔ SUNG: Reset form đổi trạng thái
             setFormData(prev => ({ ...prev, newStatus: '', statusNote: '' }));
         } else if (type === 'detail') {
             try {
-                // Kiểm tra loại hóa đơn
                 if (invoice.category === 1) {
-                    // Hóa đơn trả thêm - Hiển thị thông tin đơn giản từ invoice
-                    // Không cần gọi API vì không có utilityHistory
                     setDetailData({
                         apartmentCode: invoice.apartmentCode,
                         statusName: invoice.statusName,
@@ -114,7 +107,6 @@ const InvoiceManagement = () => {
                         details: invoice.note ? [{ feeName: 'Ghi chú', amount: invoice.note }] : []
                     });
                 } else {
-                    // Hóa đơn tiền tháng - gọi API theo apartment + month/year
                     const res = await api.get(`/Invoice/apartment/${invoice.apartmentId}?month=${invoice.billingMonth}&year=${invoice.billingYear}`);
                     const dataList = res.data?.data;
                     if (dataList && dataList.length > 0) {
@@ -174,11 +166,8 @@ const InvoiceManagement = () => {
         }
     };
 
-    // ĐÃ BỔ SUNG: Hàm xử lý Đổi Trạng Thái gọi API Backend
     const handleChangeStatus = async (e) => {
         e.preventDefault();
-
-        // Chặn ở Frontend: Bắt buộc nhập Ghi chú nếu chuyển về Unpaid
         if (formData.newStatus === '1' && !formData.statusNote.trim()) {
             return notify.warning("Vui lòng nhập lý do/ghi chú khi chuyển hóa đơn về trạng thái Chưa thanh toán!");
         }
@@ -218,6 +207,43 @@ const InvoiceManagement = () => {
         }
     };
 
+    // ĐÃ THÊM: Hàm xử lý Gọi API và Tải file Excel
+    const handleExportDebtReport = async () => {
+        setIsExporting(true);
+        try {
+            const response = await api.get('/Invoice/export-debt', {
+                responseType: 'blob',
+            });
+
+            // Khởi tạo Blob từ dữ liệu trả về
+            const blob = new Blob([response.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+
+            // Tạo link ảo để trình duyệt tải file
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+
+            // Đặt tên file kèm ngày tháng xuất
+            const date = new Date();
+            const dateString = `${date.getDate()}_${date.getMonth() + 1}_${date.getFullYear()}`;
+            link.setAttribute('download', `Bao_Cao_No_Dong_Sentana_${dateString}.xlsx`);
+
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            notify.success("Đã xuất báo cáo nợ đọng thành công!");
+        } catch (error) {
+            console.error("Lỗi khi xuất file Excel:", error);
+            notify.error("Không thể xuất báo cáo lúc này. Vui lòng thử lại sau.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const getCategoryBadge = (category) => {
         if (category === 1) {
             return <span className="badge bg-warning text-dark">Hóa đơn trả thêm</span>;
@@ -240,9 +266,24 @@ const InvoiceManagement = () => {
                     <h2 className="fw-bold mb-0">Quản lý Hóa Đơn</h2>
                     <div className="text-muted small mt-2">Sinh hóa đơn định kỳ, cộng phụ phí và gửi nhắc nợ</div>
                 </div>
-                <button className="btn btn-primary" onClick={() => openModal('generate')}>
-                    <i className="bi bi-magic me-2"></i> Sinh Hóa Đơn Tự Động
-                </button>
+
+                {/* ĐÃ THÊM: Đặt nút Xuất Excel cạnh nút Sinh Hóa Đơn */}
+                <div className="d-flex gap-2">
+                    <button
+                        className="btn btn-success shadow-sm"
+                        onClick={handleExportDebtReport}
+                        disabled={isExporting}
+                    >
+                        {isExporting ? (
+                            <><span className="spinner-border spinner-border-sm me-2"></span> Đang tải...</>
+                        ) : (
+                            <><i className="bi bi-file-earmark-excel me-2"></i> Xuất Báo Cáo Nợ</>
+                        )}
+                    </button>
+                    <button className="btn btn-primary shadow-sm" onClick={() => openModal('generate')}>
+                        <i className="bi bi-magic me-2"></i> Sinh Hóa Đơn Tự Động
+                    </button>
+                </div>
             </div>
 
             <div className="card shadow-sm border-0 mb-4 bg-light">
@@ -267,7 +308,7 @@ const InvoiceManagement = () => {
                             </select>
                         </div>
                         <div className="col-md-3">
-                        <label className="form-label small fw-bold text-muted mb-1">Trạng thái</label>
+                            <label className="form-label small fw-bold text-muted mb-1">Trạng thái</label>
                             <select className="form-select form-select-sm" name="status" value={filters.status} onChange={handleFilterChange}>
                                 <option value="">Tất cả</option>
                                 <option value="1">Chưa thanh toán (Unpaid)</option>
@@ -314,23 +355,20 @@ const InvoiceManagement = () => {
                                             <tr key={inv.invoiceId}>
                                                 <td className="fw-bold text-primary">{inv.apartmentCode}</td>
                                                 <td className="fw-semibold text-primary">
-                                                    {inv.category === 1 
+                                                    {inv.category === 1
                                                         ? (() => {
-                                                            // Parse createdAt - format có thể là "15/04/2025 14:05"
                                                             const dateStr = inv.createdAt;
                                                             if (!dateStr) return <span className="badge bg-warning text-dark">Thanh lý hợp đồng</span>;
-                                                            
-                                                            // Thử parse format DD/MM/YYYY
+
                                                             const parts = dateStr.split(' ')[0].split('/');
                                                             if (parts.length === 3) {
                                                                 const month = parts[1];
                                                                 const year = parts[2];
                                                                 return <span className="badge bg-warning text-dark">Thanh lý {month}/{year}</span>;
                                                             }
-                                                            
-                                                            // Fallback
+
                                                             return <span className="badge bg-warning text-dark">Thanh lý hợp đồng</span>;
-                                                          })()
+                                                        })()
                                                         : <span className="badge bg-info text-white">{inv.billingPeriod || `Tháng ${inv.billingMonth}/${inv.billingYear}`}</span>
                                                     }
                                                 </td>
@@ -340,7 +378,6 @@ const InvoiceManagement = () => {
                                                 <td>{getStatusBadge(inv.statusName)}</td>
                                                 <td>{getCategoryBadge(inv.category)}</td>
                                                 <td>
-                                                    {/* Nhóm nút thao tác */}
                                                     <div className="d-flex flex-wrap gap-1 justify-content-center">
                                                         <button className="btn btn-sm btn-outline-info" onClick={() => openModal('detail', inv)}>
                                                             <i className="bi bi-eye me-1"></i> Chi tiết
@@ -477,13 +514,13 @@ const InvoiceManagement = () => {
                                     <div className="p-4">
                                         <div className="row mb-4 bg-light p-3 rounded border">
                                             <div className="col-md-6 mb-2 mb-md-0">
-                                                <p className="mb-1 text-muted small">Mã Phòng:</p> 
+                                                <p className="mb-1 text-muted small">Mã Phòng:</p>
                                                 <h6 className="fw-bold mb-0">{detailData.apartmentCode}</h6>
                                             </div>
                                             <div className="col-md-6 mb-2 mb-md-0">
-                                                <p className="mb-1 text-muted small">Kỳ thanh toán:</p> 
+                                                <p className="mb-1 text-muted small">Kỳ thanh toán:</p>
                                                 <h6 className="fw-bold text-primary mb-0">
-                                                    {selectedInvoice.category === 1 
+                                                    {selectedInvoice.category === 1
                                                         ? (() => {
                                                             const dateStr = selectedInvoice.createdAt;
                                                             if (!dateStr) return "Thanh lý hợp đồng";
@@ -492,22 +529,21 @@ const InvoiceManagement = () => {
                                                                 return `Thanh lý ${parts[1]}/${parts[2]}`;
                                                             }
                                                             return "Thanh lý hợp đồng";
-                                                          })()
+                                                        })()
                                                         : (detailData.billingPeriod || `Tháng ${detailData.billingMonth}/${detailData.billingYear}`)
                                                     }
                                                 </h6>
                                             </div>
                                             <div className="col-md-6 mt-md-3">
-                                                <p className="mb-1 text-muted small">Trạng thái:</p> 
+                                                <p className="mb-1 text-muted small">Trạng thái:</p>
                                                 <div className="mb-0">{getStatusBadge(detailData.statusName)}</div>
                                             </div>
                                             <div className="col-md-6 mt-md-3">
-                                                <p className="mb-1 text-muted small">Ngày lập:</p> 
+                                                <p className="mb-1 text-muted small">Ngày lập:</p>
                                                 <h6 className="mb-0">{detailData.dayCreat || detailData.createdAt || "Đang cập nhật"}</h6>
                                             </div>
                                         </div>
 
-                                        {/* Chỉ hiển thị Chỉ số Điện/Nước cho Hóa đơn tiền tháng */}
                                         {selectedInvoice.category === 0 && detailData.utilityHistory && (
                                             <>
                                                 <h6 className="fw-bold text-warning border-bottom pb-2 mb-3 mt-4">
@@ -573,7 +609,6 @@ const InvoiceManagement = () => {
                                                 </thead>
                                                 <tbody>
                                                     {selectedInvoice.category === 1 ? (
-                                                        // Hóa đơn trả thêm - Hiển thị đơn giản
                                                         <>
                                                             <tr className="border-bottom border-light">
                                                                 <td className="text-start ps-4 py-2">Tiền thanh lý hợp đồng</td>
@@ -589,7 +624,6 @@ const InvoiceManagement = () => {
                                                             )}
                                                         </>
                                                     ) : (
-                                                        // Hóa đơn tiền tháng - Hiển thị chi tiết
                                                         detailData.details && detailData.details.map((d, idx) => (
                                                             <tr key={idx} className="border-bottom border-light">
                                                                 <td className="text-start ps-4 py-2">{d.feeName}</td>

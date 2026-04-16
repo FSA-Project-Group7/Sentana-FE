@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../utils/axiosConfig';
 import { notify, confirmDelete, confirmAction } from '../../utils/notificationAlert';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import {
+    PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+    BarChart, Bar, XAxis, YAxis, CartesianGrid,
+    AreaChart, Area
+} from 'recharts';
 
 const AdminDashboard = () => {
     // --- 1. STATE THỐNG KÊ ---
@@ -10,7 +14,9 @@ const AdminDashboard = () => {
         buildings: 0,
         apartments: 0,
         residents: 0,
-        tasks: { pending: 0, processing: 0, fixed: 0, closed: 0 }
+        unpaidInvoices: 0,
+        tasks: { pending: 0, processing: 0, fixed: 0, closed: 0 },
+        revenueData: []
     });
     const [loadingStats, setLoadingStats] = useState(true);
 
@@ -27,33 +33,75 @@ const AdminDashboard = () => {
     const [isHoveringSlider, setIsHoveringSlider] = useState(false);
 
     // ==========================================
-    // 📊 FETCH DATA KHỞI TẠO
+    // 📊 FETCH DATA KHỞI TẠO (ĐÃ NÂNG CẤP THUẬT TOÁN)
     // ==========================================
     const fetchStats = async () => {
         try {
-            const [bldRes, aptRes, resRes, taskRes] = await Promise.all([
+            // Lấy song song các dữ liệu. TỐI ƯU: Đọc trực tiếp totalCount từ API để đếm hóa đơn
+            const [bldRes, aptRes, resRes, taskRes, unpaidRes, paidRes] = await Promise.all([
                 api.get('/Buildings').catch(() => ({ data: [] })),
                 api.get('/Apartments').catch(() => ({ data: [] })),
                 api.get('/Residents/GetAllResidents').catch(() => ({ data: [] })),
-                api.get('/Maintenance/request', { params: { pageSize: 1000 } }).catch(() => ({ data: { items: [] } }))
+                api.get('/Maintenance/request', { params: { PageSize: 1000 } }).catch(() => ({ data: { items: [] } })),
+
+                // Gọi API lấy trực tiếp SỐ LƯỢNG hóa đơn Chưa thanh toán (Status = 1)
+                api.get('/Invoice/list', { params: { Status: 1, PageSize: 1 } }).catch(() => ({ data: { data: { totalCount: 0 } } })),
+
+                // Gọi API lấy Hóa đơn Đã thanh toán (Status = 3) để vẽ biểu đồ doanh thu
+                api.get('/Invoice/list', { params: { Status: 3, PageSize: 2000 } }).catch(() => ({ data: { data: { items: [] } } }))
             ]);
 
+            // --- XỬ LÝ SỰ CỐ ---
             const tasks = taskRes.data?.data?.items || taskRes.data?.items || [];
-
-            // Thống kê phân loại sự cố
             const pending = tasks.filter(t => String(t.status) === '1').length;
             const processing = tasks.filter(t => String(t.status) === '2' || String(t.status) === '3').length;
             const fixed = tasks.filter(t => String(t.status) === '4').length;
             const closed = tasks.filter(t => String(t.status) === '5' || String(t.status) === 'resolved' || String(t.status) === 'closed').length;
 
+            // --- XỬ LÝ HÓA ĐƠN NỢ ---
+            // Trích xuất chuẩn xác totalCount do Backend tính toán
+            const unpaidCount = unpaidRes.data?.data?.totalCount || unpaidRes.data?.totalCount || 0;
+
+            // --- XỬ LÝ DOANH THU 6 THÁNG GẦN NHẤT ---
+            let paidInvoices = [];
+            if (Array.isArray(paidRes.data?.data?.items)) paidInvoices = paidRes.data.data.items;
+            else if (Array.isArray(paidRes.data?.items)) paidInvoices = paidRes.data.items;
+
+            const last6Months = Array.from({ length: 6 }, (_, i) => {
+                const d = new Date();
+                d.setMonth(d.getMonth() - (5 - i));
+                return {
+                    monthStr: `T${d.getMonth() + 1}`,
+                    monthNum: d.getMonth() + 1,
+                    year: d.getFullYear(),
+                    Doanh_thu: 0
+                };
+            });
+
+            paidInvoices.forEach(inv => {
+                const bMonth = inv.billingMonth ?? inv.BillingMonth;
+                const bYear = inv.billingYear ?? inv.BillingYear;
+                const money = inv.pay ?? inv.Pay ?? inv.totalMoney ?? inv.TotalMoney ?? 0;
+
+                const match = last6Months.find(m => m.monthNum === bMonth && m.year === bYear);
+                if (match) {
+                    match.Doanh_thu += money;
+                }
+            });
+
             setStats({
                 buildings: (bldRes.data?.data || bldRes.data || []).length,
                 apartments: (aptRes.data?.data || aptRes.data || []).length,
                 residents: (resRes.data?.data || resRes.data || []).length,
-                tasks: { pending, processing, fixed, closed }
+                unpaidInvoices: unpaidCount, // Hiển thị con số đếm chuẩn xác từ Backend
+                tasks: { pending, processing, fixed, closed },
+                revenueData: last6Months.map(m => ({ name: m.monthStr, Doanh_thu: m.Doanh_thu }))
             });
-        } catch (error) { console.error(error); }
-        finally { setLoadingStats(false); }
+        } catch (error) {
+            console.error("Lỗi tải thống kê Dashboard:", error);
+        } finally {
+            setLoadingStats(false);
+        }
     };
 
     const fetchNews = async () => {
@@ -132,13 +180,7 @@ const AdminDashboard = () => {
         { name: 'Đang xử lý', value: stats.tasks.processing, color: '#ffc107' },
         { name: 'Chờ nghiệm thu', value: stats.tasks.fixed, color: '#0dcaf0' },
         { name: 'Đã hoàn thành', value: stats.tasks.closed, color: '#198754' }
-    ].filter(item => item.value > 0); // Ẩn các mục có giá trị 0
-
-    const overviewBarData = [
-        { name: 'Tòa nhà', Số_lượng: stats.buildings },
-        { name: 'Căn hộ', Số_lượng: stats.apartments },
-        { name: 'Cư dân', Số_lượng: stats.residents }
-    ];
+    ].filter(item => item.value > 0);
 
     return (
         <div className="container-fluid p-0 pb-5">
@@ -148,13 +190,13 @@ const AdminDashboard = () => {
             </div>
 
             {/* ========================================== */}
-            {/* THỐNG KÊ (KPI CARDS HIỆN ĐẠI)               */}
+            {/* THỐNG KÊ (5 KPI CARDS HIỆN ĐẠI)            */}
             {/* ========================================== */}
             {loadingStats ? (
                 <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
             ) : (
-                <div className="row g-4 mb-4">
-                    <div className="col-xl-3 col-md-6">
+                <div className="row row-cols-1 row-cols-md-3 row-cols-xl-5 g-4 mb-4">
+                    <div className="col">
                         <div className="card h-100 border-0 shadow-sm rounded-4 position-relative overflow-hidden kpi-card">
                             <div className="card-body p-4 d-flex align-items-center justify-content-between">
                                 <div>
@@ -175,7 +217,7 @@ const AdminDashboard = () => {
                         </div>
                     </div>
 
-                    <div className="col-xl-3 col-md-6">
+                    <div className="col">
                         <div className="card h-100 border-0 shadow-sm rounded-4 position-relative overflow-hidden kpi-card">
                             <div className="card-body p-4 d-flex align-items-center justify-content-between">
                                 <div>
@@ -196,7 +238,7 @@ const AdminDashboard = () => {
                         </div>
                     </div>
 
-                    <div className="col-xl-3 col-md-6">
+                    <div className="col">
                         <div className="card h-100 border-0 shadow-sm rounded-4 position-relative overflow-hidden kpi-card">
                             <div className="card-body p-4 d-flex align-items-center justify-content-between">
                                 <div>
@@ -217,52 +259,85 @@ const AdminDashboard = () => {
                         </div>
                     </div>
 
-                    <div className="col-xl-3 col-md-6">
+                    <div className="col">
                         <div className="card h-100 border-0 shadow-sm rounded-4 position-relative overflow-hidden kpi-card">
                             <div className="card-body p-4 d-flex align-items-center justify-content-between">
                                 <div>
-                                    <h6 className="text-muted fw-bold mb-1 small text-uppercase">Sự cố tồn đọng</h6>
-                                    <h2 className="fw-bold mb-0 text-dark">{stats.tasks.pending + stats.tasks.processing}</h2>
+                                    <h6 className="text-muted fw-bold mb-1 small text-uppercase">Hóa Đơn Nợ</h6>
+                                    <h2 className="fw-bold mb-0 text-danger">{stats.unpaidInvoices}</h2>
                                 </div>
                                 <div className="bg-danger bg-opacity-10 p-3 rounded-circle d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
-                                    <i className="bi bi-tools text-danger fs-3"></i>
+                                    <i className="bi bi-receipt text-danger fs-3"></i>
                                 </div>
                             </div>
                             <div className="card-footer bg-white border-0 p-0">
-                                <Link to="/admin/maintenance" className="text-decoration-none d-flex align-items-center justify-content-between px-4 py-3 border-top hover-bg-light">
-                                    <span className="small text-danger fw-bold">Xem chi tiết</span>
+                                <Link to="/admin/invoices" className="text-decoration-none d-flex align-items-center justify-content-between px-4 py-3 border-top hover-bg-light">
+                                    <span className="small text-danger fw-bold">Tới trang Thu Phí</span>
                                     <i className="bi bi-arrow-right text-danger"></i>
                                 </Link>
                             </div>
                             <div className="position-absolute bottom-0 start-0 w-100 bg-danger" style={{ height: '4px' }}></div>
                         </div>
                     </div>
+
+                    <div className="col">
+                        <div className="card h-100 border-0 shadow-sm rounded-4 position-relative overflow-hidden kpi-card">
+                            <div className="card-body p-4 d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 className="text-muted fw-bold mb-1 small text-uppercase">Sự cố tồn đọng</h6>
+                                    <h2 className="fw-bold mb-0 text-info">{stats.tasks.pending + stats.tasks.processing}</h2>
+                                </div>
+                                <div className="bg-info bg-opacity-10 p-3 rounded-circle d-flex align-items-center justify-content-center" style={{ width: '60px', height: '60px' }}>
+                                    <i className="bi bi-tools text-info fs-3"></i>
+                                </div>
+                            </div>
+                            <div className="card-footer bg-white border-0 p-0">
+                                <Link to="/admin/maintenance" className="text-decoration-none d-flex align-items-center justify-content-between px-4 py-3 border-top hover-bg-light">
+                                    <span className="small text-info fw-bold">Xem chi tiết</span>
+                                    <i className="bi bi-arrow-right text-info"></i>
+                                </Link>
+                            </div>
+                            <div className="position-absolute bottom-0 start-0 w-100 bg-info" style={{ height: '4px' }}></div>
+                        </div>
+                    </div>
                 </div>
             )}
 
             {/* ========================================== */}
-            {/* BIỂU ĐỒ (CHARTS AREA)                       */}
+            {/* BIỂU ĐỒ DOANH THU & SỰ CỐ                  */}
             {/* ========================================== */}
             <div className="row g-4 mb-4">
-                <div className="col-lg-7">
+                {/* Biểu đồ Doanh Thu */}
+                <div className="col-lg-8">
                     <div className="card border-0 shadow-sm rounded-4 h-100">
                         <div className="card-header bg-white border-bottom pt-4 px-4 pb-3">
-                            <h6 className="fw-bold mb-0 text-dark"><i className="bi bi-bar-chart-fill text-primary me-2"></i> Tổng Quan Số Lượng</h6>
+                            <h6 className="fw-bold mb-0 text-dark"><i className="bi bi-graph-up-arrow text-success me-2"></i> Doanh Thu 6 Tháng Gần Nhất (VNĐ)</h6>
                         </div>
                         <div className="card-body p-4" style={{ height: '350px' }}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={overviewBarData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                <AreaChart data={stats.revenueData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#198754" stopOpacity={0.4} />
+                                            <stop offset="95%" stopColor="#198754" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e9ecef" />
                                     <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                    <YAxis axisLine={false} tickLine={false} />
-                                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-                                    <Bar dataKey="Số_lượng" fill="#0d6efd" radius={[6, 6, 0, 0]} barSize={50} />
-                                </BarChart>
+                                    <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`} />
+                                    <Tooltip
+                                        formatter={(value) => [value.toLocaleString() + ' đ', 'Doanh thu']}
+                                        contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                                    />
+                                    <Area type="monotone" dataKey="Doanh_thu" stroke="#198754" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                                </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
                 </div>
-                <div className="col-lg-5">
+
+                {/* Biểu đồ Sự Cố */}
+                <div className="col-lg-4">
                     <div className="card border-0 shadow-sm rounded-4 h-100">
                         <div className="card-header bg-white border-bottom pt-4 px-4 pb-3">
                             <h6 className="fw-bold mb-0 text-dark"><i className="bi bi-pie-chart-fill text-warning me-2"></i> Tỷ Lệ Xử Lý Sự Cố</h6>
@@ -271,7 +346,7 @@ const AdminDashboard = () => {
                             {maintenanceChartData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={maintenanceChartData} cx="50%" cy="50%" innerRadius={70} outerRadius={110} paddingAngle={5} dataKey="value">
+                                        <Pie data={maintenanceChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value">
                                             {maintenanceChartData.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.color} />
                                             ))}
@@ -289,88 +364,92 @@ const AdminDashboard = () => {
             </div>
 
             {/* ========================================== */}
-            {/* BẢNG TIN TỨC (SLIDER) CÓ NÚT BẤM TRÁI/PHẢI */}
+            {/* TỔNG QUAN BAR CHART VÀ BẢNG TIN TỨC        */}
             {/* ========================================== */}
-            <div className="card border-0 shadow-sm rounded-4 mb-4">
-                <div className="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
-                    <h5 className="fw-bold mb-0 text-dark">
-                        <i className="bi bi-newspaper text-primary me-2"></i>
-                        {showNewsTrash ? 'Thùng rác: Bảng Tin' : 'Bản tin Cư Dân'}
-                    </h5>
-                    <div className="d-flex align-items-center gap-2">
-                        {!showNewsTrash && (
-                            <button className="btn btn-primary btn-sm fw-bold rounded-pill px-3" onClick={() => handleOpenNewsModal()} data-bs-toggle="modal" data-bs-target="#newsModal">
-                                <i className="bi bi-plus-lg me-1"></i> Đăng tin
-                            </button>
-                        )}
-                        <button className={`btn btn-sm fw-bold rounded-pill px-3 ${showNewsTrash ? 'btn-secondary' : 'btn-outline-danger'}`} onClick={() => setShowNewsTrash(!showNewsTrash)}>
-                            <i className={`bi ${showNewsTrash ? 'bi-arrow-left' : 'bi-archive'} me-1`}></i>
-                            {showNewsTrash ? 'Quay lại' : 'Thùng rác'}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="card-body p-4 position-relative" onMouseEnter={() => setIsHoveringSlider(true)} onMouseLeave={() => setIsHoveringSlider(false)}>
-                    {loadingNews ? (
-                        <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
-                    ) : newsList.length === 0 ? (
-                        <div className="text-center p-5 text-muted bg-light rounded-4 border border-dashed">Chưa có bản tin nào.</div>
-                    ) : (
-                        <>
-                            {newsList.length > 3 && (
-                                <button onClick={prevSlide} className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 start-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark" style={{ width: '45px', height: '45px', marginLeft: '10px' }}>
-                                    <i className="bi bi-chevron-left fs-5"></i>
+            <div className="row g-4 mb-4">
+                {/* Bảng Tin Tức */}
+                <div className="col-lg-12">
+                    <div className="card border-0 shadow-sm rounded-4 mb-4">
+                        <div className="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
+                            <h5 className="fw-bold mb-0 text-dark">
+                                <i className="bi bi-newspaper text-primary me-2"></i>
+                                {showNewsTrash ? 'Thùng rác: Bảng Tin' : 'Bản tin Cư Dân'}
+                            </h5>
+                            <div className="d-flex align-items-center gap-2">
+                                {!showNewsTrash && (
+                                    <button className="btn btn-primary btn-sm fw-bold rounded-pill px-3" onClick={() => handleOpenNewsModal()} data-bs-toggle="modal" data-bs-target="#newsModal">
+                                        <i className="bi bi-plus-lg me-1"></i> Đăng tin
+                                    </button>
+                                )}
+                                <button className={`btn btn-sm fw-bold rounded-pill px-3 ${showNewsTrash ? 'btn-secondary' : 'btn-outline-danger'}`} onClick={() => setShowNewsTrash(!showNewsTrash)}>
+                                    <i className={`bi ${showNewsTrash ? 'bi-arrow-left' : 'bi-archive'} me-1`}></i>
+                                    {showNewsTrash ? 'Quay lại' : 'Thùng rác'}
                                 </button>
-                            )}
+                            </div>
+                        </div>
 
-                            <div className="row g-4 px-2">
-                                {getVisibleNews().map((news, index) => (
-                                    <div className="col-md-4" key={`${news.newsId}-${index}`}>
-                                        <div className={`card h-100 border rounded-4 hover-shadow-sm ${showNewsTrash ? 'bg-light' : 'bg-white'}`}>
-                                            <div className="card-body p-4 d-flex flex-column">
-                                                <div className="d-flex justify-content-between mb-3">
-                                                    <span className="badge bg-light text-dark border"><i className="bi bi-pin-angle me-1 text-primary"></i>Tin tức</span>
-                                                    <div className="dropdown">
-                                                        <i className="bi bi-three-dots text-muted cursor-pointer" data-bs-toggle="dropdown"></i>
-                                                        <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                                                            {!showNewsTrash ? (
-                                                                <>
-                                                                    <li><button className="dropdown-item small" onClick={() => handleOpenNewsModal(news)} data-bs-toggle="modal" data-bs-target="#newsModal">Sửa tin</button></li>
-                                                                    <li><button className="dropdown-item small text-danger" onClick={() => handleSoftDeleteNews(news.newsId)}>Gỡ tin</button></li>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <li><button className="dropdown-item small text-success" onClick={() => handleRestoreNews(news.newsId)}>Khôi phục</button></li>
-                                                                    <li><button className="dropdown-item small text-danger" onClick={() => handleHardDeleteNews(news.newsId)}>Xóa vĩnh viễn</button></li>
-                                                                </>
-                                                            )}
-                                                        </ul>
+                        <div className="card-body p-4 position-relative" onMouseEnter={() => setIsHoveringSlider(true)} onMouseLeave={() => setIsHoveringSlider(false)}>
+                            {loadingNews ? (
+                                <div className="text-center p-5"><div className="spinner-border text-primary"></div></div>
+                            ) : newsList.length === 0 ? (
+                                <div className="text-center p-5 text-muted bg-light rounded-4 border border-dashed">Chưa có bản tin nào.</div>
+                            ) : (
+                                <>
+                                    {newsList.length > 3 && (
+                                        <button onClick={prevSlide} className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 start-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark" style={{ width: '45px', height: '45px', marginLeft: '10px' }}>
+                                            <i className="bi bi-chevron-left fs-5"></i>
+                                        </button>
+                                    )}
+
+                                    <div className="row g-4 px-2">
+                                        {getVisibleNews().map((news, index) => (
+                                            <div className="col-md-4" key={`${news.newsId}-${index}`}>
+                                                <div className={`card h-100 border rounded-4 hover-shadow-sm ${showNewsTrash ? 'bg-light' : 'bg-white'}`}>
+                                                    <div className="card-body p-4 d-flex flex-column">
+                                                        <div className="d-flex justify-content-between mb-3">
+                                                            <span className="badge bg-light text-dark border"><i className="bi bi-pin-angle me-1 text-primary"></i>Tin tức</span>
+                                                            <div className="dropdown">
+                                                                <i className="bi bi-three-dots text-muted cursor-pointer" data-bs-toggle="dropdown"></i>
+                                                                <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                                                    {!showNewsTrash ? (
+                                                                        <>
+                                                                            <li><button className="dropdown-item small" onClick={() => handleOpenNewsModal(news)} data-bs-toggle="modal" data-bs-target="#newsModal">Sửa tin</button></li>
+                                                                            <li><button className="dropdown-item small text-danger" onClick={() => handleSoftDeleteNews(news.newsId)}>Gỡ tin</button></li>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <li><button className="dropdown-item small text-success" onClick={() => handleRestoreNews(news.newsId)}>Khôi phục</button></li>
+                                                                            <li><button className="dropdown-item small text-danger" onClick={() => handleHardDeleteNews(news.newsId)}>Xóa vĩnh viễn</button></li>
+                                                                        </>
+                                                                    )}
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                        <h6 className="fw-bold mb-2 text-dark line-clamp-2" style={{ height: '2.5rem' }}>{news.title}</h6>
+                                                        <p className="small text-muted mb-4 flex-grow-1 line-clamp-3">{news.description}</p>
+                                                        <div className="mt-auto d-flex justify-content-between align-items-center pt-3 border-top">
+                                                            <small className="text-muted fw-medium"><i className="bi bi-calendar3 me-1"></i>{formatDate(news.createdAt)}</small>
+                                                            <span className="text-primary small fw-bold cursor-pointer hover-text-dark" onClick={() => setDetailNews(news)} data-bs-toggle="modal" data-bs-target="#newsDetailModal">Chi tiết <i className="bi bi-arrow-right"></i></span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <h6 className="fw-bold mb-2 text-dark line-clamp-2" style={{ height: '2.5rem' }}>{news.title}</h6>
-                                                <p className="small text-muted mb-4 flex-grow-1 line-clamp-3">{news.description}</p>
-                                                <div className="mt-auto d-flex justify-content-between align-items-center pt-3 border-top">
-                                                    <small className="text-muted fw-medium"><i className="bi bi-calendar3 me-1"></i>{formatDate(news.createdAt)}</small>
-                                                    <span className="text-primary small fw-bold cursor-pointer hover-text-dark" onClick={() => setDetailNews(news)} data-bs-toggle="modal" data-bs-target="#newsDetailModal">Chi tiết <i className="bi bi-arrow-right"></i></span>
-                                                </div>
                                             </div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
 
-                            {newsList.length > 3 && (
-                                <button onClick={nextSlide} className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 end-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark" style={{ width: '45px', height: '45px', marginRight: '10px' }}>
-                                    <i className="bi bi-chevron-right fs-5"></i>
-                                </button>
+                                    {newsList.length > 3 && (
+                                        <button onClick={nextSlide} className="btn btn-white bg-white shadow border rounded-circle position-absolute top-50 end-0 translate-middle-y z-2 d-flex align-items-center justify-content-center hover-dark" style={{ width: '45px', height: '45px', marginRight: '10px' }}>
+                                            <i className="bi bi-chevron-right fs-5"></i>
+                                        </button>
+                                    )}
+                                </>
                             )}
-                        </>
-                    )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Các Modal (Thêm/Sửa tin, Xem chi tiết) - Đã giữ nguyên logic của bạn */}
-            {/* Modal Sửa/Thêm News */}
+            {/* Các Modal (Thêm/Sửa tin, Xem chi tiết) */}
             <div className="modal fade" id="newsModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg rounded-4">
