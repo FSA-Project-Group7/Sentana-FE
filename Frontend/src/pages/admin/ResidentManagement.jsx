@@ -25,7 +25,6 @@ const ResidentManagement = () => {
     const [formData, setFormData] = useState(initialFormState);
 
     const [viewDetailResident, setViewDetailResident] = useState(null);
-
     const [importFile, setImportFile] = useState(null);
     const [importResult, setImportResult] = useState(null);
 
@@ -33,7 +32,6 @@ const ResidentManagement = () => {
     const [isTrashMode, setIsTrashMode] = useState(false);
     const [deletedResidents, setDeletedResidents] = useState([]);
 
-    // Tự động reset trang khi đổi filter
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, filterStatus, isTrashMode]);
@@ -51,36 +49,13 @@ const ResidentManagement = () => {
         }
     };
 
-    // --- HÀM GỘP DỮ LIỆU (1 CƯ DÂN -> NHIỀU PHÒNG) ---
-    const groupResidents = (flatList) => {
-        const grouped = flatList.reduce((acc, curr) => {
-            if (!acc[curr.accountId]) {
-                acc[curr.accountId] = { ...curr, apartments: [] };
-            }
-            // Nếu có phòng và phòng chưa tồn tại trong mảng apartments của người này
-            if (curr.apartmentCode && !acc[curr.accountId].apartments.some(a => a.apartmentId === curr.apartmentId)) {
-                acc[curr.accountId].apartments.push({
-                    apartmentId: curr.apartmentId,
-                    apartmentCode: curr.apartmentCode,
-                    relationshipId: curr.relationshipId,
-                    relationshipName: getRelationshipName(curr.relationshipId, curr.relationship?.relationshipName)
-                });
-            }
-            return acc;
-        }, {});
-        return Object.values(grouped);
-    };
-
-    // --- API LẤY DATA ---
+    // --- API LẤY DATA (Đã tối ưu: KHÔNG CẦN GROUP NỮA VÌ BE ĐÃ TRẢ VỀ MẢNG) ---
     const fetchData = async () => {
         try {
             setLoading(true);
             const resData = await api.get('/Residents/GetAllResidents');
             const rList = resData.data?.data || resData.data;
-
-            // Ép kiểu mảng phẳng thành mảng gộp
-            const groupedList = groupResidents(Array.isArray(rList) ? rList : []);
-            setResidents(groupedList);
+            setResidents(Array.isArray(rList) ? rList : []);
         } catch (error) {
             notify.error("Không thể tải danh sách cư dân.");
             setResidents([]);
@@ -94,9 +69,7 @@ const ResidentManagement = () => {
             setLoading(true);
             const res = await api.get('/Residents/Deleted');
             const list = res.data?.data || res.data;
-
-            const groupedList = groupResidents(Array.isArray(list) ? list : []);
-            setDeletedResidents(groupedList);
+            setDeletedResidents(Array.isArray(list) ? list : []);
         } catch (error) {
             notify.error("Lỗi tải danh sách đã xóa.");
             setDeletedResidents([]);
@@ -120,8 +93,7 @@ const ResidentManagement = () => {
     // --- CÁC HÀM XỬ LÝ XÓA / KHÔI PHỤC ---
     const handleSoftDelete = async (id) => {
         const { isConfirmed } = await confirmDelete.fire({
-            title: 'Chuyển vào Thùng rác?',
-            text: "Bạn có chắc chắn muốn chuyển cư dân này vào danh sách đã xóa?"
+            title: 'Chuyển vào Thùng rác?', text: "Bạn có chắc chắn muốn chuyển cư dân này vào danh sách đã xóa?"
         });
         if (!isConfirmed) return;
         try {
@@ -250,13 +222,16 @@ const ResidentManagement = () => {
 
     const filteredList = activeList.filter(res => {
         const term = searchTerm.toLowerCase();
+
+        // Đảm bảo mảng apartments luôn tồn tại để tránh lỗi filter
+        const userApartments = res.apartments || res.Apartments || [];
+
         const matchSearch = term ? (
             (res.fullName?.toLowerCase() || '').includes(term) ||
             (res.code?.toLowerCase() || '').includes(term) ||
             (res.phoneNumber || '').includes(term) ||
             (res.email?.toLowerCase() || '').includes(term) ||
-            // Lọc luôn cả mã phòng
-            res.apartments.some(a => a.apartmentCode.toLowerCase().includes(term))
+            userApartments.some(a => (a.apartmentCode || a.ApartmentCode || '').toLowerCase().includes(term))
         ) : true;
 
         const matchStatus = filterStatus ? res.status === Number(filterStatus) : true;
@@ -269,7 +244,6 @@ const ResidentManagement = () => {
 
     return (
         <div className="container-fluid p-0">
-            {/* Header */}
             <div className="d-flex justify-content-between align-items-start mb-4">
                 <div>
                     <h2 className="fw-bold mb-0">Quản lý Cư dân</h2>
@@ -288,20 +262,13 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* BỘ LỌC */}
             <div className="card shadow-sm border-0 mb-4 bg-light">
                 <div className="card-body py-3">
                     <div className="row g-3">
                         <div className="col-md-6">
                             <div className="input-group">
                                 <span className="input-group-text bg-white border-end-0 text-muted"><i className="bi bi-search"></i></span>
-                                <input
-                                    type="text"
-                                    className="form-control border-start-0 ps-0"
-                                    placeholder="Tìm theo Mã cư dân, Tên, SĐT, Email hoặc Mã phòng..."
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                />
+                                <input type="text" className="form-control border-start-0 ps-0" placeholder="Tìm theo Mã cư dân, Tên, SĐT, Email hoặc Mã phòng..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
                         <div className="col-md-4">
@@ -318,7 +285,6 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* BẢNG DỮ LIỆU */}
             <div className="card shadow-sm border-0">
                 <div className="card-body p-0">
                     {loading ? (
@@ -346,6 +312,8 @@ const ResidentManagement = () => {
                                     <tbody>
                                         {currentItems.map((res, idx) => {
                                             const stt = indexOfFirstItem + idx + 1;
+                                            const userApts = res.apartments || res.Apartments || [];
+
                                             return (
                                                 <tr key={res.accountId} className={isTrashMode ? "bg-light" : ""}>
                                                     <td>{stt}</td>
@@ -361,18 +329,18 @@ const ResidentManagement = () => {
 
                                                     {/* CỘT PHÒNG Ở: Hiển thị dạng Badge + N */}
                                                     <td>
-                                                        {res.apartments && res.apartments.length > 0 ? (
+                                                        {userApts.length > 0 ? (
                                                             <div className="d-flex justify-content-center align-items-center flex-wrap gap-1">
                                                                 <span className="badge bg-info text-dark border px-2 py-1 rounded-pill shadow-sm">
-                                                                    <i className="bi bi-door-open-fill me-1"></i> {res.apartments[0].apartmentCode}
+                                                                    <i className="bi bi-door-open-fill me-1"></i> {userApts[0].apartmentCode || userApts[0].ApartmentCode}
                                                                 </span>
-                                                                {res.apartments.length > 1 && (
+                                                                {userApts.length > 1 && (
                                                                     <span
                                                                         className="badge bg-secondary bg-opacity-10 text-secondary border px-2 py-1 rounded-pill"
-                                                                        title={res.apartments.slice(1).map(a => `P.${a.apartmentCode}`).join(' | ')}
+                                                                        title={userApts.slice(1).map(a => `P.${a.apartmentCode || a.ApartmentCode}`).join(' | ')}
                                                                         style={{ cursor: 'help' }}
                                                                     >
-                                                                        +{res.apartments.length - 1} khác
+                                                                        +{userApts.length - 1} khác
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -397,10 +365,10 @@ const ResidentManagement = () => {
                                                                     <i className="bi bi-eye"></i>
                                                                 </button>
                                                                 <button className="btn btn-sm btn-outline-warning" onClick={() => handleOpenModal(res)} data-bs-toggle="modal" data-bs-target="#residentModal" title="Sửa thông tin">
-                                                                    <i className="bi bi-pencil-square"></i> Cập nhật
+                                                                    <i className="bi bi-pencil-square"></i>
                                                                 </button>
                                                                 <button className="btn btn-sm btn-outline-danger" onClick={() => handleSoftDelete(res.accountId)} title="Chuyển vào Danh sách đã xóa">
-                                                                    <i className="bi bi-trash"></i> Xóa
+                                                                    <i className="bi bi-trash"></i>
                                                                 </button>
                                                             </div>
                                                         ) : (
@@ -426,9 +394,7 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* ================================================== */}
             {/* MODAL 1: XEM CHI TIẾT CƯ DÂN & DANH SÁCH PHÒNG Ở */}
-            {/* ================================================== */}
             <div className="modal fade" id="viewDetailModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-xl modal-dialog-scrollable">
                     <div className="modal-content border-0 shadow-lg rounded-4">
@@ -441,7 +407,6 @@ const ResidentManagement = () => {
                         <div className="modal-body bg-light p-4">
                             {viewDetailResident && (
                                 <div className="row g-4">
-                                    {/* THÔNG TIN CÁ NHÂN */}
                                     <div className="col-lg-4">
                                         <div className="card border-0 shadow-sm rounded-4 h-100">
                                             <div className="card-header bg-white border-bottom-0 pt-4 pb-0">
@@ -471,37 +436,36 @@ const ResidentManagement = () => {
                                         </div>
                                     </div>
 
-                                    {/* DANH SÁCH CĂN HỘ SỞ HỮU/THUÊ */}
                                     <div className="col-lg-8">
                                         <div className="card border-0 shadow-sm rounded-4 h-100">
                                             <div className="card-header bg-white border-bottom-0 pt-4 pb-2 d-flex justify-content-between align-items-center">
                                                 <h6 className="fw-bold text-success text-uppercase mb-0">Danh sách Căn hộ & Hợp đồng</h6>
                                                 <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill">
-                                                    Tổng cộng: {viewDetailResident.apartments.length} căn
+                                                    Tổng cộng: {(viewDetailResident.apartments || viewDetailResident.Apartments || []).length} căn
                                                 </span>
                                             </div>
                                             <div className="card-body bg-light rounded-bottom-4 p-3">
-                                                {viewDetailResident.apartments.length === 0 ? (
+                                                {!(viewDetailResident.apartments || viewDetailResident.Apartments || [])?.length ? (
                                                     <div className="text-center text-muted p-5 bg-white rounded-4 border border-dashed">
                                                         <i className="bi bi-house-x display-4 d-block mb-3 opacity-25"></i>
                                                         Cư dân này hiện chưa đứng tên trên hợp đồng căn hộ nào.
                                                     </div>
                                                 ) : (
                                                     <div className="row g-3">
-                                                        {viewDetailResident.apartments.map((apt, index) => (
+                                                        {(viewDetailResident.apartments || viewDetailResident.Apartments).map((apt, index) => (
                                                             <div className="col-md-6" key={index}>
                                                                 <div className="card border shadow-sm rounded-3 hover-shadow-sm h-100">
                                                                     <div className="card-body p-3">
                                                                         <div className="d-flex justify-content-between align-items-start mb-2">
                                                                             <h5 className="fw-bold text-info mb-0">
-                                                                                <i className="bi bi-door-open-fill me-2"></i>Phòng {apt.apartmentCode}
+                                                                                <i className="bi bi-door-open-fill me-2"></i>Phòng {apt.apartmentCode || apt.ApartmentCode}
                                                                             </h5>
                                                                         </div>
                                                                         <hr className="my-2 border-secondary opacity-25" />
                                                                         <div className="d-flex align-items-center justify-content-between small">
                                                                             <span className="text-muted">Vai trò hợp đồng:</span>
                                                                             <span className={`badge ${apt.relationshipId === 1 ? 'bg-danger' : 'bg-primary'} rounded-pill`}>
-                                                                                {apt.relationshipName}
+                                                                                {apt.relationshipName || apt.RelationshipName || getRelationshipName(apt.relationshipId)}
                                                                             </span>
                                                                         </div>
                                                                     </div>
@@ -523,7 +487,7 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* MODAL 2: THÊM / SỬA CƯ DÂN (GIỮ NGUYÊN) */}
+            {/* MODAL 2: THÊM / SỬA CƯ DÂN */}
             <div className="modal fade" id="residentModal" tabIndex="-1" aria-hidden="true">
                 <div className={`modal-dialog ${editId ? 'modal-lg' : 'modal-lg modal-dialog-scrollable'}`}>
                     <div className="modal-content border-0">
@@ -540,7 +504,7 @@ const ResidentManagement = () => {
                                 <form onSubmit={handleSubmit}>
                                     <div className="modal-body">
                                         <div className="row g-3">
-                                            <div className="col-12"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông tin cá nhân</h6></div>
+                                            <div className="col-12"><h6 className="fw-bold text-primary mb-0 border-bottom pb-2">Thông-tin cá nhân</h6></div>
                                             <div className="col-md-6"><label className="form-label fw-semibold">Họ và Tên (*)</label><input type="text" className="form-control" name="fullName" value={formData.fullName} onChange={handleInputChange} required /></div>
                                             <div className="col-md-6"><label className="form-label fw-semibold">Email (*)</label><input type="email" className="form-control" name="email" value={formData.email} onChange={handleInputChange} required /></div>
                                             <div className="col-md-6"><label className="form-label fw-semibold">Số CCCD</label><input type="text" className="form-control" name="identityCard" value={formData.identityCard} onChange={handleInputChange} /></div>
@@ -565,7 +529,7 @@ const ResidentManagement = () => {
                 </div>
             </div>
 
-            {/* MODAL 3: IMPORT EXCEL (GIỮ NGUYÊN) */}
+            {/* MODAL 3: IMPORT EXCEL */}
             <div className="modal fade" id="importModal" tabIndex="-1" aria-hidden="true">
                 <div className="modal-dialog modal-lg">
                     <div className="modal-content">
