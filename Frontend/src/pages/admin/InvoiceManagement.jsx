@@ -223,9 +223,6 @@ const InvoiceManagement = () => {
                     <h2 className="fw-bold mb-0">Quản lý Hóa Đơn</h2>
                     <div className="text-muted small mt-2">Sinh hóa đơn định kỳ, cộng phụ phí và gửi nhắc nợ</div>
                 </div>
-                <button className="btn btn-primary" onClick={() => openModal('generate')}>
-                    <i className="bi bi-magic me-2"></i> Sinh Hóa Đơn Tự Động
-                </button>
             </div>
 
             <div className="card shadow-sm border-0 mb-4 bg-light">
@@ -355,62 +352,7 @@ const InvoiceManagement = () => {
 
             {activeModal && <div className="modal-backdrop fade show"></div>}
 
-            {/* --- MODAL 1: SINH HÓA ĐƠN --- */}
-            {activeModal === 'generate' && (
-                <div className="modal fade show d-block" tabIndex="-1">
-                    <div className="modal-dialog">
-                        <div className="modal-content">
-                            <div className="modal-header bg-primary text-white">
-                                <h5 className="modal-title fw-bold">Sinh Hóa Đơn Tự Động</h5>
-                                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
-                            </div>
-                            <form onSubmit={handleGenerate}>
-                                <div className="modal-body">
-                                    <div className="alert alert-info small">
-                                        <i className="bi bi-info-circle me-1"></i>
-                                        Hệ thống sẽ tự động tổng hợp Tiền phòng, Điện, Nước và Phí dịch vụ của tháng được chọn.
-                                    </div>
-                                    <div className="row g-3">
-                                        <div className="col-6">
-                                            <label className="form-label fw-semibold">Tháng (*)</label>
-                                            <select className="form-select" name="genMonth" value={formData.genMonth} onChange={handleInputChange} required>
-                                                {[...Array(12).keys()].map(m => (
-                                                    <option key={m + 1} value={m + 1}>Tháng {m + 1}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="col-6">
-                                            <label className="form-label fw-semibold">Năm (*)</label>
-                                            <select className="form-select" name="genYear" value={formData.genYear} onChange={handleInputChange} required>
-                                                {availableYears.map(y => (
-                                                    <option key={y} value={y}>Năm {y}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="col-12">
-                                            <label className="form-label fw-semibold">Áp dụng cho phòng</label>
-                                            <select className="form-select" name="genApartmentId" value={formData.genApartmentId} onChange={handleInputChange}>
-                                                <option value="">-- Tất cả phòng đang thuê --</option>
-                                                {apartments.filter(a => a.status === 2).map(apt => (
-                                                    <option key={apt.apartmentId} value={apt.apartmentId}>{apt.apartmentCode} - {apt.apartmentName}</option>
-                                                ))}
-                                            </select>
-                                            <small className="text-muted mt-1 d-block">* Để trống nếu muốn tính tiền cho toàn bộ hệ thống.</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="modal-footer bg-light">
-                                    <button type="button" className="btn btn-secondary" onClick={closeModal}>Hủy</button>
-                                    <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                                        {isSubmitting ? 'Đang xử lý...' : 'Bắt đầu Tạo'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            
             {/* --- MODAL 2: THÊM PHỤ PHÍ --- */}
             {activeModal === 'edit' && (
                 <div className="modal fade show d-block" tabIndex="-1">
